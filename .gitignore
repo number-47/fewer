@@ -1,0 +1,7 @@
+.build/
+Config/Signing.local.xcconfig
+*.xcuserstate
+xcuserdata/
+.DS_Store
+node_modules
+*.inspect.ndjson

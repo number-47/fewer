@@ -96,7 +96,7 @@ flowchart LR
     Finder["Finder Sync Extension<br/>原生右键菜单"]
     Helper["Shortcut Helper<br/>Finder 快捷键"]
     Core["FewerCore<br/>模型与文件操作"]
-    Group["App Group<br/>设置、模板、剪切事务"]
+    Group["共享数据目录<br/>设置、模板、剪切事务"]
 
     App --> Core
     Finder --> Core
@@ -118,6 +118,7 @@ flowchart LR
 - 继承 `FIFinderSync`，通过 `menu(for:)` 返回原生 `NSMenu`。
 - 使用 `FIFinderSyncController` 读取当前选中项和目标目录。
 - 注册需要显示菜单的目录范围；第一版覆盖用户可访问的本地目录和已挂载卷，并在权限受限位置自然降级。
+- 扩展保持 App Sandbox，并使用文件读写临时例外执行用户明确触发的任意目录操作；该能力按官网直装发行设计，提交 App Store 前需重新评估和说明例外用途。
 - 不实现徽标和目录观察业务，避免无关工作影响 Finder 性能。
 - 菜单构建只读取轻量配置，耗时文件操作移出菜单构建主路径。
 
@@ -161,7 +162,7 @@ SwiftUI 和 AppKit 不各自维护第二份业务状态。主应用、扩展和�
 
 ### 5.3 菜单规则
 
-- 菜单开关和排序在设置修改后写入 App Group，扩展下一次构建菜单时读取新值。
+- 菜单开关和排序在设置修改后写入 `~/Library/Application Support/Fewer/Shared`，扩展下一次构建菜单时读取新值。
 - 没有选中项时不显示文件项操作。
 - 剪切事务无有效源文件时不显示粘贴操作。
 - 不支持的只读或受保护位置中，“New File”和“Paste”保持可诊断的禁用状态，避免点击后无反馈。

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-run}"
+APP_NAME="Fewer"
+HELPER_NAME="FewerShortcutHelper"
+FINDER_EXTENSION_NAME="FewerFinderExtension"
+FINDER_EXTENSION_ID="com.number47.fewer.finder-extension"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DERIVED_DATA="$PROJECT_ROOT/.build/DerivedData"
+APP_BUNDLE="$DERIVED_DATA/Build/Products/Debug/Fewer.app"
+APP_BINARY="$APP_BUNDLE/Contents/MacOS/Fewer"
+
+pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+pkill -x "$HELPER_NAME" >/dev/null 2>&1 || true
+pkill -x "$FINDER_EXTENSION_NAME" >/dev/null 2>&1 || true
+
+cd "$PROJECT_ROOT"
+xcodegen generate
+xcodebuild \
+  -project Fewer.xcodeproj \
+  -scheme Fewer \
+  -configuration Debug \
+  -derivedDataPath "$DERIVED_DATA" \
+  SYMROOT="$DERIVED_DATA/Build/Products" \
+  OBJROOT="$DERIVED_DATA/Build/Intermediates.noindex" \
+  CODE_SIGNING_ALLOWED=NO \
+  build | xcbeautify
+
+sign_macos_bundle() {
+  local bundle="$1"
+  local entitlements="$2"
+  while IFS= read -r binary; do
+    /usr/bin/codesign --force --sign - "$binary"
+  done < <(/usr/bin/find "$bundle/Contents/MacOS" -type f \( -name '*.dylib' -o -perm -111 \))
+  /usr/bin/codesign --force --sign - --entitlements "$entitlements" "$bundle"
+}
+
+sign_macos_bundle \
+  "$APP_BUNDLE/Contents/PlugIns/FewerFinderExtension.appex" \
+  "$PROJECT_ROOT/FewerFinderExtension/FewerFinderExtension.entitlements"
+sign_macos_bundle \
+  "$APP_BUNDLE/Contents/Library/LoginItems/FewerShortcutHelper.app" \
+  "$PROJECT_ROOT/FewerShortcutHelper/FewerShortcutHelper.entitlements"
+sign_macos_bundle "$APP_BUNDLE" "$PROJECT_ROOT/FewerApp/Fewer.entitlements"
+/usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
+/usr/bin/pluginkit -a "$APP_BUNDLE/Contents/PlugIns/FewerFinderExtension.appex"
+/usr/bin/pluginkit -e use -i "$FINDER_EXTENSION_ID"
+
+open_app() {
+  /usr/bin/open -n "$APP_BUNDLE"
+}
+
+case "$MODE" in
+  run)
+    open_app
+    ;;
+  --debug|debug)
+    lldb -- "$APP_BINARY"
+    ;;
+  --logs|logs)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate 'process == "Fewer" OR process == "FewerFinderExtension" OR process == "FewerShortcutHelper"'
+    ;;
+  --telemetry|telemetry)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate 'subsystem BEGINSWITH "com.number47.fewer"'
+    ;;
+  --verify|verify)
+    test -d "$APP_BUNDLE/Contents/PlugIns/FewerFinderExtension.appex"
+    test -d "$APP_BUNDLE/Contents/Library/LoginItems/FewerShortcutHelper.app"
+    open_app
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      if pgrep -x "$APP_NAME" >/dev/null; then
+        exit 0
+      fi
+      sleep 1
+    done
+    echo "Fewer did not launch within 10 seconds" >&2
+    exit 1
+    ;;
+  *)
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    exit 2
+    ;;
+esac

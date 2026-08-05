@@ -1,0 +1,1200 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0656680B2C4131F4E8C7C468 /* SharedSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430103A240A0ADBA6602CFD4 /* SharedSettingsStore.swift */; };
+		0970952846ACB82A8BE651E2 /* ExcelWorkbook.xlsx in Resources */ = {isa = PBXBuildFile; fileRef = 114EBEE2BCF0E3F316D9736F /* ExcelWorkbook.xlsx */; };
+		14CCCF4FDB47A825C09AB0C8 /* FewerVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0155D67E2F30B665E379D /* FewerVersion.swift */; };
+		17090C268020FF5F08184A30 /* TemplateSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A683A7A030197CBDFF60FC65 /* TemplateSettingsView.swift */; };
+		189982D48E3F5B1DBA1AE7CF /* ExtensionStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0142F0BB91E18752AA48161B /* ExtensionStatusService.swift */; };
+		1CFCECA0EFB6B33FF7315ACB /* ShortcutHelperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39B1888298D269F8B4733B8D /* ShortcutHelperApp.swift */; };
+		260E232621F12FBC0961ED83 /* JSON.json in Resources */ = {isa = PBXBuildFile; fileRef = E486E0C370001BDD1F254F2D /* JSON.json */; };
+		26405D23D1CE516DCDBB93F0 /* RootSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2627C6E9227CE2954509FB90 /* RootSettingsView.swift */; };
+		27B3C39D1F4F730CB00BC729 /* libFewerCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */; };
+		29F3DB16406BEA3BD4DD557B /* PowerPointPresentation.pptx in Resources */ = {isa = PBXBuildFile; fileRef = F660A6AF69A4B53BD4DE2C74 /* PowerPointPresentation.pptx */; };
+		30A5A572FB43C114AB54CB37 /* CutTransaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B14690F0109FC1301C39F29 /* CutTransaction.swift */; };
+		31A6D6CFAF3604851BDBC8F2 /* JSON.json in Resources */ = {isa = PBXBuildFile; fileRef = E486E0C370001BDD1F254F2D /* JSON.json */; };
+		378A12491F746AE53039BD0B /* FileOperationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2B5D5B09515F2B4D82DA2AB /* FileOperationCoordinator.swift */; };
+		3A18C88DC050530E2F32C175 /* libFewerCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */; };
+		3B10C42D651063E616004627 /* PlainText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */; };
+		3CCE98766A9F41E21C8F8C45 /* PathFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3044175E13BAA149D682285 /* PathFormatter.swift */; };
+		4642A3C08C52D93D7F546110 /* CSV.csv in Resources */ = {isa = PBXBuildFile; fileRef = 47314DC883D7AF703A400FFA /* CSV.csv */; };
+		502589B2177ED0C6FCE349CA /* Markdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 5DCBAB18206B48A164123D21 /* Markdown.md */; };
+		542E572929FDB232A7AA413F /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5E301AF55F9B6EE11F99F2 /* PermissionService.swift */; };
+		57BEFDF0DD4772CDA4A816E5 /* libFewerCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */; };
+		5A8D5A1C243D786C624327AE /* CSV.csv in Resources */ = {isa = PBXBuildFile; fileRef = 47314DC883D7AF703A400FFA /* CSV.csv */; };
+		608B865F831C295B1CF3AEE0 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C62DCDB91E7F90DF163CA4 /* MenuBuilder.swift */; };
+		627DE8E1AB98B4733946A8E1 /* SettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71A478AA0E53057EBBD40FEB /* SettingsSection.swift */; };
+		6536B8877F98B388F48C1AF0 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9D9E5D45B52039A847259B /* MenuModels.swift */; };
+		6B88FFE67A4095218C9519E1 /* FinderShortcutRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034A2AEFFDCF559A28935C8B /* FinderShortcutRouter.swift */; };
+		6F0024D1552867B58C92CEC8 /* FileOperationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 222B85A537EDCCB6ACA874E4 /* FileOperationCoordinatorTests.swift */; };
+		6F0FCFBB2AE077A333E6B2CF /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D664B4F5CC892E173398ED51 /* OverviewView.swift */; };
+		70867DFE76C3681593F4707A /* PasteboardCutBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 726CC1F5787677155743F432 /* PasteboardCutBridge.swift */; };
+		74A848DADACB455C338EC9BA /* FinderActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7D83F8016118A27A45DD9D0 /* FinderActionHandler.swift */; };
+		79A9AE0E06FBD94FBBF1EB32 /* ConflictNameResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751E7709532065ED071D6A32 /* ConflictNameResolverTests.swift */; };
+		86D59A17D888D466EC1DA5BE /* FinderShortcutRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A2C7FEE3C2050BAF4E64DAF /* FinderShortcutRouterTests.swift */; };
+		8CE0DB0FD316A833A26935B4 /* FewerVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57DF1E903FFD79FEA38D3F4D /* FewerVersionTests.swift */; };
+		8FF07D97267E2F651A53637E /* TemplateDescriptor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEBCA91B54000C6B9323909E /* TemplateDescriptor.swift */; };
+		8FF0CB5C7350747658D8ACAD /* libFewerCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */; };
+		949DE44A5713092ABF37D5E2 /* ShortcutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D62C76B6813F26DAACAF664E /* ShortcutModels.swift */; };
+		97F8EA3907AB5835EDB71A6D /* ShortcutSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4811BEC760F14C4DF93D57 /* ShortcutSettingsView.swift */; };
+		9E37B0BD3764CB6462BF6C0F /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = EA2D10252461A2630E1E7272 /* .gitkeep */; };
+		A484496FFE810A8097BF50FC /* PlainText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */; };
+		A716777F20D5CBB58F3835B5 /* FeatureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DDE5E3ADB8E59CDC65169A /* FeatureSettings.swift */; };
+		AF3E095DCF2309015DC5340F /* FinderMenuContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3F67DB14875969F7570D7E /* FinderMenuContext.swift */; };
+		B0E1FF8A3FB0A493DEC44375 /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = EA2D10252461A2630E1E7272 /* .gitkeep */; };
+		B50C3C2339D97F70D64308D3 /* FewerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F40E178A5381E4C89D4E2A /* FewerApp.swift */; };
+		B539B2512349EA081679F4C6 /* FinderMenuAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D12004B26EBB220F3925A0 /* FinderMenuAdapter.swift */; };
+		BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F16C21A119618BD4EED9C6 /* AppGroupConstants.swift */; };
+		BE4A3EDA08B513201EBE1C81 /* TemplateStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CB2C7EF7DD29381B6E49AB /* TemplateStoreTests.swift */; };
+		C007E0E7EA4E336F9ADE7120 /* CutTransactionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */; };
+		C00A7E01DF9284EF5D4B9AAF /* FinderSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FD09E799CC7609BCE2DB189 /* FinderSync.swift */; };
+		C0543AFA9613BD018480AA64 /* PowerPointPresentation.pptx in Resources */ = {isa = PBXBuildFile; fileRef = F660A6AF69A4B53BD4DE2C74 /* PowerPointPresentation.pptx */; };
+		C07F46B1B1889B683C982C5A /* WordDocument.docx in Resources */ = {isa = PBXBuildFile; fileRef = 8C4772AAF25AABDB8D5903D3 /* WordDocument.docx */; };
+		C2CAD7750E3195F02851D062 /* TemplateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3998FE40A4A92799B1318DA /* TemplateStore.swift */; };
+		CCA75B996F080F0A4E6798B8 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5555E76441DC981E08EB8844 /* GeneralSettingsView.swift */; };
+		D0986492EABA3959ADB2CC27 /* ConflictNameResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDDAB82FC4FD5AA342676BD /* ConflictNameResolver.swift */; };
+		D11F04F640D19B32AF433655 /* CutTransactionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE26BBF7A5FC7385D5E1537F /* CutTransactionStoreTests.swift */; };
+		D3C75378A1CB2C4F5A8D61DC /* MenuBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D82FC1E5CEE5597FE0CBFDD1 /* MenuBuilderTests.swift */; };
+		D4EFFA5349F39EFEC0ED7D1C /* FileOperationResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC6B0C5A1CF3E12AB3D1FAF8 /* FileOperationResult.swift */; };
+		D508FAD0FB6F4D33FE066641 /* WordDocument.docx in Resources */ = {isa = PBXBuildFile; fileRef = 8C4772AAF25AABDB8D5903D3 /* WordDocument.docx */; };
+		DC8BBB92C6B5EFCA078872FA /* ExcelWorkbook.xlsx in Resources */ = {isa = PBXBuildFile; fileRef = 114EBEE2BCF0E3F316D9736F /* ExcelWorkbook.xlsx */; };
+		EAB8BC6D5DDAB41ECEBFB976 /* ContextMenuSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72C6C0607F552A371AB6D27 /* ContextMenuSettingsView.swift */; };
+		EDCF248BA290E912AB9E3272 /* SharedSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC575139904B0CFCF160C8F /* SharedSettingsStoreTests.swift */; };
+		EE44B73DB9EEDFFC29862E20 /* PathFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFF1411645E54268D5850CE1 /* PathFormatterTests.swift */; };
+		EE4E989506357893DB684AD3 /* FewerFinderExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E5EE696B38C35981E774928F /* FewerFinderExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F475E5E48D568B1326A6C020 /* TemplateFileCreator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A47411330D7B10DE342D95 /* TemplateFileCreator.swift */; };
+		F7F75A54BBD375202A1948AE /* EventTapController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84FF39755B17BFEC9FB885B /* EventTapController.swift */; };
+		F859001DB2E8E82AADDD25B2 /* TemplateManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004F4C2A39A8BF5043549D0A /* TemplateManifest.swift */; };
+		FCDC27F213C7CB0578F8F28D /* Markdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 5DCBAB18206B48A164123D21 /* Markdown.md */; };
+		FF87E7F274C71B6B9832D7D9 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF6ABD6CF2C6836E7F083EF /* SettingsViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		01ABEFACDE3F85DFFE5B910D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E778179DCBD554885B35E655;
+			remoteInfo = FewerShortcutHelper;
+		};
+		1BEB42E9AB8EAD8B999EECA7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B12B03D86A020A1364832F1E;
+			remoteInfo = FewerFinderExtension;
+		};
+		3A20CC75D8615012EF0A1833 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DAEB9ABFDF0EA0D63B7175D3;
+			remoteInfo = FewerCore;
+		};
+		8C3719FE923E19AB037249D9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DAEB9ABFDF0EA0D63B7175D3;
+			remoteInfo = FewerCore;
+		};
+		9C73BA00263C2E9FA645349E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DAEB9ABFDF0EA0D63B7175D3;
+			remoteInfo = FewerCore;
+		};
+		C7A6C58F34753EB6287E3885 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E86381287456766201C270D6 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DAEB9ABFDF0EA0D63B7175D3;
+			remoteInfo = FewerCore;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		EEF38AE5BEB701E4FB554490 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				EE4E989506357893DB684AD3 /* FewerFinderExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		004F4C2A39A8BF5043549D0A /* TemplateManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateManifest.swift; sourceTree = "<group>"; };
+		0142F0BB91E18752AA48161B /* ExtensionStatusService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStatusService.swift; sourceTree = "<group>"; };
+		034A2AEFFDCF559A28935C8B /* FinderShortcutRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderShortcutRouter.swift; sourceTree = "<group>"; };
+		094A98D34253A6AFEC7D292B /* Fewer.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Fewer.entitlements; sourceTree = "<group>"; };
+		114EBEE2BCF0E3F316D9736F /* ExcelWorkbook.xlsx */ = {isa = PBXFileReference; path = ExcelWorkbook.xlsx; sourceTree = "<group>"; };
+		1DE1364A00CF4A76960D5B23 /* FewerFinderExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FewerFinderExtension.entitlements; sourceTree = "<group>"; };
+		222B85A537EDCCB6ACA874E4 /* FileOperationCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationCoordinatorTests.swift; sourceTree = "<group>"; };
+		25B5CC1F8A0E499768B1D2E7 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2627C6E9227CE2954509FB90 /* RootSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootSettingsView.swift; sourceTree = "<group>"; };
+		2C4376AD2525EACD08426FD3 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
+		2F3A7C61EF67BF66E65B9903 /* FewerCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FewerCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FD09E799CC7609BCE2DB189 /* FinderSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSync.swift; sourceTree = "<group>"; };
+		32A47411330D7B10DE342D95 /* TemplateFileCreator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateFileCreator.swift; sourceTree = "<group>"; };
+		3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libFewerCore.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		39B1888298D269F8B4733B8D /* ShortcutHelperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutHelperApp.swift; sourceTree = "<group>"; };
+		3A2C7FEE3C2050BAF4E64DAF /* FinderShortcutRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderShortcutRouterTests.swift; sourceTree = "<group>"; };
+		430103A240A0ADBA6602CFD4 /* SharedSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSettingsStore.swift; sourceTree = "<group>"; };
+		47314DC883D7AF703A400FFA /* CSV.csv */ = {isa = PBXFileReference; path = CSV.csv; sourceTree = "<group>"; };
+		47F40E178A5381E4C89D4E2A /* FewerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerApp.swift; sourceTree = "<group>"; };
+		4B4811BEC760F14C4DF93D57 /* ShortcutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutSettingsView.swift; sourceTree = "<group>"; };
+		4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = PlainText.txt; sourceTree = "<group>"; };
+		52BDCE7A09C42B34E4EA696A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		5555E76441DC981E08EB8844 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
+		57DF1E903FFD79FEA38D3F4D /* FewerVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerVersionTests.swift; sourceTree = "<group>"; };
+		5DCBAB18206B48A164123D21 /* Markdown.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Markdown.md; sourceTree = "<group>"; };
+		60F16C21A119618BD4EED9C6 /* AppGroupConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupConstants.swift; sourceTree = "<group>"; };
+		6B14690F0109FC1301C39F29 /* CutTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutTransaction.swift; sourceTree = "<group>"; };
+		71A478AA0E53057EBBD40FEB /* SettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSection.swift; sourceTree = "<group>"; };
+		726CC1F5787677155743F432 /* PasteboardCutBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardCutBridge.swift; sourceTree = "<group>"; };
+		73D12004B26EBB220F3925A0 /* FinderMenuAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderMenuAdapter.swift; sourceTree = "<group>"; };
+		751E7709532065ED071D6A32 /* ConflictNameResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictNameResolverTests.swift; sourceTree = "<group>"; };
+		75CB2C7EF7DD29381B6E49AB /* TemplateStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateStoreTests.swift; sourceTree = "<group>"; };
+		8C4772AAF25AABDB8D5903D3 /* WordDocument.docx */ = {isa = PBXFileReference; path = WordDocument.docx; sourceTree = "<group>"; };
+		8EC575139904B0CFCF160C8F /* SharedSettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSettingsStoreTests.swift; sourceTree = "<group>"; };
+		91C62DCDB91E7F90DF163CA4 /* MenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilder.swift; sourceTree = "<group>"; };
+		9CB22F9A21FE0C16396C640B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9E7B6F86D811CE26136DAD15 /* Fewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Fewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A3DDE5E3ADB8E59CDC65169A /* FeatureSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureSettings.swift; sourceTree = "<group>"; };
+		A683A7A030197CBDFF60FC65 /* TemplateSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateSettingsView.swift; sourceTree = "<group>"; };
+		A72C6C0607F552A371AB6D27 /* ContextMenuSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMenuSettingsView.swift; sourceTree = "<group>"; };
+		A84FF39755B17BFEC9FB885B /* EventTapController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventTapController.swift; sourceTree = "<group>"; };
+		ADDDAB82FC4FD5AA342676BD /* ConflictNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictNameResolver.swift; sourceTree = "<group>"; };
+		B40FAD864CDBF83CEE13AEF6 /* FewerShortcutHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FewerShortcutHelper.entitlements; sourceTree = "<group>"; };
+		BC6B0C5A1CF3E12AB3D1FAF8 /* FileOperationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationResult.swift; sourceTree = "<group>"; };
+		CBF6ABD6CF2C6836E7F083EF /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		CE26BBF7A5FC7385D5E1537F /* CutTransactionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutTransactionStoreTests.swift; sourceTree = "<group>"; };
+		CF3F67DB14875969F7570D7E /* FinderMenuContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderMenuContext.swift; sourceTree = "<group>"; };
+		D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutTransactionStore.swift; sourceTree = "<group>"; };
+		D3044175E13BAA149D682285 /* PathFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathFormatter.swift; sourceTree = "<group>"; };
+		D62C76B6813F26DAACAF664E /* ShortcutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutModels.swift; sourceTree = "<group>"; };
+		D664B4F5CC892E173398ED51 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		D7D83F8016118A27A45DD9D0 /* FinderActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderActionHandler.swift; sourceTree = "<group>"; };
+		D82FC1E5CEE5597FE0CBFDD1 /* MenuBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilderTests.swift; sourceTree = "<group>"; };
+		DC9D9E5D45B52039A847259B /* MenuModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModels.swift; sourceTree = "<group>"; };
+		E0A0155D67E2F30B665E379D /* FewerVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerVersion.swift; sourceTree = "<group>"; };
+		E2B5D5B09515F2B4D82DA2AB /* FileOperationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationCoordinator.swift; sourceTree = "<group>"; };
+		E3998FE40A4A92799B1318DA /* TemplateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateStore.swift; sourceTree = "<group>"; };
+		E486E0C370001BDD1F254F2D /* JSON.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = JSON.json; sourceTree = "<group>"; };
+		E5EE696B38C35981E774928F /* FewerFinderExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FewerFinderExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA2D10252461A2630E1E7272 /* .gitkeep */ = {isa = PBXFileReference; path = .gitkeep; sourceTree = "<group>"; };
+		F660A6AF69A4B53BD4DE2C74 /* PowerPointPresentation.pptx */ = {isa = PBXFileReference; path = PowerPointPresentation.pptx; sourceTree = "<group>"; };
+		F6FBDA306F4F73BB93F4F839 /* FewerShortcutHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FewerShortcutHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA5E301AF55F9B6EE11F99F2 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
+		FEBCA91B54000C6B9323909E /* TemplateDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateDescriptor.swift; sourceTree = "<group>"; };
+		FFF1411645E54268D5850CE1 /* PathFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathFormatterTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		075A04460FB7EEA0B6CF1E6B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3A18C88DC050530E2F32C175 /* libFewerCore.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		640F09F928BCBAE68FBCE2FE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				57BEFDF0DD4772CDA4A816E5 /* libFewerCore.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7C4D1AFA15E5D9513258793C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				27B3C39D1F4F730CB00BC729 /* libFewerCore.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		91D0A113C79B882559C3F5AF /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8FF0CB5C7350747658D8ACAD /* libFewerCore.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		24449DDC86017A1B2384B8DF /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A72C6C0607F552A371AB6D27 /* ContextMenuSettingsView.swift */,
+				5555E76441DC981E08EB8844 /* GeneralSettingsView.swift */,
+				D664B4F5CC892E173398ED51 /* OverviewView.swift */,
+				2627C6E9227CE2954509FB90 /* RootSettingsView.swift */,
+				4B4811BEC760F14C4DF93D57 /* ShortcutSettingsView.swift */,
+				A683A7A030197CBDFF60FC65 /* TemplateSettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		3715989C73CC678B7358538E /* Menu */ = {
+			isa = PBXGroup;
+			children = (
+				CF3F67DB14875969F7570D7E /* FinderMenuContext.swift */,
+				91C62DCDB91E7F90DF163CA4 /* MenuBuilder.swift */,
+				DC9D9E5D45B52039A847259B /* MenuModels.swift */,
+			);
+			path = Menu;
+			sourceTree = "<group>";
+		};
+		39FAAF4AE429ADF78B4852DE /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				4E9AB83A37DDF7185F006791 /* Templates */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		3A3FBFBF728E0F1B68949E6E /* FewerShortcutHelper */ = {
+			isa = PBXGroup;
+			children = (
+				A84FF39755B17BFEC9FB885B /* EventTapController.swift */,
+				B40FAD864CDBF83CEE13AEF6 /* FewerShortcutHelper.entitlements */,
+				25B5CC1F8A0E499768B1D2E7 /* Info.plist */,
+				726CC1F5787677155743F432 /* PasteboardCutBridge.swift */,
+				39B1888298D269F8B4733B8D /* ShortcutHelperApp.swift */,
+			);
+			path = FewerShortcutHelper;
+			sourceTree = "<group>";
+		};
+		4E9AB83A37DDF7185F006791 /* Templates */ = {
+			isa = PBXGroup;
+			children = (
+				EA2D10252461A2630E1E7272 /* .gitkeep */,
+				47314DC883D7AF703A400FFA /* CSV.csv */,
+				114EBEE2BCF0E3F316D9736F /* ExcelWorkbook.xlsx */,
+				E486E0C370001BDD1F254F2D /* JSON.json */,
+				5DCBAB18206B48A164123D21 /* Markdown.md */,
+				4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */,
+				F660A6AF69A4B53BD4DE2C74 /* PowerPointPresentation.pptx */,
+				8C4772AAF25AABDB8D5903D3 /* WordDocument.docx */,
+			);
+			path = Templates;
+			sourceTree = "<group>";
+		};
+		55B4382E3A3E33F2427F8A2C /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */,
+				E2B5D5B09515F2B4D82DA2AB /* FileOperationCoordinator.swift */,
+				034A2AEFFDCF559A28935C8B /* FinderShortcutRouter.swift */,
+				430103A240A0ADBA6602CFD4 /* SharedSettingsStore.swift */,
+				32A47411330D7B10DE342D95 /* TemplateFileCreator.swift */,
+				004F4C2A39A8BF5043549D0A /* TemplateManifest.swift */,
+				E3998FE40A4A92799B1318DA /* TemplateStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		5F02DC70884A0C1C46BF0763 /* FewerApp */ = {
+			isa = PBXGroup;
+			children = (
+				094A98D34253A6AFEC7D292B /* Fewer.entitlements */,
+				9CB22F9A21FE0C16396C640B /* Info.plist */,
+				91C3D3588BBBF8DAA5F73EAB /* App */,
+				B1E3F9589327DB353C78C704 /* Models */,
+				646E94963BBBFF737006E6DA /* Services */,
+				24449DDC86017A1B2384B8DF /* Views */,
+			);
+			path = FewerApp;
+			sourceTree = "<group>";
+		};
+		646E94963BBBFF737006E6DA /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				0142F0BB91E18752AA48161B /* ExtensionStatusService.swift */,
+				FA5E301AF55F9B6EE11F99F2 /* PermissionService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		6D770B13AEBC2F0632F90FB8 = {
+			isa = PBXGroup;
+			children = (
+				A6556303394C374F041BBB21 /* Config */,
+				5F02DC70884A0C1C46BF0763 /* FewerApp */,
+				A2A05BAAEFD8BE7104820B67 /* FewerCore */,
+				A1748EB9C97D49E92979B878 /* FewerCoreTests */,
+				B66A2074E71A89DE4AE412BF /* FewerFinderExtension */,
+				3A3FBFBF728E0F1B68949E6E /* FewerShortcutHelper */,
+				39FAAF4AE429ADF78B4852DE /* Resources */,
+				CFE838BED8EA4B01E0C3386D /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		91C3D3588BBBF8DAA5F73EAB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				47F40E178A5381E4C89D4E2A /* FewerApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A1748EB9C97D49E92979B878 /* FewerCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				751E7709532065ED071D6A32 /* ConflictNameResolverTests.swift */,
+				CE26BBF7A5FC7385D5E1537F /* CutTransactionStoreTests.swift */,
+				57DF1E903FFD79FEA38D3F4D /* FewerVersionTests.swift */,
+				222B85A537EDCCB6ACA874E4 /* FileOperationCoordinatorTests.swift */,
+				3A2C7FEE3C2050BAF4E64DAF /* FinderShortcutRouterTests.swift */,
+				D82FC1E5CEE5597FE0CBFDD1 /* MenuBuilderTests.swift */,
+				FFF1411645E54268D5850CE1 /* PathFormatterTests.swift */,
+				8EC575139904B0CFCF160C8F /* SharedSettingsStoreTests.swift */,
+				75CB2C7EF7DD29381B6E49AB /* TemplateStoreTests.swift */,
+			);
+			path = FewerCoreTests;
+			sourceTree = "<group>";
+		};
+		A2A05BAAEFD8BE7104820B67 /* FewerCore */ = {
+			isa = PBXGroup;
+			children = (
+				3715989C73CC678B7358538E /* Menu */,
+				C47F5FBA5989C1C056B077CC /* Models */,
+				55B4382E3A3E33F2427F8A2C /* Services */,
+				AF3439E174AA0488CE7D1D43 /* Support */,
+			);
+			path = FewerCore;
+			sourceTree = "<group>";
+		};
+		A6556303394C374F041BBB21 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				2C4376AD2525EACD08426FD3 /* Base.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		AF3439E174AA0488CE7D1D43 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				60F16C21A119618BD4EED9C6 /* AppGroupConstants.swift */,
+				ADDDAB82FC4FD5AA342676BD /* ConflictNameResolver.swift */,
+				E0A0155D67E2F30B665E379D /* FewerVersion.swift */,
+				D3044175E13BAA149D682285 /* PathFormatter.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		B1E3F9589327DB353C78C704 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				71A478AA0E53057EBBD40FEB /* SettingsSection.swift */,
+				CBF6ABD6CF2C6836E7F083EF /* SettingsViewModel.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B66A2074E71A89DE4AE412BF /* FewerFinderExtension */ = {
+			isa = PBXGroup;
+			children = (
+				1DE1364A00CF4A76960D5B23 /* FewerFinderExtension.entitlements */,
+				D7D83F8016118A27A45DD9D0 /* FinderActionHandler.swift */,
+				73D12004B26EBB220F3925A0 /* FinderMenuAdapter.swift */,
+				2FD09E799CC7609BCE2DB189 /* FinderSync.swift */,
+				52BDCE7A09C42B34E4EA696A /* Info.plist */,
+			);
+			path = FewerFinderExtension;
+			sourceTree = "<group>";
+		};
+		C47F5FBA5989C1C056B077CC /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				6B14690F0109FC1301C39F29 /* CutTransaction.swift */,
+				A3DDE5E3ADB8E59CDC65169A /* FeatureSettings.swift */,
+				BC6B0C5A1CF3E12AB3D1FAF8 /* FileOperationResult.swift */,
+				D62C76B6813F26DAACAF664E /* ShortcutModels.swift */,
+				FEBCA91B54000C6B9323909E /* TemplateDescriptor.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		CFE838BED8EA4B01E0C3386D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9E7B6F86D811CE26136DAD15 /* Fewer.app */,
+				2F3A7C61EF67BF66E65B9903 /* FewerCoreTests.xctest */,
+				E5EE696B38C35981E774928F /* FewerFinderExtension.appex */,
+				F6FBDA306F4F73BB93F4F839 /* FewerShortcutHelper.app */,
+				3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		B12B03D86A020A1364832F1E /* FewerFinderExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D19CCA66EA2951555FAF83D /* Build configuration list for PBXNativeTarget "FewerFinderExtension" */;
+			buildPhases = (
+				F16667BCE3A3789811939454 /* Sources */,
+				4849FAC04F03C704A395214C /* Resources */,
+				640F09F928BCBAE68FBCE2FE /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				131B9EE4571F9B5F0A18329C /* PBXTargetDependency */,
+			);
+			name = FewerFinderExtension;
+			packageProductDependencies = (
+			);
+			productName = FewerFinderExtension;
+			productReference = E5EE696B38C35981E774928F /* FewerFinderExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		D93ADB9C2C5DAAD87B6093FB /* Fewer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F00F1860AE0F7AD5918F0219 /* Build configuration list for PBXNativeTarget "Fewer" */;
+			buildPhases = (
+				7E652402FD2216E1B3DD2217 /* Sources */,
+				A497A90B12E3AE2244314A68 /* Resources */,
+				91D0A113C79B882559C3F5AF /* Frameworks */,
+				EEF38AE5BEB701E4FB554490 /* Embed Foundation Extensions */,
+				D676A94FF03C2FA2AFF8FCA3 /* Embed Shortcut Helper */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				605366A166EA2D90117C1C20 /* PBXTargetDependency */,
+				70381FB93EBD6607AA25175C /* PBXTargetDependency */,
+				B52DDFD1E61F4D41F80E4042 /* PBXTargetDependency */,
+			);
+			name = Fewer;
+			packageProductDependencies = (
+			);
+			productName = Fewer;
+			productReference = 9E7B6F86D811CE26136DAD15 /* Fewer.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 39B2C76DA857A68C3E7E7CA7 /* Build configuration list for PBXNativeTarget "FewerCore" */;
+			buildPhases = (
+				09B2C1EAD05CC1F955E97132 /* Sources */,
+				AC72F70EF4039956F4987A78 /* Copy Swift Objective-C Interface Header */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FewerCore;
+			packageProductDependencies = (
+			);
+			productName = FewerCore;
+			productReference = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */;
+			productType = "com.apple.product-type.library.static";
+		};
+		DF500D2B12EBFB181A37F1D6 /* FewerCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7450F34C1661281999FE3D58 /* Build configuration list for PBXNativeTarget "FewerCoreTests" */;
+			buildPhases = (
+				CC88834D83EE52C497FE2018 /* Sources */,
+				7C4D1AFA15E5D9513258793C /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				85E6905A5B15C1AA65D0E4A1 /* PBXTargetDependency */,
+			);
+			name = FewerCoreTests;
+			packageProductDependencies = (
+			);
+			productName = FewerCoreTests;
+			productReference = 2F3A7C61EF67BF66E65B9903 /* FewerCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E778179DCBD554885B35E655 /* FewerShortcutHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3E6929CF799590CDE46571AA /* Build configuration list for PBXNativeTarget "FewerShortcutHelper" */;
+			buildPhases = (
+				8F1B4EBA742F060964C2E2E6 /* Sources */,
+				075A04460FB7EEA0B6CF1E6B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				2D0F6FA260137F99A6E352AA /* PBXTargetDependency */,
+			);
+			name = FewerShortcutHelper;
+			packageProductDependencies = (
+			);
+			productName = FewerShortcutHelper;
+			productReference = F6FBDA306F4F73BB93F4F839 /* FewerShortcutHelper.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E86381287456766201C270D6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					B12B03D86A020A1364832F1E = {
+						DevelopmentTeam = "$(FEWER_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+					D93ADB9C2C5DAAD87B6093FB = {
+						DevelopmentTeam = "$(FEWER_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+					DAEB9ABFDF0EA0D63B7175D3 = {
+						DevelopmentTeam = "$(FEWER_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+					DF500D2B12EBFB181A37F1D6 = {
+						DevelopmentTeam = "$(FEWER_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+					E778179DCBD554885B35E655 = {
+						DevelopmentTeam = "$(FEWER_DEVELOPMENT_TEAM)";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 9284A5967D3C121841CF67FD /* Build configuration list for PBXProject "Fewer" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 6D770B13AEBC2F0632F90FB8;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CFE838BED8EA4B01E0C3386D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */,
+				E778179DCBD554885B35E655 /* FewerShortcutHelper */,
+				B12B03D86A020A1364832F1E /* FewerFinderExtension */,
+				D93ADB9C2C5DAAD87B6093FB /* Fewer */,
+				DF500D2B12EBFB181A37F1D6 /* FewerCoreTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4849FAC04F03C704A395214C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0E1FF8A3FB0A493DEC44375 /* .gitkeep in Resources */,
+				5A8D5A1C243D786C624327AE /* CSV.csv in Resources */,
+				0970952846ACB82A8BE651E2 /* ExcelWorkbook.xlsx in Resources */,
+				31A6D6CFAF3604851BDBC8F2 /* JSON.json in Resources */,
+				FCDC27F213C7CB0578F8F28D /* Markdown.md in Resources */,
+				A484496FFE810A8097BF50FC /* PlainText.txt in Resources */,
+				C0543AFA9613BD018480AA64 /* PowerPointPresentation.pptx in Resources */,
+				C07F46B1B1889B683C982C5A /* WordDocument.docx in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A497A90B12E3AE2244314A68 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9E37B0BD3764CB6462BF6C0F /* .gitkeep in Resources */,
+				4642A3C08C52D93D7F546110 /* CSV.csv in Resources */,
+				DC8BBB92C6B5EFCA078872FA /* ExcelWorkbook.xlsx in Resources */,
+				260E232621F12FBC0961ED83 /* JSON.json in Resources */,
+				502589B2177ED0C6FCE349CA /* Markdown.md in Resources */,
+				3B10C42D651063E616004627 /* PlainText.txt in Resources */,
+				29F3DB16406BEA3BD4DD557B /* PowerPointPresentation.pptx in Resources */,
+				D508FAD0FB6F4D33FE066641 /* WordDocument.docx in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AC72F70EF4039956F4987A78 /* Copy Swift Objective-C Interface Header */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(DERIVED_SOURCES_DIR)/$(SWIFT_OBJC_INTERFACE_HEADER_NAME)",
+			);
+			name = "Copy Swift Objective-C Interface Header";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/include/$(PRODUCT_MODULE_NAME)/$(SWIFT_OBJC_INTERFACE_HEADER_NAME)",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "ditto \"${SCRIPT_INPUT_FILE_0}\" \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+		};
+		D676A94FF03C2FA2AFF8FCA3 /* Embed Shortcut Helper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Shortcut Helper";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nHELPER_SOURCE=\"${BUILT_PRODUCTS_DIR}/FewerShortcutHelper.app\"\nHELPER_DIRECTORY=\"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/Contents/Library/LoginItems\"\n/bin/mkdir -p \"${HELPER_DIRECTORY}\"\n/usr/bin/ditto \"${HELPER_SOURCE}\" \"${HELPER_DIRECTORY}/FewerShortcutHelper.app\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		09B2C1EAD05CC1F955E97132 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */,
+				D0986492EABA3959ADB2CC27 /* ConflictNameResolver.swift in Sources */,
+				30A5A572FB43C114AB54CB37 /* CutTransaction.swift in Sources */,
+				C007E0E7EA4E336F9ADE7120 /* CutTransactionStore.swift in Sources */,
+				A716777F20D5CBB58F3835B5 /* FeatureSettings.swift in Sources */,
+				14CCCF4FDB47A825C09AB0C8 /* FewerVersion.swift in Sources */,
+				378A12491F746AE53039BD0B /* FileOperationCoordinator.swift in Sources */,
+				D4EFFA5349F39EFEC0ED7D1C /* FileOperationResult.swift in Sources */,
+				AF3E095DCF2309015DC5340F /* FinderMenuContext.swift in Sources */,
+				6B88FFE67A4095218C9519E1 /* FinderShortcutRouter.swift in Sources */,
+				608B865F831C295B1CF3AEE0 /* MenuBuilder.swift in Sources */,
+				6536B8877F98B388F48C1AF0 /* MenuModels.swift in Sources */,
+				3CCE98766A9F41E21C8F8C45 /* PathFormatter.swift in Sources */,
+				0656680B2C4131F4E8C7C468 /* SharedSettingsStore.swift in Sources */,
+				949DE44A5713092ABF37D5E2 /* ShortcutModels.swift in Sources */,
+				8FF07D97267E2F651A53637E /* TemplateDescriptor.swift in Sources */,
+				F475E5E48D568B1326A6C020 /* TemplateFileCreator.swift in Sources */,
+				F859001DB2E8E82AADDD25B2 /* TemplateManifest.swift in Sources */,
+				C2CAD7750E3195F02851D062 /* TemplateStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7E652402FD2216E1B3DD2217 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EAB8BC6D5DDAB41ECEBFB976 /* ContextMenuSettingsView.swift in Sources */,
+				189982D48E3F5B1DBA1AE7CF /* ExtensionStatusService.swift in Sources */,
+				B50C3C2339D97F70D64308D3 /* FewerApp.swift in Sources */,
+				CCA75B996F080F0A4E6798B8 /* GeneralSettingsView.swift in Sources */,
+				6F0FCFBB2AE077A333E6B2CF /* OverviewView.swift in Sources */,
+				542E572929FDB232A7AA413F /* PermissionService.swift in Sources */,
+				26405D23D1CE516DCDBB93F0 /* RootSettingsView.swift in Sources */,
+				627DE8E1AB98B4733946A8E1 /* SettingsSection.swift in Sources */,
+				FF87E7F274C71B6B9832D7D9 /* SettingsViewModel.swift in Sources */,
+				97F8EA3907AB5835EDB71A6D /* ShortcutSettingsView.swift in Sources */,
+				17090C268020FF5F08184A30 /* TemplateSettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8F1B4EBA742F060964C2E2E6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7F75A54BBD375202A1948AE /* EventTapController.swift in Sources */,
+				70867DFE76C3681593F4707A /* PasteboardCutBridge.swift in Sources */,
+				1CFCECA0EFB6B33FF7315ACB /* ShortcutHelperApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC88834D83EE52C497FE2018 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				79A9AE0E06FBD94FBBF1EB32 /* ConflictNameResolverTests.swift in Sources */,
+				D11F04F640D19B32AF433655 /* CutTransactionStoreTests.swift in Sources */,
+				8CE0DB0FD316A833A26935B4 /* FewerVersionTests.swift in Sources */,
+				6F0024D1552867B58C92CEC8 /* FileOperationCoordinatorTests.swift in Sources */,
+				86D59A17D888D466EC1DA5BE /* FinderShortcutRouterTests.swift in Sources */,
+				D3C75378A1CB2C4F5A8D61DC /* MenuBuilderTests.swift in Sources */,
+				EE44B73DB9EEDFFC29862E20 /* PathFormatterTests.swift in Sources */,
+				EDCF248BA290E912AB9E3272 /* SharedSettingsStoreTests.swift in Sources */,
+				BE4A3EDA08B513201EBE1C81 /* TemplateStoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F16667BCE3A3789811939454 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				74A848DADACB455C338EC9BA /* FinderActionHandler.swift in Sources */,
+				B539B2512349EA081679F4C6 /* FinderMenuAdapter.swift in Sources */,
+				C00A7E01DF9284EF5D4B9AAF /* FinderSync.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		131B9EE4571F9B5F0A18329C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */;
+			targetProxy = 8C3719FE923E19AB037249D9 /* PBXContainerItemProxy */;
+		};
+		2D0F6FA260137F99A6E352AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */;
+			targetProxy = 3A20CC75D8615012EF0A1833 /* PBXContainerItemProxy */;
+		};
+		605366A166EA2D90117C1C20 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */;
+			targetProxy = 9C73BA00263C2E9FA645349E /* PBXContainerItemProxy */;
+		};
+		70381FB93EBD6607AA25175C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B12B03D86A020A1364832F1E /* FewerFinderExtension */;
+			targetProxy = 1BEB42E9AB8EAD8B999EECA7 /* PBXContainerItemProxy */;
+		};
+		85E6905A5B15C1AA65D0E4A1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DAEB9ABFDF0EA0D63B7175D3 /* FewerCore */;
+			targetProxy = C7A6C58F34753EB6287E3885 /* PBXContainerItemProxy */;
+		};
+		B52DDFD1E61F4D41F80E4042 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E778179DCBD554885B35E655 /* FewerShortcutHelper */;
+			targetProxy = 01ABEFACDE3F85DFFE5B910D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		012536514A62027C78AD892F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		0269462D0B5BBA7A3FEDD0C4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FewerShortcutHelper/FewerShortcutHelper.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerShortcutHelper/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.shortcut-helper";
+				PRODUCT_NAME = FewerShortcutHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		0786E576AA0BA8CC79A4B184 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEFINES_MODULE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.number47.fewer.core;
+				PRODUCT_MODULE_NAME = FewerCore;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		07D5DC4687F984D3705C18AE /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEFINES_MODULE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.number47.fewer.core;
+				PRODUCT_MODULE_NAME = FewerCore;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		1357ABF166101EDB599A94F8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.core-tests";
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		1D183D218E30E5E4357E46F0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FewerApp/Fewer.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.number47.fewer;
+				PRODUCT_NAME = Fewer;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		B81C6AFB886793598C791ECF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGNING_ALLOWED = NO;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.core-tests";
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		BCDD432A33CDE5622072B509 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = FewerFinderExtension/FewerFinderExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerFinderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.finder-extension";
+				PRODUCT_NAME = FewerFinderExtension;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		D6CB0894A9D8EC5F600AB862 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FewerApp/Fewer.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerApp/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.number47.fewer;
+				PRODUCT_NAME = Fewer;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		D956CF25B590F0878B5C2A80 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = FewerShortcutHelper/FewerShortcutHelper.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerShortcutHelper/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.shortcut-helper";
+				PRODUCT_NAME = FewerShortcutHelper;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		DFFD6466CBDFCA6DDC787C1A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 2C4376AD2525EACD08426FD3 /* Base.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = FewerFinderExtension/FewerFinderExtension.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = FewerFinderExtension/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.number47.fewer.finder-extension";
+				PRODUCT_NAME = FewerFinderExtension;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		F2163E73DEC636AD2BF8FBDC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		39B2C76DA857A68C3E7E7CA7 /* Build configuration list for PBXNativeTarget "FewerCore" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0786E576AA0BA8CC79A4B184 /* Debug */,
+				07D5DC4687F984D3705C18AE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3E6929CF799590CDE46571AA /* Build configuration list for PBXNativeTarget "FewerShortcutHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0269462D0B5BBA7A3FEDD0C4 /* Debug */,
+				D956CF25B590F0878B5C2A80 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7450F34C1661281999FE3D58 /* Build configuration list for PBXNativeTarget "FewerCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B81C6AFB886793598C791ECF /* Debug */,
+				1357ABF166101EDB599A94F8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8D19CCA66EA2951555FAF83D /* Build configuration list for PBXNativeTarget "FewerFinderExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DFFD6466CBDFCA6DDC787C1A /* Debug */,
+				BCDD432A33CDE5622072B509 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9284A5967D3C121841CF67FD /* Build configuration list for PBXProject "Fewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				012536514A62027C78AD892F /* Debug */,
+				F2163E73DEC636AD2BF8FBDC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F00F1860AE0F7AD5918F0219 /* Build configuration list for PBXNativeTarget "Fewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1D183D218E30E5E4357E46F0 /* Debug */,
+				D6CB0894A9D8EC5F600AB862 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E86381287456766201C270D6 /* Project object */;
+}

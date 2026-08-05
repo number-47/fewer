@@ -240,7 +240,7 @@ xcodebuild test -project Fewer.xcodeproj -scheme FewerCore -derivedDataPath .bui
 2. 将 items/container/sidebar 场景映射为 `FinderMenuContext`。
 3. 把 `MenuCommand` 映射为原生 `NSMenuItem` 和 New File 子菜单。
 4. Copy Path 使用 `NSPasteboard` 写入字符串。
-5. Cut 同时写入文件 URL pasteboard 与 `CutTransactionStore`。
+5. Cut 写入 `CutTransactionStore` 且不覆盖用户现有剪贴板，后续由 Fewer 的 Paste 命令完成移动。
 6. Paste 调用 `FileOperationCoordinator`，完成后发送汇总通知。
 7. 菜单构建同步且轻量；文件操作异步执行。
 
