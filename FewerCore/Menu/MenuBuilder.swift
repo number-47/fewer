@@ -40,6 +40,16 @@ public struct MenuBuilder: Sendable {
             case (.items, .copyPath) where !context.selectedURLs.isEmpty:
                 return MenuEntry(command: .copyPath, title: "复制路径")
 
+            case (.items, .openInTerminal) where !context.selectedURLs.isEmpty:
+                return MenuEntry(command: .openInTerminal, title: "在终端打开")
+
+            case (.container, .openInTerminal):
+                return MenuEntry(command: .openInTerminal, title: "在终端打开")
+
+            case (.container, .copyPath):
+                // 空白处右键：复制当前文件夹路径
+                return MenuEntry(command: .copyPath, title: "复制路径")
+
             case (.items, .cut) where !context.selectedURLs.isEmpty:
                 return MenuEntry(command: .cut, title: "剪切")
 

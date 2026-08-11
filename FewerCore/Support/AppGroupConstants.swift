@@ -5,7 +5,15 @@ public enum AppGroupConstants {
     public static let groupIdentifier = "group.com.number47.fewer"
     public static let featureSettingsKey = "feature-settings-v1"
     public static let cutTransactionKey = "cut-transaction-v1"
-
+    public static let requestShortcutHelperAccessibilityNotification = Notification.Name(
+        "com.number47.fewer.request-shortcut-helper-accessibility"
+    )
+    public static let rollingScrollCommandNotification = Notification.Name(
+        "com.number47.fewer.rolling-scroll-command"
+    )
+    public static let rollingScrollResponseNotification = Notification.Name(
+        "com.number47.fewer.rolling-scroll-response"
+    )
     /// File-backed state lives outside the App Group container so ad-hoc local builds and
     /// properly provisioned releases share the same deterministic storage contract.
     public static func sharedDataDirectory(fileManager: FileManager = .default) -> URL {

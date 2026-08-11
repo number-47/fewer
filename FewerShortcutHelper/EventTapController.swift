@@ -11,6 +11,7 @@ final class EventTapController: @unchecked Sendable {
     private let settingsStore = try? SharedSettingsStore()
 
     func start() {
+        guard eventTap == nil else { return }
         guard AXIsProcessTrusted() else { return }
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         let pointer = Unmanaged.passUnretained(self).toOpaque()
@@ -30,7 +31,7 @@ final class EventTapController: @unchecked Sendable {
         CGEvent.tapEnable(tap: eventTap, enable: true)
     }
 
-    fileprivate func process(_ event: CGEvent) -> Unmanaged<CGEvent>? {
+    fileprivate func process(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if event.getIntegerValueField(.eventSourceUserData) == syntheticEventMarker {
             return Unmanaged.passUnretained(event)
         }
@@ -75,6 +76,12 @@ final class EventTapController: @unchecked Sendable {
         }
     }
 
+    fileprivate func reenableAfterTimeout() {
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: true)
+        }
+    }
+
     private func postShortcut(keyCode: CGKeyCode, flags: CGEventFlags) {
         let source = CGEventSource(stateID: .hidSystemState)
         for isKeyDown in [true, false] {
@@ -87,8 +94,16 @@ final class EventTapController: @unchecked Sendable {
 }
 
 private let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in
-    guard type == .keyDown, let userInfo else {
+    guard let userInfo else {
         return Unmanaged.passUnretained(event)
     }
-    return Unmanaged<EventTapController>.fromOpaque(userInfo).takeUnretainedValue().process(event)
+    let controller = Unmanaged<EventTapController>.fromOpaque(userInfo).takeUnretainedValue()
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        controller.reenableAfterTimeout()
+        return Unmanaged.passUnretained(event)
+    }
+    guard type == .keyDown else {
+        return Unmanaged.passUnretained(event)
+    }
+    return controller.process(type: type, event: event)
 }

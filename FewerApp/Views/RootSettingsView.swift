@@ -16,13 +16,15 @@ struct RootSettingsView: View {
             Group {
                 switch selection ?? .overview {
                 case .overview:
-                    OverviewView()
+                    OverviewView(model: model)
                 case .contextMenu:
                     ContextMenuSettingsView(model: model)
                 case .templates:
                     TemplateSettingsView(model: model)
                 case .shortcuts:
                     ShortcutSettingsView(model: model)
+                case .screenshot:
+                    ScreenshotSettingsView()
                 case .general:
                     GeneralSettingsView(model: model)
                 }

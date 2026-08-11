@@ -18,5 +18,13 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Fewer 需要读取系统日历，以在菜单栏日历中展示节假日订阅和日程。</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Fewer 需要读取系统日历，以在菜单栏日历中展示节假日订阅和日程。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Fewer 需要读取提醒事项，以在菜单栏日历中展示带日期的计划任务。</string>
 </dict>
 </plist>

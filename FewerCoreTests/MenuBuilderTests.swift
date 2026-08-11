@@ -20,7 +20,7 @@ final class MenuBuilderTests: XCTestCase {
             templates: [TemplateDescriptor.builtInPlainText]
         )
 
-        XCTAssertEqual(entries.map(\.command), [.newFile, .pasteHere])
+        XCTAssertEqual(entries.map(\.command), [.newFile, .copyPath, .pasteHere, .openInTerminal])
         XCTAssertEqual(entries.first?.children.count, 1)
     }
 
@@ -34,7 +34,7 @@ final class MenuBuilderTests: XCTestCase {
         )
 
         let entries = MenuBuilder().entries(for: context, settings: .default, templates: [])
-        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut])
+        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut, .openInTerminal])
     }
 
     func testDisabledFeatureIsRemovedAndOrderIsRespected() {
@@ -68,7 +68,8 @@ final class MenuBuilderTests: XCTestCase {
             templates: [TemplateDescriptor.builtInPlainText]
         )
 
-        XCTAssertEqual(entries.map(\.isEnabled), [false, false])
+        // 复制路径是读操作，只读容器下仍可用
+        XCTAssertEqual(entries.map(\.isEnabled), [false, true, false, true])
     }
 
     func testSelectedFolderShowsPasteIntoFolder() {
@@ -83,6 +84,22 @@ final class MenuBuilderTests: XCTestCase {
         )
 
         let entries = MenuBuilder().entries(for: context, settings: .default, templates: [])
-        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut, .pasteIntoFolder])
+        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut, .pasteIntoFolder, .openInTerminal])
+    }
+
+    func testOpenInTerminalCanBeDisabledAndRepositioned() {
+        var settings = FeatureSettings.default
+        settings.enabledFeatures.remove(.openInTerminal)
+        settings.menuOrder = [.openInTerminal, .copyPath]
+        let context = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [target.appendingPathComponent("A.txt")],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        let entries = MenuBuilder().entries(for: context, settings: settings, templates: [])
+        XCTAssertEqual(entries.map(\.command), [.copyPath])
     }
 }

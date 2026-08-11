@@ -5,6 +5,7 @@ public enum FewerFeature: String, Codable, CaseIterable, Identifiable, Sendable 
     case copyPath
     case cut
     case paste
+    case openInTerminal
 
     public var id: String { rawValue }
 }
@@ -26,7 +27,11 @@ public enum ConflictPolicy: String, Codable, CaseIterable, Identifiable, Sendabl
 }
 
 public struct FeatureSettings: Codable, Equatable, Sendable {
-    public static let currentSchemaVersion = 1
+    /// 当前配置结构版本：v2 起新增"在终端打开"功能；v3 起支持自定义终端应用。
+    public static let currentSchemaVersion = 3
+
+    /// "在终端打开"默认使用的终端应用 Bundle Identifier。
+    public static let defaultTerminalBundleID = "com.apple.Terminal"
 
     public var schemaVersion: Int
     public var enabledFeatures: Set<FewerFeature>
@@ -36,6 +41,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var notificationsEnabled: Bool
     public var shortcutHelperEnabled: Bool
     public var launchHelperAtLogin: Bool
+    public var terminalBundleID: String
 
     public init(
         schemaVersion: Int = currentSchemaVersion,
@@ -45,7 +51,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         conflictPolicy: ConflictPolicy = .keepBoth,
         notificationsEnabled: Bool = true,
         shortcutHelperEnabled: Bool = true,
-        launchHelperAtLogin: Bool = false
+        launchHelperAtLogin: Bool = false,
+        terminalBundleID: String = defaultTerminalBundleID
     ) {
         self.schemaVersion = schemaVersion
         self.enabledFeatures = enabledFeatures
@@ -55,6 +62,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.notificationsEnabled = notificationsEnabled
         self.shortcutHelperEnabled = shortcutHelperEnabled
         self.launchHelperAtLogin = launchHelperAtLogin
+        self.terminalBundleID = terminalBundleID
     }
 
     public static let `default` = FeatureSettings()
@@ -68,6 +76,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case notificationsEnabled
         case shortcutHelperEnabled
         case launchHelperAtLogin
+        case terminalBundleID
     }
 
     public init(from decoder: Decoder) throws {
@@ -90,5 +99,21 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ?? defaults.shortcutHelperEnabled
         launchHelperAtLogin = try values.decodeIfPresent(Bool.self, forKey: .launchHelperAtLogin)
             ?? defaults.launchHelperAtLogin
+        terminalBundleID = try values.decodeIfPresent(String.self, forKey: .terminalBundleID)
+            ?? defaults.terminalBundleID
+
+        migrateIfNeeded()
+    }
+
+    /// 旧版本配置缺少后续新增的功能项（如 v1 → v2 的"在终端打开"），
+    /// 解码后按版本补全：新功能默认启用并追加到菜单末尾，不破坏用户已有开关与排序。
+    private mutating func migrateIfNeeded() {
+        if schemaVersion < Self.currentSchemaVersion {
+            enabledFeatures.insert(.openInTerminal)
+            if !menuOrder.contains(.openInTerminal) {
+                menuOrder.append(.openInTerminal)
+            }
+            schemaVersion = Self.currentSchemaVersion
+        }
     }
 }

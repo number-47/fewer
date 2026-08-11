@@ -1,9 +1,18 @@
 import FinderSync
+import FewerCore
 import SwiftUI
 
 struct OverviewView: View {
+    @ObservedObject var model: SettingsViewModel
     @State private var extensionStatus: ExtensionStatus = .unknown
-    @State private var accessibilityTrusted = PermissionService.isAccessibilityTrusted
+    @State private var helperStatus = PermissionService.shortcutHelperStatus
+
+    private var authorizationStatusText: String {
+        if helperStatus.isAccessibilityTrusted {
+            return helperStatus.isFresh() ? "已授权" : "已授权（助手未运行）"
+        }
+        return helperStatus.isFresh() ? "未授权" : "等待助手启动"
+    }
 
     var body: some View {
         Form {
@@ -19,7 +28,7 @@ struct OverviewView: View {
 
             Section("组件状态") {
                 LabeledContent("Finder 右键扩展", value: extensionStatus.title)
-                LabeledContent("快捷键辅助功能", value: accessibilityTrusted ? "已授权" : "未授权")
+                LabeledContent("快捷键辅助功能", value: authorizationStatusText)
             }
 
             Section {
@@ -39,11 +48,22 @@ struct OverviewView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("概览")
-        .task { refresh() }
+        .task {
+            if model.settings.shortcutHelperEnabled {
+                PermissionService.launchShortcutHelper()
+            }
+            while !Task.isCancelled {
+                if model.settings.shortcutHelperEnabled {
+                    PermissionService.ensureShortcutHelperRunning()
+                }
+                refresh()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     private func refresh() {
         extensionStatus = ExtensionStatusService.finderExtensionStatus()
-        accessibilityTrusted = PermissionService.isAccessibilityTrusted
+        helperStatus = PermissionService.shortcutHelperStatus
     }
 }

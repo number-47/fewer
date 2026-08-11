@@ -52,6 +52,12 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         }
     }
 
+    @IBAction nonisolated func openInTerminalCommand(_ sender: AnyObject?) {
+        Task { @MainActor [weak self] in
+            self?.actionHandler.perform(.openInTerminal)
+        }
+    }
+
     @IBAction nonisolated func pasteCommand(_ sender: AnyObject?) {
         Task { @MainActor [weak self] in
             guard let self,

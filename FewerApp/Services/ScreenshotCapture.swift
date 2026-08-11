@@ -1,0 +1,418 @@
+import AppKit
+import CoreImage
+import CoreGraphics
+import CoreMedia
+import CoreVideo
+import FewerCore
+import Foundation
+import ScreenCaptureKit
+import Security
+
+/// 截屏捕获底层：屏幕录制权限、全屏/区域/窗口捕获、在屏窗口列表。
+/// 注意坐标：CGWindowList* 使用全局屏幕坐标（原点左上）；NSEvent/NSScreen 使用 AppKit 坐标（原点左下）。
+enum ScreenshotCapture {
+    enum RollingCaptureError: LocalizedError {
+        case displayUnavailable
+        case captureFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .displayUnavailable: "选区必须完整位于同一台显示器内"
+            case .captureFailed: "无法读取滚动截图区域"
+            }
+        }
+    }
+
+    /// 连续读取 ScreenCaptureKit 帧；拼接计算期间仍保留桥接帧，避免快速滚动跨过可匹配重叠区。
+    final class RollingRegionSession: @unchecked Sendable {
+        private let stream: SCStream
+        private let output: RollingStreamOutput
+        private var started = false
+
+        fileprivate init(
+            filter: SCContentFilter,
+            configuration: SCStreamConfiguration,
+            cropRect: CGRect
+        ) {
+            output = RollingStreamOutput(cropRect: cropRect)
+            stream = SCStream(filter: filter, configuration: configuration, delegate: output)
+        }
+
+        func capture() async throws -> CGImage {
+            if !started {
+                try stream.addStreamOutput(
+                    output,
+                    type: .screen,
+                    sampleHandlerQueue: output.queue
+                )
+                do {
+                    try await stream.startCapture()
+                    started = true
+                } catch {
+                    output.finish(throwing: error)
+                    throw error
+                }
+            }
+            return try await output.nextFrame()
+        }
+
+        func discardPendingFrames() {
+            output.discardPendingFrames()
+        }
+
+        func stop() async {
+            guard started else { return }
+            started = false
+            try? await stream.stopCapture()
+            output.finish()
+        }
+    }
+
+    private final class RollingStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+        let queue = DispatchQueue(label: "com.number47.fewer.rolling-capture-frames", qos: .userInteractive)
+
+        private let cropRect: CGRect
+        private let context = CIContext(options: [.cacheIntermediates: false])
+        private let lock = NSLock()
+        private var frames = RollingFrameBuffer<CGImage>(capacity: 12)
+        private var waiter: CheckedContinuation<CGImage, Error>?
+        private var terminalError: Error?
+        private var finished = false
+
+        init(cropRect: CGRect) {
+            self.cropRect = cropRect
+        }
+
+        func nextFrame() async throws -> CGImage {
+            try await withCheckedThrowingContinuation { continuation in
+                lock.lock()
+                defer { lock.unlock() }
+                if let next = frames.removeNext() {
+                    continuation.resume(returning: next)
+                } else if let terminalError {
+                    continuation.resume(throwing: terminalError)
+                } else if finished {
+                    continuation.resume(throwing: RollingCaptureError.captureFailed)
+                } else {
+                    waiter = continuation
+                }
+            }
+        }
+
+        func finish(throwing error: Error? = nil) {
+            lock.lock()
+            finished = true
+            terminalError = error
+            let waiter = waiter
+            self.waiter = nil
+            frames.removeAll()
+            lock.unlock()
+            waiter?.resume(throwing: error ?? RollingCaptureError.captureFailed)
+        }
+
+        func discardPendingFrames() {
+            lock.lock()
+            frames.removeAll()
+            lock.unlock()
+        }
+
+        func stream(
+            _ stream: SCStream,
+            didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
+            of type: SCStreamOutputType
+        ) {
+            guard type == .screen,
+                  sampleBuffer.isValid,
+                  let attachments = CMSampleBufferGetSampleAttachmentsArray(
+                    sampleBuffer,
+                    createIfNecessary: false
+                  ) as? [[SCStreamFrameInfo: Any]],
+                  let statusRawValue = attachments.first?[.status] as? Int,
+                  SCFrameStatus(rawValue: statusRawValue) == .complete,
+                  let pixelBuffer = sampleBuffer.imageBuffer
+            else { return }
+
+            let fullImage = CIImage(cvPixelBuffer: pixelBuffer)
+            let ciCropRect = CGRect(
+                x: cropRect.minX,
+                y: fullImage.extent.height - cropRect.maxY,
+                width: cropRect.width,
+                height: cropRect.height
+            ).integral
+            guard fullImage.extent.contains(ciCropRect),
+                  let image = context.createCGImage(fullImage, from: ciCropRect)
+            else { return }
+            offer(image)
+        }
+
+        func stream(_ stream: SCStream, didStopWithError error: Error) {
+            finish(throwing: error)
+        }
+
+        private func offer(_ image: CGImage) {
+            lock.lock()
+            guard !finished else {
+                lock.unlock()
+                return
+            }
+            if let waiter {
+                self.waiter = nil
+                lock.unlock()
+                waiter.resume(returning: image)
+                return
+            }
+            frames.append(image)
+            lock.unlock()
+        }
+    }
+    /// TCC 授权与代码签名身份绑定。请求记录也必须按身份隔离，不能让旧 ad-hoc
+    /// 构建留下的标记阻止新签名构建发起自己的首次授权。
+    private static var permissionRequestedKey: String {
+        "fewer.screenCapturePermissionRequested.v2.\(codeSigningScope)"
+    }
+
+    private static let codeSigningScope: String = {
+        var dynamicCode: SecCode?
+        guard SecCodeCopySelf(SecCSFlags(), &dynamicCode) == errSecSuccess,
+              let dynamicCode
+        else { return "unknown" }
+
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(dynamicCode, SecCSFlags(), &staticCode) == errSecSuccess,
+              let staticCode
+        else { return "unknown" }
+
+        var signingInformation: CFDictionary?
+        guard SecCodeCopySigningInformation(
+            staticCode,
+            SecCSFlags(rawValue: kSecCSSigningInformation),
+            &signingInformation
+        ) == errSecSuccess,
+              let information = signingInformation as? [CFString: Any]
+        else { return "unknown" }
+
+        let team = information[kSecCodeInfoTeamIdentifier] as? String ?? "adhoc"
+        let identifier = information[kSecCodeInfoIdentifier] as? String
+            ?? Bundle.main.bundleIdentifier
+            ?? "unknown"
+        return "\(team).\(identifier)"
+    }()
+
+    static var permissionIdentity: String { codeSigningScope }
+
+    // MARK: - 权限
+
+    /// 是否已获得屏幕录制权限（TCC）。无权限时所有捕获 API 返回 nil。
+    static var hasPermission: Bool {
+        CGPreflightScreenCaptureAccess()
+    }
+
+    /// 是否已经向系统发起过权限请求。用于避免每次点击截图都重复弹出同一请求。
+    static var permissionWasRequested: Bool {
+        UserDefaults.standard.bool(forKey: permissionRequestedKey)
+    }
+
+    /// 请求屏幕录制权限。只允许触发一次系统请求；之后改为引导用户去系统设置，
+    /// 避免权限状态短暂不同步时每次截图都重新触发系统提示。
+    @discardableResult
+    static func requestPermission() -> Bool {
+        guard !permissionWasRequested else { return hasPermission }
+        UserDefaults.standard.set(true, forKey: permissionRequestedKey)
+        UserDefaults.standard.synchronize()
+        return CGRequestScreenCaptureAccess()
+    }
+
+    /// 保留“已请求”标记。权限被撤销或开发构建身份变化时，也不应自动再次弹系统请求。
+    static func reconcilePermissionState() {
+        _ = hasPermission
+    }
+
+    @MainActor
+    static func openPermissionSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    /// macOS 的屏幕录制授权通常需要重启当前进程才会对捕获 API 生效。
+    @MainActor
+    static func restartApplication() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(
+            at: Bundle.main.bundleURL,
+            configuration: configuration
+        ) { _, error in
+            guard error == nil else { return }
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+        }
+    }
+
+    // MARK: - 捕获
+
+    /// 鼠标所在屏幕的全屏图像。
+    static func fullscreenImage() -> CGImage? {
+        guard let displayID = displayIDUnderMouse() else { return nil }
+        return CGDisplayCreateImage(displayID)
+    }
+
+    /// 指定显示器全屏图像。
+    static func fullscreenImage(displayID: CGDirectDisplayID) -> CGImage? {
+        CGDisplayCreateImage(displayID)
+    }
+
+    /// 使用 ScreenCaptureKit 按窗口所在屏幕的物理像素尺寸捕获，避免旧 API 返回低分辨率图像。
+    static func windowImage(windowID: CGWindowID) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        guard let window = content.windows.first(where: { $0.windowID == windowID }) else {
+            throw RollingCaptureError.captureFailed
+        }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        // 过滤器自带窗口所在屏幕的点到像素比例，比手动匹配显示器更可靠。
+        let scale = CGFloat(filter.pointPixelScale)
+        let outputSize = ScreenshotPixelGeometry.outputSize(
+            pointSize: window.frame.size,
+            pointPixelScale: scale
+        )
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(outputSize.width)
+        configuration.height = Int(outputSize.height)
+        configuration.captureResolution = .best
+        configuration.scalesToFit = false
+        configuration.preservesAspectRatio = true
+        configuration.showsCursor = false
+        configuration.capturesAudio = false
+        configuration.ignoreShadowsSingleWindow = true
+        guard let image = try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: configuration
+        ) as CGImage? else {
+            throw RollingCaptureError.captureFailed
+        }
+        return image
+    }
+
+    /// 使用 ScreenCaptureKit 捕获滚动截图选区，并排除 Fewer 自身的 HUD/边框窗口。
+    static func rollingRegionImage(_ cgRect: CGRect) async throws -> CGImage {
+        try await rollingRegionSession(cgRect).capture()
+    }
+
+    static func rollingRegionSession(_ cgRect: CGRect) async throws -> RollingRegionSession {
+        let content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        guard let display = content.displays.first(where: { $0.frame.contains(cgRect) }) else {
+            throw RollingCaptureError.displayUnavailable
+        }
+        let ownApplications = content.applications.filter {
+            $0.processID == ProcessInfo.processInfo.processIdentifier
+        }
+        let filter = SCContentFilter(
+            display: display,
+            excludingApplications: ownApplications,
+            exceptingWindows: []
+        )
+        // 使用 ScreenCaptureKit 自己的点像素比例，避免 NSScreen 映射失败时退化成 1x。
+        let scale = CGFloat(filter.pointPixelScale)
+        let outputSize = ScreenshotPixelGeometry.outputSize(
+            pointSize: cgRect.size,
+            pointPixelScale: scale
+        )
+        let configuration = SCStreamConfiguration()
+        // 连续流直接在 WindowServer 端裁剪，避免 60 fps 整屏 Retina 帧在传输后才裁剪而丢帧。
+        // 输出尺寸与选区物理像素严格一致，不发生缩放，保留原始清晰度。
+        configuration.sourceRect = CGRect(
+            x: cgRect.minX - display.frame.minX,
+            y: cgRect.minY - display.frame.minY,
+            width: cgRect.width,
+            height: cgRect.height
+        )
+        configuration.width = Int(outputSize.width)
+        configuration.height = Int(outputSize.height)
+        configuration.captureResolution = .best
+        configuration.scalesToFit = false
+        configuration.preservesAspectRatio = true
+        configuration.showsCursor = false
+        configuration.capturesAudio = false
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+        configuration.queueDepth = 5
+        configuration.pixelFormat = kCVPixelFormatType_32BGRA
+        let cropRect = CGRect(origin: .zero, size: outputSize)
+        return RollingRegionSession(filter: filter, configuration: configuration, cropRect: cropRect)
+    }
+
+    // MARK: - 窗口信息
+
+    struct WindowInfo {
+        let id: CGWindowID
+        let ownerPID: pid_t
+        /// 全局屏幕坐标（原点左上）。
+        let bounds: CGRect
+        let title: String
+        let ownerName: String
+    }
+
+    /// 鼠标下的屏幕 display ID。
+    static func displayIDUnderMouse() -> CGDirectDisplayID? {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) else {
+            return NSScreen.main.flatMap { displayID(for: $0) }
+        }
+        return displayID(for: screen)
+    }
+
+    static func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
+
+    /// 所有在屏窗口（排除桌面/菜单栏/自己），按 z-order 从顶到底。
+    static func onScreenWindows(excludingOwnProcess: Bool = true) -> [WindowInfo] {
+        let list = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] ?? []
+
+        var windows: [WindowInfo] = []
+        for dict in list {
+            let layer = dict[kCGWindowLayer as String] as? Int ?? 0
+            guard layer == 0 else { continue }
+            if excludingOwnProcess,
+               let pid = dict[kCGWindowOwnerPID as String] as? Int32,
+               pid == ProcessInfo.processInfo.processIdentifier {
+                continue
+            }
+            guard let id = dict[kCGWindowNumber as String] as? CGWindowID,
+                  let boundsDict = dict[kCGWindowBounds as String] as? [String: CGFloat],
+                  (boundsDict["Width"] ?? 0) > 4,
+                  (boundsDict["Height"] ?? 0) > 4
+            else { continue }
+
+            let bounds = CGRect(
+                x: boundsDict["X"] ?? 0,
+                y: boundsDict["Y"] ?? 0,
+                width: boundsDict["Width"] ?? 0,
+                height: boundsDict["Height"] ?? 0
+            )
+            windows.append(WindowInfo(
+                id: id,
+                ownerPID: dict[kCGWindowOwnerPID as String] as? pid_t ?? 0,
+                bounds: bounds,
+                title: dict[kCGWindowName as String] as? String ?? "",
+                ownerName: dict[kCGWindowOwnerName as String] as? String ?? ""
+            ))
+        }
+        return windows
+    }
+
+    static func runningApplication(at point: CGPoint) -> NSRunningApplication? {
+        guard let window = onScreenWindows().first(where: { $0.bounds.contains(point) }),
+              window.ownerPID > 0
+        else { return nil }
+        return NSRunningApplication(processIdentifier: window.ownerPID)
+    }
+}

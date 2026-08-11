@@ -1,4 +1,8 @@
 .build/
+build/
+.codegraph/
+.omo/
+dist/
 Config/Signing.local.xcconfig
 *.xcuserstate
 xcuserdata/

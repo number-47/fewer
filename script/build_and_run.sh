@@ -27,13 +27,25 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   build | xcbeautify
 
+SIGNING_IDENTITY="${FEWER_SIGNING_IDENTITY:-$(/usr/bin/security find-identity -v -p codesigning | /usr/bin/awk '/Apple Development/ { print $2; exit }')}"
+if [[ -z "$SIGNING_IDENTITY" ]]; then
+  echo "No Apple Development signing identity found. Set FEWER_SIGNING_IDENTITY explicitly." >&2
+  exit 1
+fi
+
 sign_macos_bundle() {
   local bundle="$1"
   local entitlements="$2"
   while IFS= read -r binary; do
-    /usr/bin/codesign --force --sign - "$binary"
+    /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$binary"
   done < <(/usr/bin/find "$bundle/Contents/MacOS" -type f \( -name '*.dylib' -o -perm -111 \))
-  /usr/bin/codesign --force --sign - --entitlements "$entitlements" "$bundle"
+  /usr/bin/codesign \
+    --force \
+    --sign "$SIGNING_IDENTITY" \
+    --timestamp=none \
+    --options runtime \
+    --entitlements "$entitlements" \
+    "$bundle"
 }
 
 sign_macos_bundle \
@@ -42,7 +54,9 @@ sign_macos_bundle \
 sign_macos_bundle \
   "$APP_BUNDLE/Contents/Library/LoginItems/FewerShortcutHelper.app" \
   "$PROJECT_ROOT/FewerShortcutHelper/FewerShortcutHelper.entitlements"
-sign_macos_bundle "$APP_BUNDLE" "$PROJECT_ROOT/FewerApp/Fewer.entitlements"
+sign_macos_bundle \
+  "$APP_BUNDLE" \
+  "$PROJECT_ROOT/FewerApp/Fewer.entitlements"
 /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
 /usr/bin/pluginkit -a "$APP_BUNDLE/Contents/PlugIns/FewerFinderExtension.appex"
 /usr/bin/pluginkit -e use -i "$FINDER_EXTENSION_ID"

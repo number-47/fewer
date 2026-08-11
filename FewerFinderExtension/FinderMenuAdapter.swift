@@ -35,6 +35,8 @@ final class FinderMenuAdapter {
             NSSelectorFromString("cutCommand:")
         case .pasteHere, .pasteIntoFolder:
             NSSelectorFromString("pasteCommand:")
+        case .openInTerminal:
+            NSSelectorFromString("openInTerminalCommand:")
         case .createFromTemplate:
             NSSelectorFromString("createFromTemplateCommand:")
         case .newFile:

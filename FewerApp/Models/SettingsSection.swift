@@ -5,6 +5,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case contextMenu
     case templates
     case shortcuts
+    case screenshot
     case general
 
     var id: String { rawValue }
@@ -15,6 +16,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .contextMenu: "右键菜单"
         case .templates: "文件模板"
         case .shortcuts: "快捷键"
+        case .screenshot: "截屏"
         case .general: "通用"
         }
     }
@@ -25,6 +27,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .contextMenu: "cursorarrow.click.2"
         case .templates: "doc.on.doc"
         case .shortcuts: "keyboard"
+        case .screenshot: "camera"
         case .general: "gearshape"
         }
     }

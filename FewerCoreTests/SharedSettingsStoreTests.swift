@@ -25,7 +25,7 @@ final class SharedSettingsStoreTests: XCTestCase {
         let result = store.load()
 
         XCTAssertNil(result.recoveryReason)
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste])
+        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal])
         XCTAssertEqual(result.settings.enabledFeatures, Set(FewerFeature.allCases))
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
         XCTAssertEqual(result.settings.pathFormat, .posix)
@@ -59,9 +59,47 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         let result = SharedSettingsStore(defaults: defaults).load()
 
-        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath])
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste])
+        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .openInTerminal])
+        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal])
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
+        XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
+    }
+
+    func testV1PayloadMigratesOpenInTerminalWithoutTouchingUserChoices() throws {
+        // v1 配置：用户自定义了开关与排序（无 openInTerminal）
+        let v1 = Data(#"{"schemaVersion":1,"enabledFeatures":["copyPath","cut","paste"],"menuOrder":["cut","copyPath","paste"]}"#.utf8)
+        defaults.set(v1, forKey: AppGroupConstants.featureSettingsKey)
+
+        let result = SharedSettingsStore(defaults: defaults).load()
+
+        // 新功能默认启用并追加到菜单末尾；用户已有开关与排序保持不变
+        XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
+        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .cut, .paste, .openInTerminal])
+        XCTAssertEqual(result.settings.menuOrder, [.cut, .copyPath, .paste, .openInTerminal])
+        XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
+    }
+
+    func testV2PayloadGetsDefaultTerminalApp() throws {
+        // v2 配置：无 terminalBundleID 字段 → 回退默认终端
+        let v2 = Data(#"{"schemaVersion":2,"enabledFeatures":["copyPath","openInTerminal"],"menuOrder":["copyPath","openInTerminal"]}"#.utf8)
+        defaults.set(v2, forKey: AppGroupConstants.featureSettingsKey)
+
+        let result = SharedSettingsStore(defaults: defaults).load()
+
+        XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
+        XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
+    }
+
+    func testCustomTerminalBundleIDRoundTrips() throws {
+        let store = SharedSettingsStore(defaults: defaults)
+        var settings = FeatureSettings.default
+        settings.terminalBundleID = "com.googlecode.iterm2"
+
+        try store.save(settings)
+        let result = store.load()
+
+        XCTAssertEqual(result.settings.terminalBundleID, "com.googlecode.iterm2")
+        XCTAssertNil(result.recoveryReason)
     }
 
     func testFileBackedStoreRoundTripsAcrossInstances() throws {

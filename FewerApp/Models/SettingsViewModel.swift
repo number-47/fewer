@@ -50,6 +50,11 @@ final class SettingsViewModel: ObservableObject {
         saveSettings()
     }
 
+    func setTerminalBundleID(_ bundleIdentifier: String) {
+        settings.terminalBundleID = bundleIdentifier
+        saveSettings()
+    }
+
     func setConflictPolicy(_ policy: ConflictPolicy) {
         settings.conflictPolicy = policy
         saveSettings()
@@ -70,6 +75,9 @@ final class SettingsViewModel: ObservableObject {
             settings.shortcutHelperEnabled = enabled
             settings.launchHelperAtLogin = enabled
             saveSettings()
+            if enabled {
+                PermissionService.launchShortcutHelper()
+            }
         } catch {
             errorMessage = "无法更新快捷键助手：\(error.localizedDescription)"
         }
@@ -84,6 +92,9 @@ final class SettingsViewModel: ObservableObject {
             }
             settings.launchHelperAtLogin = enabled
             saveSettings()
+            if enabled {
+                PermissionService.launchShortcutHelper()
+            }
         } catch {
             errorMessage = "无法更新登录项：\(error.localizedDescription)"
         }

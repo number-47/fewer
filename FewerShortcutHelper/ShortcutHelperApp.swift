@@ -1,4 +1,6 @@
 import AppKit
+import ApplicationServices
+import FewerCore
 
 @main
 enum ShortcutHelperApp {
@@ -14,9 +16,64 @@ enum ShortcutHelperApp {
 
 final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
     private var eventTapController: EventTapController?
+    private var rollingScrollDriver: RollingScrollDriver?
+    private var heartbeatTimer: Timer?
+    private let statusStore = ShortcutHelperStatusStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         eventTapController = EventTapController()
-        eventTapController?.start()
+        rollingScrollDriver = RollingScrollDriver()
+        rollingScrollDriver?.start()
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(requestAccessibility),
+            name: AppGroupConstants.requestShortcutHelperAccessibilityNotification,
+            object: nil,
+            suspensionBehavior: .deliverImmediately
+        )
+        heartbeatTimer = Timer.scheduledTimer(
+            timeInterval: 1,
+            target: self,
+            selector: #selector(refreshStatus),
+            userInfo: nil,
+            repeats: true
+        )
+
+        if CommandLine.arguments.contains("--request-accessibility") {
+            requestAccessibility()
+        } else {
+            refreshStatus()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        heartbeatTimer?.invalidate()
+        rollingScrollDriver?.stop()
+        DistributedNotificationCenter.default().removeObserver(self)
+        let status = ShortcutHelperStatus(
+            isAccessibilityTrusted: AXIsProcessTrusted(),
+            processIdentifier: 0,
+            updatedAt: Date()
+        )
+        try? statusStore.save(status)
+    }
+
+    @objc private func requestAccessibility() {
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        refreshStatus()
+    }
+
+    @objc private func refreshStatus() {
+        let isTrusted = AXIsProcessTrusted()
+        let status = ShortcutHelperStatus(
+            isAccessibilityTrusted: isTrusted,
+            processIdentifier: ProcessInfo.processInfo.processIdentifier,
+            updatedAt: Date()
+        )
+        try? statusStore.save(status)
+        if isTrusted {
+            eventTapController?.start()
+        }
     }
 }
