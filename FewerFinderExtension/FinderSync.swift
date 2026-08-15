@@ -52,9 +52,15 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         }
     }
 
-    @IBAction nonisolated func openInTerminalCommand(_ sender: AnyObject?) {
+   @IBAction nonisolated func openInTerminalCommand(_ sender: AnyObject?) {
+       Task { @MainActor [weak self] in
+           self?.actionHandler.perform(.openInTerminal)
+       }
+   }
+
+    @IBAction nonisolated func refreshCommand(_ sender: AnyObject?) {
         Task { @MainActor [weak self] in
-            self?.actionHandler.perform(.openInTerminal)
+            self?.actionHandler.perform(.refresh)
         }
     }
 

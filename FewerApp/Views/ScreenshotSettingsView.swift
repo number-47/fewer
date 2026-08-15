@@ -7,7 +7,6 @@ struct ScreenshotSettingsView: View {
     @State private var settings = ScreenshotSettings.default
     @State private var hasScreenCapturePermission = ScreenshotCapture.hasPermission
     @State private var permissionWasRequested = ScreenshotCapture.permissionWasRequested
-    @State private var helperStatus = PermissionService.shortcutHelperStatus
     private let store = ScreenshotSettingsStore()
 
     var body: some View {
@@ -80,18 +79,7 @@ struct ScreenshotSettingsView: View {
                     get: { settings.rollingCaptureEnabled },
                     set: { settings.rollingCaptureEnabled = $0 }
                 ))
-                LabeledContent("自动滚动辅助功能", value: helperAuthorizationText)
-                if !helperStatus.isAccessibilityTrusted {
-                    HStack {
-                        Button("请求权限") {
-                            PermissionService.requestAccessibility()
-                        }
-                        Button("打开系统设置") {
-                            PermissionService.openAccessibilitySettings()
-                        }
-                    }
-                }
-                Text("手动逐步和自动模式都由 FewerShortcutHelper 每次滚动一步，截取稳定帧后才继续，不记录页面内容或输入。")
+                Text("选中后立即开始录制，可自行上下滚动；点击停止并生成后，会先处理已经捕获的剩余画面再生成长图。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -146,12 +134,9 @@ struct ScreenshotSettingsView: View {
         .onAppear {
             settings = store.load()
             refreshScreenCapturePermission()
-            PermissionService.ensureShortcutHelperRunning()
-            helperStatus = PermissionService.shortcutHelperStatus
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshScreenCapturePermission()
-            helperStatus = PermissionService.shortcutHelperStatus
         }
         .onChange(of: settings) { _, _ in
             store.save(settings)
@@ -172,13 +157,6 @@ struct ScreenshotSettingsView: View {
             return "权限尚未对当前版本生效；若系统设置已开启，请关闭后重新开启，再重启 Fewer"
         }
         return "需要屏幕录制权限"
-    }
-
-    private var helperAuthorizationText: String {
-        if helperStatus.isAccessibilityTrusted {
-            return helperStatus.isFresh() ? "已授权" : "已授权（助手未运行）"
-        }
-        return helperStatus.isFresh() ? "未授权" : "等待助手启动"
     }
 
     private func requestScreenCapturePermission() {

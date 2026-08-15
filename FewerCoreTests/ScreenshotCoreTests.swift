@@ -533,7 +533,12 @@ final class ScreenshotCoreTests: XCTestCase {
     }
 
     func testAnalyzeTracksFastSameDirectionWithTenPercentOverlap() throws {
-        let configuration = StitchConfiguration(minimumOverlapRatio: 0.1)
+        // 引擎保留显式放宽的能力；默认安全配置下 10% 重叠会被拒绝，
+        // 见 testAnalyzeRejectsShiftBelowMinimumMatchOverlapByDefault。
+        let configuration = StitchConfiguration(
+            minimumOverlapRatio: 0.1,
+            minimumMatchOverlapRatio: 0.1
+        )
         let previous = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
         let next = makeScrollingFrame(documentStart: 216, width: 96, height: 240)
         let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
@@ -550,6 +555,179 @@ final class ScreenshotCoreTests: XCTestCase {
         XCTAssertEqual(match.offsetY, 216)
         XCTAssertEqual(match.overlapHeight, 24)
         XCTAssertGreaterThanOrEqual(match.confidence, 0.99)
+    }
+
+    func testAnalyzeRejectsShiftBelowMinimumMatchOverlapByDefault() throws {
+        // 位移 216/240（仅剩 10% 重叠）：默认安全配置下应拒绝。
+        // 快速滚动/丢帧时小重叠匹配极易锁到错误峰值，产生错误 placement，
+        // 造成长图内容重复（重叠）或漏画（黑边）。
+        let configuration = StitchConfiguration(minimumOverlapRatio: 0.1)
+        let previous = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let next = makeScrollingFrame(documentStart: 216, width: 96, height: 240)
+        let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
+        let nextPrepared = try XCTUnwrap(StitchEngine.prepare(next, configuration: configuration))
+
+        guard case .failure(.lowConfidence) = StitchEngine.analyze(
+            previous: previousPrepared,
+            next: nextPrepared,
+            preferredDirection: .down,
+            maximumShiftRatio: 0.9,
+            configuration: configuration
+        ) else {
+            return XCTFail("默认安全配置下 10% 重叠的匹配应被拒绝")
+        }
+    }
+
+    func testBestGuessDoesNotExceedReliableShiftCap() throws {
+        // 猜测位移同样受可靠重叠上限约束；帧间实际位移超出上限时，
+        // 过期的先验位移得分很差、不会被采用，调用方据此保持基准
+        // 而不是错误推进 coverage。
+        let configuration = StitchConfiguration(minimumOverlapRatio: 0.1)
+        let previous = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let next = makeScrollingFrame(documentStart: 216, width: 96, height: 240)
+        let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
+        let nextPrepared = try XCTUnwrap(StitchEngine.prepare(next, configuration: configuration))
+
+        let guess = try XCTUnwrap(
+            StitchEngine.bestGuess(
+                previous: previousPrepared,
+                next: nextPrepared,
+                maximumShiftRatio: 0.9,
+                configuration: configuration
+            )
+        )
+        XCTAssertLessThanOrEqual(guess.offsetY, 180)
+
+        let guided = try XCTUnwrap(
+            StitchEngine.bestGuess(
+                previous: previousPrepared,
+                next: nextPrepared,
+                maximumShiftRatio: 0.9,
+                priorDirection: .down,
+                priorShift: 30,
+                configuration: configuration
+            )
+        )
+        XCTAssertNotEqual(guided.offsetY, 30)
+    }
+
+    func testAnalyzeAcceptsCleanJumpUnderExtendedRecoveryConfig() throws {
+        // PageDown、拖滚动条等一次位移可达 90% 帧高。放宽重叠上限并同时
+        // 提高置信度与峰值锐度要求后，明显唯一的对齐应能恢复，保证跳页也能截到。
+        let configuration = StitchConfiguration(
+            minimumOverlapRatio: 0.04,
+            minimumMatchOverlapRatio: 0.05,
+            minimumConfidence: 0.98,
+            minimumScoreMargin: 0.06
+        )
+        let previous = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let next = makeScrollingFrame(documentStart: 216, width: 96, height: 240)
+        let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
+        let nextPrepared = try XCTUnwrap(StitchEngine.prepare(next, configuration: configuration))
+
+        let match = try StitchEngine.analyze(
+            previous: previousPrepared,
+            next: nextPrepared,
+            preferredDirection: .down,
+            maximumShiftRatio: 0.95,
+            configuration: configuration
+        ).get()
+
+        XCTAssertEqual(match.offsetY, 216)
+        XCTAssertEqual(match.overlapHeight, 24)
+        XCTAssertGreaterThanOrEqual(match.confidence, 0.98)
+    }
+
+    func testAnalyzeRejectsAmbiguousJumpUnderExtendedRecoveryConfig() throws {
+        // 周期性内容在 90% 位移处存在多个同样完美的对齐：峰值锐度不足，
+        // 即使放宽上限也不能接受，否则长图会写入错位内容。
+        let configuration = StitchConfiguration(
+            minimumOverlapRatio: 0.04,
+            minimumMatchOverlapRatio: 0.05,
+            minimumConfidence: 0.98,
+            minimumScoreMargin: 0.06
+        )
+        let previous = makePeriodicFrame(period: 60, documentStart: 0, width: 96, height: 240)
+        let next = makePeriodicFrame(period: 60, documentStart: 216, width: 96, height: 240)
+        let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
+        let nextPrepared = try XCTUnwrap(StitchEngine.prepare(next, configuration: configuration))
+
+        guard case .failure(.lowConfidence) = StitchEngine.analyze(
+            previous: previousPrepared,
+            next: nextPrepared,
+            preferredDirection: .down,
+            maximumShiftRatio: 0.95,
+            configuration: configuration
+        ) else {
+            return XCTFail("周期性内容的跳转对齐应因峰值锐度不足被拒绝")
+        }
+    }
+
+    func testAnalyzeDistinguishesUniqueLabelsOnUniformCardPage() throws {
+        // 复现 /private/tmp/fewer-scroll-test.html：浅色卡片铺满宽度、按 3 张
+        // 一轮循环颜色，只有左侧标签逐卡唯一。位移对齐到 3 张卡片周期时
+        // 标签错位必须体现在分数里，否则离群裁剪会把唯一差异裁掉，
+        // 真位移与假位移分数相同 → 首对帧即低置信度 → 只截到首帧。
+        let previous = makeUniformCardPageFrame(documentStart: 0, width: 480, height: 480)
+        let next = makeUniformCardPageFrame(documentStart: 60, width: 480, height: 480)
+
+        let match = try StitchEngine.analyze(previous: previous, next: next).get()
+
+        XCTAssertEqual(match.offsetY, 60)
+    }
+
+    func testAnalyzeAutoDirectionTracksLargeManualScrollInBothDirections() throws {
+        let configuration = StitchConfiguration(
+            minimumOverlapRatio: 0.1,
+            minimumMatchOverlapRatio: 0.1
+        )
+        let top = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let bottom = makeScrollingFrame(documentStart: 204, width: 96, height: 240)
+        let topPrepared = try XCTUnwrap(StitchEngine.prepare(top, configuration: configuration))
+        let bottomPrepared = try XCTUnwrap(StitchEngine.prepare(bottom, configuration: configuration))
+
+        let downward = try StitchEngine.analyze(
+            previous: topPrepared,
+            next: bottomPrepared,
+            preferredDirection: nil,
+            maximumShiftRatio: 0.9,
+            configuration: configuration
+        ).get()
+        let upward = try StitchEngine.analyze(
+            previous: bottomPrepared,
+            next: topPrepared,
+            preferredDirection: nil,
+            maximumShiftRatio: 0.9,
+            configuration: configuration
+        ).get()
+
+        XCTAssertEqual(downward.direction, .down)
+        XCTAssertEqual(downward.offsetY, 204)
+        XCTAssertEqual(upward.direction, .up)
+        XCTAssertEqual(upward.offsetY, 204)
+    }
+
+    func testAnalyzeAutoDirectionAcceptsExactMatchOnRepeatedCardPage() throws {
+        let configuration = StitchConfiguration(minimumOverlapRatio: 0.1)
+        let previous = makeRepeatedCardFrame(documentStart: 0, width: 192, height: 360)
+        let next = makeRepeatedCardFrame(documentStart: 120, width: 192, height: 360)
+        let previousPrepared = try XCTUnwrap(StitchEngine.prepare(previous, configuration: configuration))
+        let nextPrepared = try XCTUnwrap(StitchEngine.prepare(next, configuration: configuration))
+
+        let result = StitchEngine.analyze(
+            previous: previousPrepared,
+            next: nextPrepared,
+            preferredDirection: nil,
+            maximumShiftRatio: 0.9,
+            configuration: configuration
+        )
+        guard case .success(let match) = result else {
+            return XCTFail("重复卡片页面的精确重叠应被接受：\(result)")
+        }
+
+        XCTAssertEqual(match.direction, .down)
+        XCTAssertEqual(match.offsetY, 120)
+        XCTAssertGreaterThanOrEqual(match.confidence, 0.995)
     }
 
     func testAnalyzeToleratesSmallPixelNoise() throws {
@@ -611,6 +789,103 @@ final class ScreenshotCoreTests: XCTestCase {
         XCTAssertEqual(coverage.outputHeight(frameHeight: 240), 360)
     }
 
+    func testCoverageDoesNotDuplicateContentAfterManualBacktracking() throws {
+        let starts = [0, 60, 120, 60, 0, 60, 120, 180]
+        let frames = starts.map { makeScrollingFrame(documentStart: $0, width: 96, height: 240) }
+        var coverage = StitchCoverage()
+        var contributions: [StitchCoverageContribution] = []
+        for pair in zip(frames, frames.dropFirst()) {
+            contributions.append(coverage.advance(
+                by: try StitchEngine.analyze(previous: pair.0, next: pair.1).get()
+            ))
+        }
+
+        XCTAssertEqual(
+            contributions,
+            [.append, .append, .covered, .covered, .covered, .covered, .append]
+        )
+        XCTAssertEqual(coverage.minimumOriginY, 0)
+        XCTAssertEqual(coverage.maximumOriginY, 180)
+        XCTAssertEqual(coverage.outputHeight(frameHeight: 240), 420)
+    }
+
+    func testKeyframePolicyBridgesFramesBelowSpacing() {
+        XCTAssertEqual(
+            StitchKeyframePolicy.decide(gap: 100, spacing: 200),
+            .bridge
+        )
+    }
+
+    func testKeyframePolicyRetainsFramesWithinSafeGap() {
+        XCTAssertEqual(
+            StitchKeyframePolicy.decide(gap: 400, spacing: 200),
+            .retain
+        )
+        // 边界：gap 恰好等于最小间距或最大安全间距时都允许存储。
+        XCTAssertEqual(
+            StitchKeyframePolicy.decide(gap: 200, spacing: 200),
+            .retain
+        )
+    }
+
+    func testKeyframePolicyOnlyDropsWhenSnapshotChainBreaks() {
+        // 空白带只取决于与“最后一个将进入快照的帧”是否仍有重叠；
+        // 距更早已存储帧的间距再大（桥接帧累加 + 大位移）也不是丢弃理由，
+        // 否则快速滚动会让后续所有帧被永久丢弃。
+        XCTAssertFalse(
+            StitchKeyframePolicy.breaksSnapshotChain(gap: 1400, frameHeight: 1440, minimumShift: 4)
+        )
+        XCTAssertTrue(
+            StitchKeyframePolicy.breaksSnapshotChain(gap: 1437, frameHeight: 1440, minimumShift: 4)
+        )
+        XCTAssertTrue(
+            StitchKeyframePolicy.breaksSnapshotChain(gap: 2000, frameHeight: 1440, minimumShift: 4)
+        )
+    }
+
+    func testRollingPreviewViewportFollowsLatestContentWhenScrollingDown() throws {
+        let rect = try XCTUnwrap(RollingPreviewViewport.cropRect(
+            imageSize: CGSize(width: 160, height: 420),
+            maximumHeight: 176,
+            direction: .down
+        ))
+
+        XCTAssertEqual(rect, CGRect(x: 0, y: 244, width: 160, height: 176))
+    }
+
+    func testRollingPreviewViewportFollowsTopWhenScrollingUp() throws {
+        let rect = try XCTUnwrap(RollingPreviewViewport.cropRect(
+            imageSize: CGSize(width: 160, height: 420),
+            maximumHeight: 176,
+            direction: .up
+        ))
+
+        XCTAssertEqual(rect, CGRect(x: 0, y: 0, width: 160, height: 176))
+    }
+
+    func testRollingPreviewViewportKeepsShortImageWhole() throws {
+        let rect = try XCTUnwrap(RollingPreviewViewport.cropRect(
+            imageSize: CGSize(width: 160, height: 120),
+            maximumHeight: 176,
+            direction: .down
+        ))
+
+        XCTAssertEqual(rect, CGRect(x: 0, y: 0, width: 160, height: 120))
+    }
+
+    func testRollingPreviewViewportRejectsEmptyDimensions() {
+        XCTAssertNil(RollingPreviewViewport.cropRect(
+            imageSize: CGSize(width: 0, height: 120),
+            maximumHeight: 176,
+            direction: .down
+        ))
+        XCTAssertNil(RollingPreviewViewport.cropRect(
+            imageSize: CGSize(width: 160, height: 120),
+            maximumHeight: 0,
+            direction: .down
+        ))
+    }
+
     func testComposeOrdersBidirectionalPlacementsWithoutDuplicatingRevisitedFrames() throws {
         let frames = [
             makeScrollingFrame(documentStart: 0, width: 96, height: 240),
@@ -627,6 +902,100 @@ final class ScreenshotCoreTests: XCTestCase {
         ).get()
 
         XCTAssertEqual(result.height, 360)
+    }
+
+    func testComposeRejectsUncoveredGapBetweenKeyframes() {
+        let frames = [
+            makeScrollingFrame(documentStart: 0, width: 96, height: 240),
+            makeScrollingFrame(documentStart: 280, width: 96, height: 240),
+        ]
+
+        let result = StitchEngine.compose(
+            frames: frames,
+            placements: [
+                StitchFramePlacement(originY: 0),
+                StitchFramePlacement(originY: 280),
+            ]
+        )
+
+        guard case .failure(.invalidFrame) = result else {
+            return XCTFail("关键帧之间存在未覆盖内容时不能静默生成缺失带")
+        }
+    }
+
+    func testComposeUsesBridgeAcrossVariableScrollSpeed() throws {
+        let frames = [0, 100, 280].map {
+            makeScrollingFrame(documentStart: $0, width: 96, height: 240)
+        }
+        let result = try StitchEngine.compose(
+            frames: frames,
+            placements: [0, 100, 280].map { StitchFramePlacement(originY: $0) }
+        ).get()
+        let expected = makeScrollingFrame(documentStart: 0, width: 96, height: 520)
+
+        XCTAssertEqual(result.height, 520)
+        XCTAssertEqual(
+            StitchEngine.frame(of: result)?.rowHashes,
+            StitchEngine.frame(of: expected)?.rowHashes
+        )
+    }
+
+    // MARK: - StitchEngine.compose seam feathering
+
+    func testComposeFeatherKeepsIdenticalOverlapUnchanged() throws {
+        let frames = [0, 80].map {
+            makeScrollingFrame(documentStart: $0, width: 96, height: 240)
+        }
+        let result = try StitchEngine.compose(
+            frames: frames,
+            placements: [0, 80].map { StitchFramePlacement(originY: $0) }
+        ).get()
+        let expected = makeScrollingFrame(documentStart: 0, width: 96, height: 320)
+
+        XCTAssertEqual(result.height, 320)
+        XCTAssertEqual(
+            StitchEngine.frame(of: result)?.rowHashes,
+            StitchEngine.frame(of: expected)?.rowHashes
+        )
+    }
+
+    func testComposeFeathersDifferingOverlapRowsNearSeam() throws {
+        // 后一帧重叠区改为纯黑，模拟滚动中悬停状态变化；
+        // 羽化只影响接缝前 16 行，其余行与跳过重叠区的参考合成逐行一致。
+        let top = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let bottom = makeFrameWithBlackTop(
+            blackTop: 160,
+            documentStart: 80,
+            width: 96,
+            height: 240
+        )
+        let result = try StitchEngine.compose(
+            frames: [top, bottom],
+            placements: [
+                StitchFramePlacement(originY: 0),
+                StitchFramePlacement(originY: 80),
+            ]
+        ).get()
+        let reference = makeSkipOverlapReference(
+            top: top,
+            bottom: bottom,
+            overlap: 160,
+            width: 96,
+            height: 320
+        )
+
+        let resultHashes = try XCTUnwrap(StitchEngine.frame(of: result)?.rowHashes)
+        let referenceHashes = try XCTUnwrap(StitchEngine.frame(of: reference)?.rowHashes)
+        XCTAssertEqual(result.height, 320)
+        XCTAssertEqual(resultHashes.count, referenceHashes.count)
+
+        for y in 0..<resultHashes.count where !(224..<240).contains(y) {
+            XCTAssertEqual(resultHashes[y], referenceHashes[y], "第 \(y) 行应与参考合成一致")
+        }
+        let blendedRows = (224..<240).filter {
+            resultHashes[$0] != referenceHashes[$0]
+        }.count
+        XCTAssertEqual(blendedRows, 16, "接缝前 16 行应全部被羽化混合")
     }
 
     func testAnalyzeRejectsDimensionChange() {
@@ -683,6 +1052,258 @@ final class ScreenshotCoreTests: XCTestCase {
         ) else {
             return XCTFail("周期性内容上的模糊位移应返回低置信度")
         }
+    }
+
+    func testBestGuessReturnsOffsetForScrolledFrames() throws {
+        let previousImage = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let nextImage = makeScrollingFrame(documentStart: 64, width: 96, height: 240)
+        let previous = try XCTUnwrap(StitchEngine.prepare(previousImage))
+        let next = try XCTUnwrap(StitchEngine.prepare(nextImage))
+
+        let guess = try XCTUnwrap(StitchEngine.bestGuess(previous: previous, next: next))
+        XCTAssertEqual(guess.direction, .down)
+        XCTAssertEqual(guess.offsetY, 64)
+    }
+
+    func testBestGuessReturnsMatchWhenAnalyzeRejectsAmbiguity() throws {
+        let previousImage = makePeriodicFrame(period: 60, documentStart: 0, width: 96, height: 240)
+        let nextImage = makePeriodicFrame(period: 60, documentStart: 30, width: 96, height: 240)
+        let previous = try XCTUnwrap(StitchEngine.prepare(previousImage))
+        let next = try XCTUnwrap(StitchEngine.prepare(nextImage))
+
+        XCTAssertNotNil(StitchEngine.bestGuess(previous: previous, next: next))
+    }
+
+    func testBestGuessPrefersPriorShiftOnPeriodicContent() throws {
+        // 周期性内容上多个位移分数相同；先验位移（上一帧的真实位移）
+        // 应被优先采用，避免快速滚动时选错周期导致拼接重叠。
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makePeriodicFrame(period: 60, documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makePeriodicFrame(period: 60, documentStart: 30, width: 96, height: 240))
+        )
+
+        let guided = try XCTUnwrap(
+            StitchEngine.bestGuess(
+                previous: previous,
+                next: next,
+                priorDirection: .down,
+                priorShift: 90
+            )
+        )
+        XCTAssertEqual(guided.direction, .down)
+        XCTAssertEqual(guided.offsetY, 90)
+    }
+
+    func testBestGuessRejectsPriorShiftWhenScoreIsMuchWorse() throws {
+        // 非周期内容上先验位移明显不匹配时，应回退到全局最优位移。
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 64, width: 96, height: 240))
+        )
+
+        let guess = try XCTUnwrap(
+            StitchEngine.bestGuess(
+                previous: previous,
+                next: next,
+                priorDirection: .down,
+                priorShift: 200
+            )
+        )
+        XCTAssertEqual(guess.offsetY, 64)
+    }
+
+    func testBestGuessIgnoresPriorShiftFromWrongDirection() throws {
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 64, width: 96, height: 240))
+        )
+
+        let guess = try XCTUnwrap(
+            StitchEngine.bestGuess(
+                previous: previous,
+                next: next,
+                priorDirection: .up,
+                priorShift: 64
+            )
+        )
+        XCTAssertEqual(guess.direction, .down)
+        XCTAssertEqual(guess.offsetY, 64)
+    }
+
+    // MARK: - StitchEngine prior continuity
+
+    func testAnalyzePrefersPriorShiftOnPeriodicContent() throws {
+        // 周期性内容上多个位移得分并列，全局最优无法通过峰值锐度检查；
+        // 传入连续滚动先验后应跳过峰值检查、在容差内采用先验位移。
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makePeriodicFrame(period: 60, documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makePeriodicFrame(period: 60, documentStart: 30, width: 96, height: 240))
+        )
+
+        let unguided = StitchEngine.analyze(
+            previous: previous,
+            next: next,
+            preferredDirection: .down
+        )
+        guard case .failure(.lowConfidence) = unguided else {
+            return XCTFail("周期性并列峰值在无先验时应判低置信度")
+        }
+
+        let guided = try StitchEngine.analyze(
+            previous: previous,
+            next: next,
+            preferredDirection: .down,
+            priorShift: 150
+        ).get()
+        XCTAssertEqual(guided.direction, .down)
+        XCTAssertEqual(guided.offsetY, 150)
+    }
+
+    func testAnalyzeRejectsPriorShiftWhenScoreIsMuchWorse() throws {
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 64, width: 96, height: 240))
+        )
+
+        let match = try StitchEngine.analyze(
+            previous: previous,
+            next: next,
+            preferredDirection: .down,
+            priorShift: 150
+        ).get()
+        XCTAssertEqual(match.offsetY, 64)
+    }
+
+    func testAnalyzeIgnoresInvalidPriorShift() throws {
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 0, width: 96, height: 240))
+        )
+        let next = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 64, width: 96, height: 240))
+        )
+
+        let zeroPrior = try StitchEngine.analyze(
+            previous: previous,
+            next: next,
+            preferredDirection: .down,
+            priorShift: 0
+        ).get()
+        XCTAssertEqual(zeroPrior.offsetY, 64)
+
+        let overCapPrior = try StitchEngine.analyze(
+            previous: previous,
+            next: next,
+            preferredDirection: .down,
+            priorShift: 200
+        ).get()
+        XCTAssertEqual(overCapPrior.offsetY, 64)
+    }
+
+    func testAnalyzeRejectsWhenScrollDirectionDoesNotMatchPreference() throws {
+        let previous = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: 0, width: 96, height: 240))
+        )
+        let upScrolled = try XCTUnwrap(
+            StitchEngine.prepare(makeScrollingFrame(documentStart: -64, width: 96, height: 240))
+        )
+
+        let result = StitchEngine.analyze(
+            previous: previous,
+            next: upScrolled,
+            preferredDirection: .down,
+            priorShift: 64
+        )
+        guard case .failure(.lowConfidence) = result else {
+            return XCTFail("实际滚动方向与先验方向不一致时不得返回成功匹配")
+        }
+    }
+
+    func testBlackBandsDetectsTopAndBottomBlackEdges() throws {
+        let image = makeScrollingFrame(
+            documentStart: 0,
+            width: 96,
+            height: 240,
+            topBlackBand: 40,
+            bottomBlackBand: 20
+        )
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared)
+        XCTAssertEqual(bands.top, 40)
+        XCTAssertEqual(bands.bottom, 20)
+    }
+
+    func testBlackBandsIgnoreFullyDarkPage() throws {
+        // 整体深色页面（如深色模式网页）不应被误判为黑边。
+        var data = Data(count: 96 * 240 * 4)
+        data.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for i in 0..<(96 * 240 * 4) {
+                bytes[i] = i % 2 == 0 ? 4 : 8
+            }
+        }
+        let image = makeImage(width: 96, height: 240, data: &data)
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared)
+        XCTAssertEqual(bands.top, 0)
+        XCTAssertEqual(bands.bottom, 0)
+    }
+
+    func testBlackBandsDetectFullyBlackCaptureFrame() throws {
+        // 整个帧平均亮度极低：捕获黑屏，应标记为 fullyBlack 而非边缘黑边。
+        var data = Data(count: 96 * 240 * 4)
+        data.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for i in 0..<(96 * 240 * 4) {
+                bytes[i] = 0
+            }
+        }
+        let image = makeImage(width: 96, height: 240, data: &data)
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared)
+        XCTAssertTrue(bands.fullyBlack)
+        XCTAssertFalse(bands.isEmpty)
+    }
+
+    func testBlackBandsSkipsMostlyBlackFrameWhenReferenceIsLight() throws {
+        // 快速滚动时未渲染区域可超过半帧：主体近黑 + 参考帧偏亮 → 未渲染黑带，
+        // 之前会按“深色页面”放行并在长图上留下黑条。
+        let image = makeSolidImage(width: 96, height: 240, color: (r: 5, g: 5, b: 5))
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared, referenceMeanLuminance: 200)
+        XCTAssertTrue(bands.unrendered)
+        XCTAssertFalse(bands.isEmpty)
+    }
+
+    func testBlackBandsKeepsDarkSectionWhenReferenceIsDark() throws {
+        // 深色页面（参考帧同样偏暗）上的深色区域是正常内容，不是未渲染黑带。
+        let image = makeSolidImage(width: 96, height: 240, color: (r: 5, g: 5, b: 5))
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared, referenceMeanLuminance: 8)
+        XCTAssertTrue(bands.isEmpty)
+    }
+
+    func testBlackBandsIgnoreNormalFrame() throws {
+        let image = makeScrollingFrame(documentStart: 0, width: 96, height: 240)
+        let prepared = try XCTUnwrap(StitchEngine.prepare(image))
+
+        let bands = StitchEngine.blackBands(of: prepared)
+        XCTAssertEqual(bands.top, 0)
+        XCTAssertEqual(bands.bottom, 0)
     }
 
     func testAnalyzeStillFindsOffsetWhenBlankAreaIsMinority() {
@@ -804,7 +1425,9 @@ final class ScreenshotCoreTests: XCTestCase {
         height: Int,
         stationaryTop: Int = 0,
         stationaryBottom: Int = 0,
-        noise: Int = 0
+        noise: Int = 0,
+        topBlackBand: Int = 0,
+        bottomBlackBand: Int = 0
     ) -> CGImage {
         var data = Data(count: width * height * 4)
         data.withUnsafeMutableBytes { raw in
@@ -813,7 +1436,9 @@ final class ScreenshotCoreTests: XCTestCase {
                 for x in 0..<width {
                     let i = (y * width + x) * 4
                     let values: (Int, Int, Int)
-                    if y < stationaryTop {
+                    if y < topBlackBand || y >= height - bottomBlackBand {
+                        values = (0, 0, 0)
+                    } else if y < stationaryTop {
                         values = (28 + x % 7, 42, 58)
                     } else if y >= height - stationaryBottom {
                         values = (72, 48 + x % 9, 36)
@@ -869,6 +1494,54 @@ final class ScreenshotCoreTests: XCTestCase {
         return makeImage(width: width, height: height, data: &data)
     }
 
+    private func makeUniformCardPageFrame(
+        documentStart: Int,
+        width: Int,
+        height: Int
+    ) -> CGImage {
+        // 复现 fewer-scroll-test.html 的结构：116px 周期的浅色卡片，
+        // 卡片颜色按 3 张一轮循环，只有左侧 40% 宽度的标签逐卡唯一。
+        let cardStride = 116
+        var data = Data(count: width * height * 4)
+        data.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for y in 0..<height {
+                let documentY = documentStart + y
+                let cardIndex = documentY / cardStride
+                let rowInCard = documentY % cardStride
+                for x in 0..<width {
+                    let index = (y * width + x) * 4
+                    let background: (Int, Int, Int)
+                    if rowInCard < 12 || rowInCard >= 104 {
+                        background = (245, 245, 247)
+                    } else {
+                        switch cardIndex % 3 {
+                        case 0: background = (255, 255, 255)
+                        case 1: background = (232, 239, 255)
+                        default: background = (223, 245, 231)
+                        }
+                    }
+                    let labelRow = rowInCard >= 34 && rowInCard < 70
+                    let labelZone = x < width * 2 / 5
+                    // 真实文字每行都有字形结构：标签值逐行变化，
+                    // 使相邻像素级位移也能被区分（纯色块会让 ±1 位移同分）。
+                    let labelValue = (cardIndex * 7919 + rowInCard * 131) % 251
+                    let values: (Int, Int, Int)
+                    if labelRow && labelZone {
+                        values = (labelValue / 4, labelValue / 2, labelValue)
+                    } else {
+                        values = background
+                    }
+                    bytes[index] = UInt8(values.0)
+                    bytes[index + 1] = UInt8(values.1)
+                    bytes[index + 2] = UInt8(values.2)
+                    bytes[index + 3] = 255
+                }
+            }
+        }
+        return makeImage(width: width, height: height, data: &data)
+    }
+
     private func makePeriodicFrame(
         period: Int,
         documentStart: Int,
@@ -890,6 +1563,121 @@ final class ScreenshotCoreTests: XCTestCase {
             }
         }
         return makeImage(width: width, height: height, data: &data)
+    }
+
+    private func makeRepeatedCardFrame(
+        documentStart: Int,
+        width: Int,
+        height: Int
+    ) -> CGImage {
+        let cardStride = 120
+        var data = Data(count: width * height * 4)
+        data.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for y in 0..<height {
+                let documentY = documentStart + y
+                let cardIndex = documentY / cardStride
+                let rowInCard = documentY % cardStride
+                for x in 0..<width {
+                    let index = (y * width + x) * 4
+                    let values: (Int, Int, Int)
+                    if rowInCard < 12 {
+                        values = (245, 245, 247)
+                    } else if rowInCard < 104 {
+                        switch cardIndex % 3 {
+                        case 0: values = (232, 239, 255)
+                        case 1: values = (255, 255, 255)
+                        default: values = (223, 245, 231)
+                        }
+                    } else {
+                        values = (245, 245, 247)
+                    }
+
+                    let isMarker = rowInCard >= 12 && rowInCard < 104 && x < width / 2
+                    let markerValue = 20
+                        + (rowInCard * rowInCard * 13 + rowInCard * 17) % 120
+                        + (cardIndex % 3) * 30
+                        + (cardIndex / 3) * 5
+                    bytes[index] = UInt8(isMarker ? markerValue : values.0)
+                    bytes[index + 1] = UInt8(isMarker ? markerValue : values.1)
+                    bytes[index + 2] = UInt8(isMarker ? markerValue : values.2)
+                    bytes[index + 3] = 255
+                }
+            }
+        }
+        return makeImage(width: width, height: height, data: &data)
+    }
+
+    private func makeFrameWithBlackTop(
+        blackTop: Int,
+        documentStart: Int,
+        width: Int,
+        height: Int
+    ) -> CGImage {
+        var data = Data(count: width * height * 4)
+        data.withUnsafeMutableBytes { raw in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            for y in 0..<height {
+                for x in 0..<width {
+                    let i = (y * width + x) * 4
+                    let values: (Int, Int, Int)
+                    if y < blackTop {
+                        values = (0, 0, 0)
+                    } else {
+                        let documentY = documentStart + y
+                        values = (
+                            (documentY * 7 + x * 3) % 251,
+                            (documentY * 11 + x * 5) % 247,
+                            (documentY * 13 + x * 7) % 239
+                        )
+                    }
+                    bytes[i] = UInt8(values.0)
+                    bytes[i + 1] = UInt8(values.1)
+                    bytes[i + 2] = UInt8(values.2)
+                    bytes[i + 3] = 255
+                }
+            }
+        }
+        return makeImage(width: width, height: height, data: &data)
+    }
+
+    /// 参考合成：完全跳过重叠区、不做羽化（用于验证羽化只影响接缝附近行）。
+    private func makeSkipOverlapReference(
+        top: CGImage,
+        bottom: CGImage,
+        overlap: Int,
+        width: Int,
+        height: Int
+    ) -> CGImage {
+        var data = Data(count: width * height * 4)
+        return data.withUnsafeMutableBytes { raw in
+            let context = CGContext(
+                data: raw.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )!
+            // 输出第 0 行在顶部；CGContext 原点在左下，按翻转坐标放置。
+            let topHeight = top.height
+            context.draw(
+                top,
+                in: CGRect(x: 0, y: height - topHeight, width: width, height: topHeight)
+            )
+            let piece = bottom.cropping(to: CGRect(
+                x: 0,
+                y: overlap,
+                width: width,
+                height: bottom.height - overlap
+            ))!
+            context.draw(
+                piece,
+                in: CGRect(x: 0, y: 0, width: width, height: bottom.height - overlap)
+            )
+            return context.makeImage()!
+        }
     }
 
     private func makeImage(width: Int, height: Int, data: inout Data) -> CGImage {

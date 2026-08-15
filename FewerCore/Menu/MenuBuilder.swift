@@ -61,6 +61,12 @@ public struct MenuBuilder: Sendable {
                     isEnabled: context.isTargetWritable
                 )
 
+            case (.container, .refresh):
+                return MenuEntry(command: .refresh, title: "刷新")
+
+            case (.items, .refresh) where !context.selectedURLs.isEmpty:
+                return MenuEntry(command: .refresh, title: "刷新")
+
             default:
                 return nil
             }

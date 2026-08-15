@@ -39,7 +39,8 @@ public enum RollingCaptureTransitions {
 }
 
 /// 连续滚动截图的有界桥接帧队列。消费端必须按捕获顺序读取，
-/// 仅在生产速度超过容量时丢弃最旧帧，避免直接跳到最新画面而失去重叠区。
+/// 队列满时丢弃最旧的待消费帧，让队列始终保留最近捕获的画面，
+/// 避免消费端积压耗尽后帧间隔跳变导致快速滚动帧失配。
 public struct RollingFrameBuffer<Element> {
     public let capacity: Int
     private var elements: [Element] = []
@@ -52,9 +53,13 @@ public struct RollingFrameBuffer<Element> {
     public var count: Int { elements.count }
 
     public mutating func append(_ element: Element) {
-        elements.append(element)
-        if elements.count > capacity {
-            elements.removeFirst(elements.count - capacity)
+        if elements.count < capacity {
+            elements.append(element)
+        } else {
+            // 队列满：丢弃最旧的待消费帧，保持消费帧间隔均匀，
+            // 并让队列始终贴近当前画面。
+            elements.removeFirst()
+            elements.append(element)
         }
     }
 

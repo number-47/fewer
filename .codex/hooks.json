@@ -1,0 +1,29 @@
+{
+  "description": "Fewer repository delivery gate.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/stop_gate.py\"",
+            "timeout": 60,
+            "statusMessage": "记录 Fewer 任务基线"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/stop_gate.py\"",
+            "timeout": 900,
+            "statusMessage": "检查 Fewer Definition of Done"
+          }
+        ]
+      }
+    ]
+  }
+}

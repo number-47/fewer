@@ -109,9 +109,9 @@ final class ScreenshotService: CaptureOverlayDelegate {
 
     // MARK: - CaptureOverlayDelegate
 
-    func overlayDidStartRollingCapture(_ cgRect: CGRect, mode: RollingCaptureMode) {
+    func overlayDidStartRollingCapture(_ cgRect: CGRect) {
         guard let captureID = captureSessions.activeID else { return }
-        Self.debugLog("rolling selected mode=\(mode.title) rect=\(cgRect)")
+        Self.debugLog("rolling selected rect=\(cgRect)")
         dismissOverlay()
         let controller = RollingCaptureController()
         rollingController = controller
@@ -119,7 +119,6 @@ final class ScreenshotService: CaptureOverlayDelegate {
             ?? captureTargetApplication
         controller.start(
             rect: cgRect,
-            mode: mode,
             targetApplication: target,
             completion: { [weak self, weak controller] image in
                 guard let self, self.rollingController === controller else { return }

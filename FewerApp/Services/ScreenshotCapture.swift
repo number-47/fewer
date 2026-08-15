@@ -11,14 +11,23 @@ import Security
 /// 截屏捕获底层：屏幕录制权限、全屏/区域/窗口捕获、在屏窗口列表。
 /// 注意坐标：CGWindowList* 使用全局屏幕坐标（原点左上）；NSEvent/NSScreen 使用 AppKit 坐标（原点左下）。
 enum ScreenshotCapture {
+    /// 一次滚动截图交付的帧，附带上一次交付以来被队列丢弃的旧帧数。
+    /// 丢帧意味着相邻交付帧之间的真实位移被放大，位置连续性先验不可信。
+    struct RollingCapturedFrame {
+        let image: CGImage
+        let droppedBefore: Int
+    }
+
     enum RollingCaptureError: LocalizedError {
         case displayUnavailable
         case captureFailed
+        case captureFinished
 
         var errorDescription: String? {
             switch self {
             case .displayUnavailable: "选区必须完整位于同一台显示器内"
             case .captureFailed: "无法读取滚动截图区域"
+            case .captureFinished: "滚动截图录制已结束"
             }
         }
     }
@@ -28,6 +37,7 @@ enum ScreenshotCapture {
         private let stream: SCStream
         private let output: RollingStreamOutput
         private var started = false
+        private var finished = false
 
         fileprivate init(
             filter: SCContentFilter,
@@ -38,8 +48,11 @@ enum ScreenshotCapture {
             stream = SCStream(filter: filter, configuration: configuration, delegate: output)
         }
 
-        func capture() async throws -> CGImage {
+        func capture() async throws -> RollingCapturedFrame {
             if !started {
+                guard !finished else {
+                    return try await output.nextFrame()
+                }
                 try stream.addStreamOutput(
                     output,
                     type: .screen,
@@ -49,6 +62,7 @@ enum ScreenshotCapture {
                     try await stream.startCapture()
                     started = true
                 } catch {
+                    finished = true
                     output.finish(throwing: error)
                     throw error
                 }
@@ -56,14 +70,27 @@ enum ScreenshotCapture {
             return try await output.nextFrame()
         }
 
-        func discardPendingFrames() {
-            output.discardPendingFrames()
+        /// 停止接收新画面，但保留已经进入本地队列的帧，供拼接器按顺序排空。
+        func finishProducing() async {
+            guard !finished else { return }
+            finished = true
+            if started {
+                started = false
+                try? await stream.stopCapture()
+            }
+            output.finish(discardPendingFrames: false)
         }
 
         func stop() async {
-            guard started else { return }
-            started = false
-            try? await stream.stopCapture()
+            guard !finished else {
+                output.finish()
+                return
+            }
+            finished = true
+            if started {
+                started = false
+                try? await stream.stopCapture()
+            }
             output.finish()
         }
     }
@@ -74,46 +101,49 @@ enum ScreenshotCapture {
         private let cropRect: CGRect
         private let context = CIContext(options: [.cacheIntermediates: false])
         private let lock = NSLock()
-        private var frames = RollingFrameBuffer<CGImage>(capacity: 12)
-        private var waiter: CheckedContinuation<CGImage, Error>?
+        private var frames = RollingFrameBuffer<CGImage>(capacity: 32)
+        private var waiter: CheckedContinuation<RollingCapturedFrame, Error>?
         private var terminalError: Error?
         private var finished = false
+        /// 自上一次交付以来因队列满而被丢弃的旧帧数。
+        private var droppedSinceDelivery = 0
 
         init(cropRect: CGRect) {
             self.cropRect = cropRect
         }
 
-        func nextFrame() async throws -> CGImage {
+        func nextFrame() async throws -> RollingCapturedFrame {
             try await withCheckedThrowingContinuation { continuation in
                 lock.lock()
                 defer { lock.unlock() }
                 if let next = frames.removeNext() {
-                    continuation.resume(returning: next)
+                    let dropped = droppedSinceDelivery
+                    droppedSinceDelivery = 0
+                    continuation.resume(returning: RollingCapturedFrame(image: next, droppedBefore: dropped))
                 } else if let terminalError {
                     continuation.resume(throwing: terminalError)
                 } else if finished {
-                    continuation.resume(throwing: RollingCaptureError.captureFailed)
+                    continuation.resume(throwing: RollingCaptureError.captureFinished)
                 } else {
                     waiter = continuation
                 }
             }
         }
 
-        func finish(throwing error: Error? = nil) {
+        func finish(
+            throwing error: Error? = nil,
+            discardPendingFrames: Bool = true
+        ) {
             lock.lock()
             finished = true
             terminalError = error
             let waiter = waiter
             self.waiter = nil
-            frames.removeAll()
+            if discardPendingFrames {
+                frames.removeAll()
+            }
             lock.unlock()
-            waiter?.resume(throwing: error ?? RollingCaptureError.captureFailed)
-        }
-
-        func discardPendingFrames() {
-            lock.lock()
-            frames.removeAll()
-            lock.unlock()
+            waiter?.resume(throwing: error ?? RollingCaptureError.captureFinished)
         }
 
         func stream(
@@ -157,9 +187,14 @@ enum ScreenshotCapture {
             }
             if let waiter {
                 self.waiter = nil
+                let dropped = droppedSinceDelivery
+                droppedSinceDelivery = 0
                 lock.unlock()
-                waiter.resume(returning: image)
+                waiter.resume(returning: RollingCapturedFrame(image: image, droppedBefore: dropped))
                 return
+            }
+            if frames.count == frames.capacity {
+                droppedSinceDelivery += 1
             }
             frames.append(image)
             lock.unlock()
@@ -298,7 +333,7 @@ enum ScreenshotCapture {
 
     /// 使用 ScreenCaptureKit 捕获滚动截图选区，并排除 Fewer 自身的 HUD/边框窗口。
     static func rollingRegionImage(_ cgRect: CGRect) async throws -> CGImage {
-        try await rollingRegionSession(cgRect).capture()
+        try await rollingRegionSession(cgRect).capture().image
     }
 
     static func rollingRegionSession(_ cgRect: CGRect) async throws -> RollingRegionSession {
@@ -319,18 +354,25 @@ enum ScreenshotCapture {
         )
         // 使用 ScreenCaptureKit 自己的点像素比例，避免 NSScreen 映射失败时退化成 1x。
         let scale = CGFloat(filter.pointPixelScale)
+        // SCK 的 sourceRect（点）与输出宽高（像素）不严格 1:1 时会在流内重采样，
+        // 画面发虚。先把选区对齐到整点，再按整点尺寸乘点像素比取整输出，
+        // 保证缩放恒为 1，滚动长图的每一帧都保持原始清晰度。
+        let alignedRect = cgRect.integral.intersection(display.frame)
+        guard alignedRect.width > 0, alignedRect.height > 0 else {
+            throw RollingCaptureError.displayUnavailable
+        }
         let outputSize = ScreenshotPixelGeometry.outputSize(
-            pointSize: cgRect.size,
+            pointSize: alignedRect.size,
             pointPixelScale: scale
         )
         let configuration = SCStreamConfiguration()
         // 连续流直接在 WindowServer 端裁剪，避免 60 fps 整屏 Retina 帧在传输后才裁剪而丢帧。
         // 输出尺寸与选区物理像素严格一致，不发生缩放，保留原始清晰度。
         configuration.sourceRect = CGRect(
-            x: cgRect.minX - display.frame.minX,
-            y: cgRect.minY - display.frame.minY,
-            width: cgRect.width,
-            height: cgRect.height
+            x: alignedRect.minX - display.frame.minX,
+            y: alignedRect.minY - display.frame.minY,
+            width: alignedRect.width,
+            height: alignedRect.height
         )
         configuration.width = Int(outputSize.width)
         configuration.height = Int(outputSize.height)
@@ -339,8 +381,11 @@ enum ScreenshotCapture {
         configuration.preservesAspectRatio = true
         configuration.showsCursor = false
         configuration.capturesAudio = false
-        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
-        configuration.queueDepth = 5
+        // 30 fps 足以保留快速滚动的桥接画面，同时避免拼接计算长期落后于 60 fps 输入。
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        // 拼接分析期间回调仍以 30 fps 入帧，内部缓冲过小会在回调稍慢时丢帧，
+        // 放大相邻被分析帧之间的滚动位移；加大缓冲保留更多桥接帧。
+        configuration.queueDepth = 16
         configuration.pixelFormat = kCVPixelFormatType_32BGRA
         let cropRect = CGRect(origin: .zero, size: outputSize)
         return RollingRegionSession(filter: filter, configuration: configuration, cropRect: cropRect)

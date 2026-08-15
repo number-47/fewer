@@ -6,10 +6,12 @@ Fewer 是面向 macOS 14+ 的 Swift 6 应用。`FewerApp/` 包含菜单栏主应
 
 ## 构建、测试与开发命令
 
+DerivedData 路径约定：Debug 构建与单元测试一律复用 `.build/DerivedData`，Release 打包复用 `.build/PackageDerivedData`。自定义构建/测试命令不得另起新目录名，避免 `.build` 体积膨胀；清理构建产物直接删除这两个目录即可。注意：本机 Xcode 全局设置为自定义绝对构建位置（`IDECustomBuildProductsPath`），因此测试等 xcodebuild 命令必须像下方一样显式传入 `SYMROOT/OBJROOT`，产物才会进入项目 `.build` 而非全局目录。
+
 - `xcodegen generate`：依据 `project.yml` 更新 Xcode 工程。
-- `./script/build_and_run.sh run`：生成工程、构建 Debug、签名并启动应用；需要 Apple Development 证书。
+- `./script/build_and_run.sh run`：生成工程、构建 Debug 到 `.build/DerivedData`、签名并启动应用；需要 Apple Development 证书。
 - `./script/build_and_run.sh --logs`：启动应用并流式查看三个进程的系统日志。
-- `xcodebuild -project Fewer.xcodeproj -scheme FewerCore -configuration Debug -derivedDataPath .build/TestDerivedData CODE_SIGNING_ALLOWED=NO test | xcbeautify`：运行核心单元测试。
+- `xcodebuild -project Fewer.xcodeproj -scheme FewerCore -configuration Debug -derivedDataPath .build/DerivedData SYMROOT="$PWD/.build/DerivedData/Build/Products" OBJROOT="$PWD/.build/DerivedData/Build/Intermediates.noindex" CODE_SIGNING_ALLOWED=NO test | xcbeautify`：运行核心单元测试（与构建共享同一 DerivedData，可复用增量产物）。
 - `./script/verify_templates.sh`：校验内置 Office 模板及 `Info.plist`。
 - `./script/package.sh --local`：生成本机测试 DMG；正式发布使用 `--signed --notarize`。
 

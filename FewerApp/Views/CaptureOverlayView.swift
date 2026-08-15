@@ -5,7 +5,7 @@ import SwiftUI
 /// 遮罩交互回调（主线程）。
 @MainActor
 protocol CaptureOverlayDelegate: AnyObject {
-    func overlayDidStartRollingCapture(_ cgRect: CGRect, mode: RollingCaptureMode)
+    func overlayDidStartRollingCapture(_ cgRect: CGRect)
     func overlayDidFinishEditing()
     func overlayDidPin(_ pngData: Data)
     func overlayDidCancel()
@@ -158,20 +158,16 @@ struct CaptureOverlayView: View {
             .disabled(hasMarkup)
             .help(hasMarkup ? "已有标注，无法再调整选区" : "拖动选区内部移动，拖动边缘或角落调整大小")
 
-            if rollingCaptureEnabled { rollingMenu }
+            if rollingCaptureEnabled {
+                Button {
+                    startRolling()
+                } label: {
+                    Label("滚动截图", systemImage: "rectangle.stack")
+                }
+                .disabled(hasMarkup)
+                .help(hasMarkup ? "已有标注，无法切换为滚动截图" : "从当前选区开始手动滚动截图")
+            }
         }
-    }
-
-    private var rollingMenu: some View {
-        Menu {
-            Button("手动逐步") { startRolling(.manual) }
-            Button("自动向下") { startRolling(.automatic(.down)) }
-            Button("自动向上") { startRolling(.automatic(.up)) }
-        } label: {
-            Label("滚动截图", systemImage: "rectangle.stack")
-        }
-        .disabled(hasMarkup)
-        .help(hasMarkup ? "已有标注，无法切换为滚动截图" : "从当前选区开始滚动截图")
     }
 
     private var toolbarPosition: CGPoint {
@@ -260,9 +256,9 @@ struct CaptureOverlayView: View {
         }
     }
 
-    private func startRolling(_ mode: RollingCaptureMode) {
+    private func startRolling() {
         guard !hasMarkup, let captureRect else { return }
-        delegate?.overlayDidStartRollingCapture(captureRect, mode: mode)
+        delegate?.overlayDidStartRollingCapture(captureRect)
     }
 
     private func debugPlaceholderImage(size: CGSize) -> CGImage? {

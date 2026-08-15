@@ -6,6 +6,7 @@ public enum FewerFeature: String, Codable, CaseIterable, Identifiable, Sendable 
     case cut
     case paste
     case openInTerminal
+    case refresh
 
     public var id: String { rawValue }
 }
@@ -27,8 +28,8 @@ public enum ConflictPolicy: String, Codable, CaseIterable, Identifiable, Sendabl
 }
 
 public struct FeatureSettings: Codable, Equatable, Sendable {
-    /// 当前配置结构版本：v2 起新增"在终端打开"功能；v3 起支持自定义终端应用。
-    public static let currentSchemaVersion = 3
+    /// 当前配置结构版本：v2 起新增"在终端打开"功能；v3 起支持自定义终端应用；v4 起新增"刷新"功能。
+    public static let currentSchemaVersion = 4
 
     /// "在终端打开"默认使用的终端应用 Bundle Identifier。
     public static let defaultTerminalBundleID = "com.apple.Terminal"
@@ -108,11 +109,19 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// 旧版本配置缺少后续新增的功能项（如 v1 → v2 的"在终端打开"），
     /// 解码后按版本补全：新功能默认启用并追加到菜单末尾，不破坏用户已有开关与排序。
     private mutating func migrateIfNeeded() {
-        if schemaVersion < Self.currentSchemaVersion {
+        if schemaVersion < 2 {
             enabledFeatures.insert(.openInTerminal)
             if !menuOrder.contains(.openInTerminal) {
                 menuOrder.append(.openInTerminal)
             }
+        }
+        if schemaVersion < 4 {
+            enabledFeatures.insert(.refresh)
+            if !menuOrder.contains(.refresh) {
+                menuOrder.append(.refresh)
+            }
+        }
+        if schemaVersion < Self.currentSchemaVersion {
             schemaVersion = Self.currentSchemaVersion
         }
     }

@@ -444,6 +444,7 @@ struct MarkupEditorView: View {
     @State private var contentFallbackBounds: [CGRect] = []
     @State private var isRecognizingContent = false
     @State private var isShowingInlineStyle = false
+    @StateObject private var zoom = MarkupZoomModel()
 
     private let settingsStore = ScreenshotSettingsStore()
 
@@ -481,7 +482,7 @@ struct MarkupEditorView: View {
 
     private var windowWorkspace: some View {
         VStack(spacing: 0) {
-            ScrollView([.horizontal, .vertical]) {
+            ZoomableCanvasScrollView(model: zoom) {
                 editorCanvas(displaySize: source.displaySize)
                     .frame(width: source.displaySize.width, height: source.displaySize.height)
                     .background(Color(nsColor: .windowBackgroundColor))
@@ -490,7 +491,6 @@ struct MarkupEditorView: View {
                     .opacity(isCanvasVisible ? 1 : 0)
                     .allowsHitTesting(isCanvasEnabled)
             }
-            .background(Color(nsColor: .underPageBackgroundColor))
 
             Divider()
             bottomToolbar
@@ -548,6 +548,14 @@ struct MarkupEditorView: View {
                     .padding(.bottom, 16)
             }
         }
+    }
+
+    /// 缩放容器的文档尺寸 = 画布逻辑尺寸 + 24 内边距。
+    private var zoomDocumentSize: CGSize {
+        CGSize(
+            width: source.displaySize.width + 48,
+            height: source.displaySize.height + 48
+        )
     }
 
     private func editorCanvas(displaySize: CGSize) -> some View {
@@ -714,6 +722,49 @@ struct MarkupEditorView: View {
             HStack(spacing: 10) {
                 if let toolbarAccessory { toolbarAccessory }
                 Spacer()
+
+                Divider().frame(height: 16)
+
+                Button {
+                    zoom.zoomOut()
+                } label: {
+                    Image(systemName: "minus.magnifyingglass")
+                }
+                .keyboardShortcut("-", modifiers: .command)
+                .help("缩小（⌘−）")
+                .accessibilityLabel("缩小")
+
+                Text(zoom.percentageLabel)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .center)
+
+                Button {
+                    zoom.zoomIn()
+                } label: {
+                    Image(systemName: "plus.magnifyingglass")
+                }
+                .keyboardShortcut("+", modifiers: .command)
+                .help("放大（⌘+）")
+                .accessibilityLabel("放大")
+
+                Button {
+                    zoom.zoomToActual()
+                } label: {
+                    Text("100%")
+                }
+                .keyboardShortcut("1", modifiers: .command)
+                .help("实际大小（⌘1）")
+
+                Button {
+                    zoom.zoomToFit(documentSize: zoomDocumentSize)
+                } label: {
+                    Text("适应窗口")
+                }
+                .keyboardShortcut("0", modifiers: .command)
+                .help("适应窗口（⌘0）")
+
+                Divider().frame(height: 16)
 
                 Button {
                     copyImage()

@@ -25,7 +25,7 @@ final class SharedSettingsStoreTests: XCTestCase {
         let result = store.load()
 
         XCTAssertNil(result.recoveryReason)
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal])
+        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal, .refresh])
         XCTAssertEqual(result.settings.enabledFeatures, Set(FewerFeature.allCases))
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
         XCTAssertEqual(result.settings.pathFormat, .posix)
@@ -59,8 +59,8 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         let result = SharedSettingsStore(defaults: defaults).load()
 
-        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .openInTerminal])
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal])
+        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal, .refresh])
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
@@ -74,8 +74,8 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         // 新功能默认启用并追加到菜单末尾；用户已有开关与排序保持不变
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
-        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .cut, .paste, .openInTerminal])
-        XCTAssertEqual(result.settings.menuOrder, [.cut, .copyPath, .paste, .openInTerminal])
+        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .cut, .paste, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.menuOrder, [.cut, .copyPath, .paste, .openInTerminal, .refresh])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
 
@@ -87,6 +87,19 @@ final class SharedSettingsStoreTests: XCTestCase {
         let result = SharedSettingsStore(defaults: defaults).load()
 
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
+        XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
+    }
+
+    func testV3PayloadMigratesRefresh() throws {
+        // v3 配置：无 refresh 功能项 -> 迁移后默认启用并追加到菜单末尾
+        let v3 = Data(#"{"schemaVersion":3,"enabledFeatures":["copyPath","openInTerminal"],"menuOrder":["copyPath","openInTerminal"]}"#.utf8)
+        defaults.set(v3, forKey: AppGroupConstants.featureSettingsKey)
+
+        let result = SharedSettingsStore(defaults: defaults).load()
+
+        XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
+        XCTAssertTrue(result.settings.enabledFeatures.contains(.refresh))
+        XCTAssertEqual(result.settings.menuOrder, [.copyPath, .openInTerminal, .refresh])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
 

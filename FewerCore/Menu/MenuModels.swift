@@ -8,6 +8,7 @@ public enum MenuCommand: Equatable, Sendable {
     case pasteHere
     case pasteIntoFolder
     case openInTerminal
+    case refresh
 }
 
 public struct MenuEntry: Equatable, Identifiable, Sendable {

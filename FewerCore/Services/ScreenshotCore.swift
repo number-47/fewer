@@ -25,6 +25,23 @@ public enum ScreenshotPixelGeometry {
     }
 }
 
+/// 从持续增长的滚动拼接图中裁出 HUD 当前应显示的区域。
+public enum RollingPreviewViewport {
+    public static func cropRect(
+        imageSize: CGSize,
+        maximumHeight: CGFloat,
+        direction: RollingScrollDirection?
+    ) -> CGRect? {
+        let width = floor(imageSize.width)
+        let imageHeight = floor(imageSize.height)
+        let height = min(floor(maximumHeight), imageHeight)
+        guard width >= 1, imageHeight >= 1, height >= 1 else { return nil }
+
+        let originY = direction == .up ? 0 : imageHeight - height
+        return CGRect(x: 0, y: originY, width: width, height: height)
+    }
+}
+
 /// 将截图编辑栏优先放在选区下方；空间不足时移到上方，并按真实尺寸限制在屏幕内。
 public enum ScreenshotToolbarLayout {
     public static let compactHeight: CGFloat = 40
@@ -375,10 +392,16 @@ public enum CaptureResizeHandle: CaseIterable, Equatable, Sendable {
 public struct StitchConfiguration: Equatable, Sendable {
     public var minimumShift: Int
     public var minimumOverlapRatio: Double
+    /// 相邻帧匹配必须保留的最小重叠比例。快速滚动或丢帧时位移接近整帧高度，
+    /// 小重叠匹配极易锁到错误峰值，产生错误 placement，导致长图内容重复
+    /// （重叠）或漏画（黑边）；超过该位移的帧对按低置信度处理。
+    public var minimumMatchOverlapRatio: Double
     public var maximumStationaryBandRatio: Double
     public var minimumConfidence: Double
     public var sampleColumns: Int
     public var rowStride: Int
+    /// 离群行裁剪比例。比例过大会把“占行数不多但唯一”的内容（卡片页的小标签）
+    /// 当成离群裁掉，使对齐到卡片周期的假位移与真位移分数相同，首对帧即低置信度。
     public var trimmedOutlierRatio: Double
     /// 最佳位移必须比同方向次佳位移的分数至少低该差值，否则视为不可靠匹配。
     public var minimumScoreMargin: Double
@@ -389,11 +412,12 @@ public struct StitchConfiguration: Equatable, Sendable {
     public init(
     minimumShift: Int = 4,
     minimumOverlapRatio: Double = 0.2,
+    minimumMatchOverlapRatio: Double = 0.25,
     maximumStationaryBandRatio: Double = 0.3,
     minimumConfidence: Double = 0.9,
     sampleColumns: Int = 96,
     rowStride: Int = 3,
-    trimmedOutlierRatio: Double = 0.3,
+    trimmedOutlierRatio: Double = 0.1,
     minimumScoreMargin: Double = 0.02,
         maximumPixelCount: Int = 64_000_000,
         maximumHeight: Int = 32_000,
@@ -401,6 +425,7 @@ public struct StitchConfiguration: Equatable, Sendable {
     ) {
         self.minimumShift = max(minimumShift, 1)
         self.minimumOverlapRatio = min(max(minimumOverlapRatio, 0.05), 0.95)
+        self.minimumMatchOverlapRatio = min(max(minimumMatchOverlapRatio, 0.05), 0.95)
         self.maximumStationaryBandRatio = min(max(maximumStationaryBandRatio, 0), 0.45)
         self.minimumConfidence = min(max(minimumConfidence, 0), 1)
         self.sampleColumns = max(sampleColumns, 8)
@@ -455,6 +480,35 @@ public enum StitchCoverageContribution: Equatable, Sendable {
     case prepend
     case append
     case covered
+}
+
+/// 关键帧存储决策。
+public enum StitchKeyframeDecision: Equatable, Sendable {
+    /// 与已有帧重叠但间距不足，仅更新桥接帧。
+    case bridge
+    /// 间距与重叠都满足，存储为关键帧。
+    case retain
+}
+
+/// 滚动截图关键帧策略：控制存储帧间距，同时拒绝与已有帧失去重叠的帧。
+public enum StitchKeyframePolicy {
+    /// 根据距最近已存储帧的间距决定帧的去向。空白带风险由调用方通过
+    /// breaksSnapshotChain 单独判断，不能与本间距混用：快速滚动时桥接帧
+    /// 累加的间距可能超过单帧重叠上限，但那并不代表会产生空白带，
+    /// 误判会让后续所有帧被永久丢弃。
+    public static func decide(gap: Int, spacing: Int) -> StitchKeyframeDecision {
+        return gap >= spacing ? .retain : .bridge
+    }
+
+    /// 与快照链（最后存储或桥接的帧）失去重叠时返回 true。
+    /// 这种情况下把帧写入长图会在两帧之间留下空白带，应丢弃该帧。
+    public static func breaksSnapshotChain(
+        gap: Int,
+        frameHeight: Int,
+        minimumShift: Int
+    ) -> Bool {
+        gap > frameHeight - max(minimumShift, 1)
+    }
 }
 
 /// 以首帧为原点追踪当前视口和已覆盖的文档范围。
@@ -512,11 +566,17 @@ public enum StitchEngine {
     public struct PreparedFrame: Sendable {
         public let width: Int
         public let height: Int
+        /// 整帧平均亮度，用于区分“未渲染黑帧”与“深色页面”。
+        public let meanLuminance: Float
         fileprivate let rows: [[Float]]
     }
 
     /// 匹配时单帧最大重叠尝试行数（防止逐行全量比较开销过大）。
     public static let maxOverlapCandidates = 240
+
+    /// 合成时相邻帧接缝的羽化行数：把后一帧重叠区最后这些行按递增 alpha 叠画，
+    /// 内容一致时输出不变，小幅错位或滚动中的悬停差异不再形成硬接缝。
+    private static let seamFeatherRows = 16
 
     /// 分析相邻帧并返回页面向上或向下滚动产生的纵向位移。
     public static func analyze(
@@ -548,11 +608,15 @@ public enum StitchEngine {
         return sampledFrame(of: image, columns: configuration.sampleColumns)
     }
 
+    /// 分析相邻帧并返回纵向位移。`priorShift` 是滚动连续性先验：方向一致且
+    /// 先验位移的匹配分数不比全局最优差超过 0.02（绝对差值）时优先采用先验，
+    /// 避免快速滚动时周期性内容（相同段落/卡片）锁到错误峰值产生重叠或漏行。
     public static func analyze(
         previous: PreparedFrame,
         next: PreparedFrame,
         preferredDirection: RollingScrollDirection? = nil,
         maximumShiftRatio: Double? = nil,
+        priorShift: Int? = nil,
         configuration: StitchConfiguration = .default
     ) -> Result<StitchMatch, StitchFailure> {
         guard previous.width == next.width, previous.height == next.height else {
@@ -577,9 +641,13 @@ public enum StitchEngine {
             return .failure(.duplicateFrame)
         }
 
-        let maximumShift = maximumShiftRatio.map {
-            max(configuration.minimumShift, Int(Double(previous.height) * min(max($0, 0.05), 0.95)))
-        }
+        // 位移上限必须同时满足“可靠重叠”约束：小重叠匹配在快速滚动/丢帧时
+        // 极易锁到错误峰值，产生错误 placement，导致长图内容重复（重叠）或漏画（黑边）。
+        let maximumShift = reliableMaximumShift(
+            height: previous.height,
+            maximumShiftRatio: maximumShiftRatio,
+            configuration: configuration
+        )
         if let preferredDirection {
             guard let selected = bestShifts(
                 first: previous,
@@ -590,22 +658,47 @@ public enum StitchEngine {
             ) else {
                 return .failure(.lowConfidence(0))
             }
-            let selectedConfidence = confidence(for: selected.best.score)
-            guard selectedConfidence >= configuration.minimumConfidence,
-                  selected.secondBest.score - selected.best.score >= configuration.minimumScoreMargin
-            else {
+            let reverse = preferredDirection == .up
+            let adoption = priorAdoptedShift(
+                first: previous,
+                second: next,
+                priorShift: priorShift,
+                best: selected.best,
+                reverse: reverse,
+                maximumShift: maximumShift,
+                configuration: configuration
+            )
+            let shift = adoption.shift
+            let selectedScore = shift == selected.best.shift
+                ? selected.best.score
+                : score(
+                    first: previous,
+                    second: next,
+                    shift: shift,
+                    reverse: reverse,
+                    configuration: configuration
+                )
+            let selectedConfidence = confidence(for: selectedScore)
+            guard selectedConfidence >= configuration.minimumConfidence else {
                 return .failure(.lowConfidence(selectedConfidence))
+            }
+            // 采用先验位移时不再要求全局峰值锐度：周期性内容的峰值常互相接近，
+            // 连续性本身即为依据；未采用先验时保持原有峰值检查。
+            if !adoption.priorAdopted {
+                guard selected.secondBest.score - selected.best.score >= configuration.minimumScoreMargin else {
+                    return .failure(.lowConfidence(selectedConfidence))
+                }
             }
             let bands = stationaryBands(
                 previous: preferredDirection == .down ? previous : next,
                 next: preferredDirection == .down ? next : previous,
-                shift: selected.best.shift,
+                shift: shift,
                 configuration: configuration
             )
             return .success(StitchMatch(
                 direction: preferredDirection,
-                offsetY: selected.best.shift,
-                overlapHeight: previous.height - selected.best.shift,
+                offsetY: shift,
+                overlapHeight: previous.height - shift,
                 confidence: selectedConfidence,
                 stationaryTopHeight: bands.top,
                 stationaryBottomHeight: bands.bottom
@@ -632,7 +725,9 @@ public enum StitchEngine {
         guard bestConfidence >= configuration.minimumConfidence else {
             return .failure(.lowConfidence(bestConfidence))
         }
-        guard abs(downwardConfidence - upwardConfidence) >= 0.015 else {
+        // 重复卡片/列表会让反方向也得到很高分；只拒绝近乎完全相同的方向结果。
+        // 保留非零差值，避免真正的周期性内容被任意判成某个方向。
+        guard abs(downwardConfidence - upwardConfidence) >= 0.005 else {
             return .failure(.lowConfidence(bestConfidence))
         }
 
@@ -678,6 +773,234 @@ public enum StitchEngine {
             configuration: configuration
         )
         return confidence(for: duplicateScore) >= 0.995
+    }
+
+    /// 低置信度时的最优猜测位移；跳过方向歧义和峰值锐度检查，仅供位置追踪使用。
+    /// 传入 priorDirection/priorShift（上一帧的匹配结果）时，滚动连续性作为先验：
+    /// 方向一致且先验位移的匹配分数不比全局最优差太多时优先采用先验，
+    /// 避免快速滚动时平滑内容上的小位移假匹配导致拼接重叠。
+    public static func bestGuess(
+        previous: PreparedFrame,
+        next: PreparedFrame,
+        maximumShiftRatio: Double? = nil,
+        priorDirection: RollingScrollDirection? = nil,
+        priorShift: Int? = nil,
+        configuration: StitchConfiguration = .default
+    ) -> StitchMatch? {
+        guard previous.width == next.width, previous.height == next.height else { return nil }
+        guard previous.rows.first?.count == next.rows.first?.count else { return nil }
+
+        // 猜测位移同样受可靠重叠上限约束：绝不越界产生小重叠的错误 placement。
+        let maximumShift = reliableMaximumShift(
+            height: previous.height,
+            maximumShiftRatio: maximumShiftRatio,
+            configuration: configuration
+        )
+
+        let downward = bestShifts(
+            first: previous, second: next,
+            reverse: false, maximumShift: maximumShift,
+            configuration: configuration
+        )
+        let upward = bestShifts(
+            first: previous, second: next,
+            reverse: true, maximumShift: maximumShift,
+            configuration: configuration
+        )
+
+        let downwardScore = downward?.best.score ?? 1
+        let upwardScore = upward?.best.score ?? 1
+
+        if downwardScore <= upwardScore, let selected = downward {
+            let shift = preferredShift(
+                first: previous,
+                second: next,
+                priorDirection: priorDirection,
+                direction: .down,
+                priorShift: priorShift,
+                best: selected.best,
+                reverse: false,
+                maximumShift: maximumShift,
+                configuration: configuration
+            )
+            let bands = stationaryBands(
+                previous: previous, next: next,
+                shift: shift, configuration: configuration
+            )
+            return StitchMatch(
+                direction: .down,
+                offsetY: shift,
+                overlapHeight: previous.height - shift,
+                confidence: confidence(for: selected.best.score),
+                stationaryTopHeight: bands.top,
+                stationaryBottomHeight: bands.bottom
+            )
+        } else if let selected = upward {
+            let shift = preferredShift(
+                first: previous,
+                second: next,
+                priorDirection: priorDirection,
+                direction: .up,
+                priorShift: priorShift,
+                best: selected.best,
+                reverse: true,
+                maximumShift: maximumShift,
+                configuration: configuration
+            )
+            let bands = stationaryBands(
+                previous: next, next: previous,
+                shift: shift, configuration: configuration
+            )
+            return StitchMatch(
+                direction: .up,
+                offsetY: shift,
+                overlapHeight: previous.height - shift,
+                confidence: confidence(for: selected.best.score),
+                stationaryTopHeight: bands.top,
+                stationaryBottomHeight: bands.bottom
+            )
+        }
+        return nil
+    }
+
+    /// 在先验位移与全局最优位移之间选择：方向一致、先验分数可接受时优先先验。
+    private static func preferredShift(
+        first: PreparedFrame,
+        second: PreparedFrame,
+        priorDirection: RollingScrollDirection?,
+        direction: RollingScrollDirection,
+        priorShift: Int?,
+        best: ShiftScore,
+        reverse: Bool,
+        maximumShift: Int?,
+        configuration: StitchConfiguration
+    ) -> Int {
+        guard let priorDirection, priorDirection == direction,
+              let priorShift,
+              priorShift >= configuration.minimumShift,
+              priorShift <= maximumShift ?? .max
+        else { return best.shift }
+        let priorScore = score(
+            first: first,
+            second: second,
+            shift: priorShift,
+            reverse: reverse,
+            configuration: configuration
+        )
+        // 先验分数不比最优差太多才采用，防止把明显失配的旧位移延续下去。
+        if priorScore <= best.score * 1.5 + 0.02 {
+            return priorShift
+        }
+        return best.shift
+    }
+
+    /// 快速滚动连续性先验：方向一致、先验位移合法且分数不比全局最优差超过
+    /// scoreTolerance（绝对差值）时采用先验位移，避免周期性内容锁到错误峰值。
+    private static func priorAdoptedShift(
+        first: PreparedFrame,
+        second: PreparedFrame,
+        priorShift: Int?,
+        best: ShiftScore,
+        reverse: Bool,
+        maximumShift: Int?,
+        configuration: StitchConfiguration,
+        scoreTolerance: Double = 0.02
+    ) -> (shift: Int, priorAdopted: Bool) {
+        guard let priorShift,
+              priorShift >= configuration.minimumShift,
+              priorShift <= maximumShift ?? .max
+        else { return (best.shift, false) }
+        let priorScore = score(
+            first: first,
+            second: second,
+            shift: priorShift,
+            reverse: reverse,
+            configuration: configuration
+        )
+        guard priorScore <= best.score + scoreTolerance else { return (best.shift, false) }
+        return (priorShift, true)
+    }
+
+    /// 帧顶部/底部的近黑边缘高度（像素）。滚动过头或页面未渲染时，
+    /// 捕获帧边缘会出现纯黑区域，拼接后表现为长图上的黑带。
+    public struct BlackBand: Equatable, Sendable {
+        public let top: Int
+        public let bottom: Int
+        /// 整个帧平均亮度极低（捕获黑屏），与深色页面不同，无法用边缘描述。
+        public let fullyBlack: Bool
+        /// 与参考帧亮度突变：页面此前明显偏亮、当前帧主体大面积变黑，
+        /// 属于滚动过快时的未渲染黑带，不能按深色页面放行。
+        public let unrendered: Bool
+
+        public var isEmpty: Bool { !fullyBlack && !unrendered && top == 0 && bottom == 0 }
+
+        public init(top: Int, bottom: Int, fullyBlack: Bool = false, unrendered: Bool = false) {
+            self.top = top
+            self.bottom = bottom
+            self.fullyBlack = fullyBlack
+            self.unrendered = unrendered
+        }
+    }
+
+    /// 检测帧顶部/底部的近黑边缘。要求边缘连续近黑行达到最小高度，
+    /// 且帧主体（中间 25%-75% 区域）大部分不是近黑——整体深色页面
+    /// （深色模式网页）不应被误判为黑边。整个帧平均亮度极低时视为
+    /// 捕获黑屏（fullyBlack），而不是深色页面。
+    public static func blackBands(
+        of frame: PreparedFrame,
+        referenceMeanLuminance: Float? = nil,
+        luminanceThreshold: Float = 10,
+        bodyBlackRatioThreshold: Double = 0.5,
+        fullyBlackThreshold: Float = 2
+    ) -> BlackBand {
+        let height = frame.height
+        let columns = frame.rows.first?.count ?? 0
+        guard height > 8, columns > 0 else { return BlackBand(top: 0, bottom: 0) }
+
+        func rowIsBlack(_ y: Int) -> Bool {
+            let row = frame.rows[y]
+            var sum: Float = 0
+            for value in row { sum += value }
+            return sum / Float(columns) < luminanceThreshold
+        }
+
+        if frame.meanLuminance < fullyBlackThreshold {
+            return BlackBand(top: 0, bottom: 0, fullyBlack: true)
+        }
+
+        let minimumBand = max(4, height / 50)
+
+        var top = 0
+        while top < height, rowIsBlack(top) { top += 1 }
+        var bottom = 0
+        while bottom < height, rowIsBlack(height - 1 - bottom) { bottom += 1 }
+        if top + bottom > height {
+            bottom = height - top
+        }
+
+        let bodyStart = height / 4
+        let bodyEnd = height * 3 / 4
+        guard bodyEnd > bodyStart else { return BlackBand(top: 0, bottom: 0) }
+        var blackRows = 0
+        var totalRows = 0
+        for y in bodyStart..<bodyEnd {
+            totalRows += 1
+            if rowIsBlack(y) { blackRows += 1 }
+        }
+        let bodyBlackRatio = totalRows > 0 ? Double(blackRows) / Double(totalRows) : 1
+        guard bodyBlackRatio < bodyBlackRatioThreshold else {
+            // 主体大多近黑：深色页面正常放行；参考帧明显更亮时则是
+            // 快速滚动产生的大片未渲染黑带（已超出边缘检测范围），必须跳过。
+            if let reference = referenceMeanLuminance, reference >= 24 {
+                return BlackBand(top: 0, bottom: 0, unrendered: true)
+            }
+            return BlackBand(top: 0, bottom: 0)
+        }
+
+        return BlackBand(
+            top: top >= minimumBand ? top : 0,
+            bottom: bottom >= minimumBand ? bottom : 0
+        )
     }
 
     /// 检查继续接收一帧是否会超过首版滚动截图限制。
@@ -762,9 +1085,13 @@ public enum StitchEngine {
         }
 
         var coveredUntil = bodyStart
+        var hasDrawnBody = false
         for (frame, placement) in ordered {
             let frameBodyStart = placement.originY + top
             let frameBodyEnd = placement.originY + frame.height - bottom
+            guard frameBodyStart <= coveredUntil else {
+                return .failure(.invalidFrame)
+            }
             let drawStart = max(frameBodyStart, coveredUntil)
             let drawHeight = frameBodyEnd - drawStart
             guard drawHeight <= 0 ||
@@ -783,7 +1110,36 @@ public enum StitchEngine {
             else {
                 return .failure(.invalidFrame)
             }
-            if drawHeight > 0 { coveredUntil = frameBodyEnd }
+            // 接缝羽化：把当前帧在重叠区最后 seamFeatherRows 行的内容按递增 alpha
+            // 叠画到上一帧已绘制的对应行上。内容一致时输出不变；小幅错位或滚动
+            // 中悬停状态差异时消除硬接缝。
+            if hasDrawnBody, drawHeight > 0, coveredUntil > frameBodyStart {
+                let featherStart = max(frameBodyStart, coveredUntil - Self.seamFeatherRows)
+                let featherCount = coveredUntil - featherStart
+                for y in featherStart..<coveredUntil {
+                    let index = y - featherStart
+                    let alpha = 0.06 + 0.88 * CGFloat(index + 1) / CGFloat(featherCount)
+                    guard drawTopOriented(
+                        image: frame,
+                        source: CGRect(
+                            x: 0,
+                            y: top + (y - frameBodyStart),
+                            width: frame.width,
+                            height: 1
+                        ),
+                        destinationTop: top + y - bodyStart,
+                        totalHeight: totalHeight,
+                        context: context,
+                        alpha: alpha
+                    ) else {
+                        return .failure(.invalidFrame)
+                    }
+                }
+            }
+            if drawHeight > 0 {
+                coveredUntil = frameBodyEnd
+                hasDrawnBody = true
+            }
         }
         destinationTop = top + bodyHeight
 
@@ -895,6 +1251,24 @@ public enum StitchEngine {
         let score: Double
     }
 
+    /// 可靠匹配允许的最大位移：帧间必须保留 minimumMatchOverlapRatio 以上的重叠。
+    /// 快速滚动或丢帧时位移接近整帧高度，重叠区极小，匹配极易锁到错误峰值；
+    /// 超过上限的帧对直接按低置信度处理，由调用方决定等待或恢复。
+    private static func reliableMaximumShift(
+        height: Int,
+        maximumShiftRatio: Double?,
+        configuration: StitchConfiguration
+    ) -> Int {
+        let overlapCap = max(
+            configuration.minimumShift,
+            height - Int(Double(height) * configuration.minimumMatchOverlapRatio)
+        )
+        guard let ratioBased = maximumShiftRatio.map({
+            max(configuration.minimumShift, Int(Double(height) * min(max($0, 0.05), 0.95)))
+        }) else { return overlapCap }
+        return min(ratioBased, overlapCap)
+    }
+
     private static func sampledFrame(of image: CGImage, columns: Int) -> PreparedFrame? {
         let width = image.width
         let height = image.height
@@ -917,11 +1291,15 @@ public enum StitchEngine {
         guard drawn else { return nil }
         var rows: [[Float]] = []
         rows.reserveCapacity(height)
+        var totalLuminance: Float = 0
         for y in 0..<height {
             let start = y * count
-            rows.append(data[start..<(start + count)].map(Float.init))
+            let row = data[start..<(start + count)].map(Float.init)
+            totalLuminance += row.reduce(0, +)
+            rows.append(row)
         }
-        return PreparedFrame(width: width, height: height, rows: rows)
+        let meanLuminance = height > 0 ? totalLuminance / Float(height * count) : 0
+        return PreparedFrame(width: width, height: height, meanLuminance: meanLuminance, rows: rows)
     }
 
     private static func bestShifts(
@@ -1087,7 +1465,8 @@ public enum StitchEngine {
         source: CGRect,
         destinationTop: Int,
         totalHeight: Int,
-        context: CGContext
+        context: CGContext,
+        alpha: CGFloat = 1
     ) -> Bool {
         guard let piece = image.cropping(to: source), piece.height > 0 else { return false }
         let destination = CGRect(
@@ -1096,7 +1475,14 @@ public enum StitchEngine {
             width: piece.width,
             height: piece.height
         )
-        context.draw(piece, in: destination)
+        if alpha >= 1 {
+            context.draw(piece, in: destination)
+        } else {
+            context.saveGState()
+            context.setAlpha(alpha)
+            context.draw(piece, in: destination)
+            context.restoreGState()
+        }
         return true
     }
 

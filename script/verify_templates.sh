@@ -12,9 +12,9 @@ done
 /usr/bin/unzip -tqq "${TEMPLATES}/ExcelWorkbook.xlsx"
 /usr/bin/unzip -tqq "${TEMPLATES}/PowerPointPresentation.pptx"
 
-/usr/bin/unzip -l "${TEMPLATES}/WordDocument.docx" | /usr/bin/grep -q 'word/document.xml'
-/usr/bin/unzip -l "${TEMPLATES}/ExcelWorkbook.xlsx" | /usr/bin/grep -q 'xl/workbook.xml'
-/usr/bin/unzip -l "${TEMPLATES}/PowerPointPresentation.pptx" | /usr/bin/grep -q 'ppt/presentation.xml'
+/usr/bin/unzip -l "${TEMPLATES}/WordDocument.docx" | /usr/bin/grep -F 'word/document.xml' >/dev/null
+/usr/bin/unzip -l "${TEMPLATES}/ExcelWorkbook.xlsx" | /usr/bin/grep -F 'xl/workbook.xml' >/dev/null
+/usr/bin/unzip -l "${TEMPLATES}/PowerPointPresentation.pptx" | /usr/bin/grep -F 'ppt/presentation.xml' >/dev/null
 
 /usr/bin/plutil -lint "${ROOT}/FewerApp/Info.plist" >/dev/null
 echo "Template verification passed"

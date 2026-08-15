@@ -16,14 +16,11 @@ enum ShortcutHelperApp {
 
 final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
     private var eventTapController: EventTapController?
-    private var rollingScrollDriver: RollingScrollDriver?
     private var heartbeatTimer: Timer?
     private let statusStore = ShortcutHelperStatusStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         eventTapController = EventTapController()
-        rollingScrollDriver = RollingScrollDriver()
-        rollingScrollDriver?.start()
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(requestAccessibility),
@@ -48,7 +45,6 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         heartbeatTimer?.invalidate()
-        rollingScrollDriver?.stop()
         DistributedNotificationCenter.default().removeObserver(self)
         let status = ShortcutHelperStatus(
             isAccessibilityTrusted: AXIsProcessTrusted(),

@@ -113,6 +113,7 @@ private extension FewerFeature {
         case .cut: "剪切"
         case .paste: "粘贴"
         case .openInTerminal: "在终端打开"
+        case .refresh: "刷新"
         }
     }
 }

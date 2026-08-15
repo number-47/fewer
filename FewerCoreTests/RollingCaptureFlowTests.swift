@@ -29,6 +29,15 @@ final class RollingCaptureFlowTests: XCTestCase {
         )
     }
 
+    func testManualStopProcessesPendingFramesBeforeCompleting() {
+        let finishing = RollingCaptureTransitions.next(from: .capturing, event: .beginFinishing)
+        XCTAssertEqual(finishing, .finishing)
+        XCTAssertEqual(
+            RollingCaptureTransitions.next(from: finishing!, event: .complete),
+            .completed
+        )
+    }
+
     func testCaptureCanCancelFromEveryActivePhase() {
         for phase in [
             RollingCapturePhase.preparing,
@@ -58,14 +67,29 @@ final class RollingCaptureFlowTests: XCTestCase {
         XCTAssertNil(buffer.removeNext())
     }
 
-    func testFrameBufferDropsOnlyOldestFrameWhenCapacityIsExceeded() {
+    func testFrameBufferDropsOldestFrameWhenCapacityIsExceeded() {
         var buffer = RollingFrameBuffer<Int>(capacity: 2)
         buffer.append(1)
         buffer.append(2)
         buffer.append(3)
 
+        // 队列满时丢弃最旧的待消费帧，让队列始终保留最近捕获的画面，
+        // 避免消费端积压耗尽后帧间隔跳变。
         XCTAssertEqual(buffer.removeNext(), 2)
         XCTAssertEqual(buffer.removeNext(), 3)
+        XCTAssertNil(buffer.removeNext())
+    }
+
+    func testFrameBufferKeepsUniformSequenceWhenContinuouslyOverCapacity() {
+        var buffer = RollingFrameBuffer<Int>(capacity: 3)
+        for value in 1...6 {
+            buffer.append(value)
+        }
+
+        XCTAssertEqual(buffer.removeNext(), 4)
+        XCTAssertEqual(buffer.removeNext(), 5)
+        XCTAssertEqual(buffer.removeNext(), 6)
+        XCTAssertNil(buffer.removeNext())
     }
 
     func testFrameBufferCanDiscardFramesFromBeforeScrollBoundary() {

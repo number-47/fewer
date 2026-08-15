@@ -48,11 +48,31 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
             paste(to: context.targetURL, services: services)
         case .openInTerminal:
             openInTerminal()
+        case .refresh:
+            refreshDirectory()
         case let .createFromTemplate(templateID):
             createFile(templateID: templateID, in: context.targetURL, services: services)
         case .newFile:
             break
         }
+    }
+
+    /// 重新加载当前 Finder 文件夹视图：空白处刷新当前文件夹，选中项时刷新其所在目录。
+    /// 通过 NSWorkspace 通知 Finder 目标目录内容已变化，让外部新增/删除/修改的文件立即显示。
+    private func refreshDirectory() {
+        guard let context else { return }
+        let targetURL: URL
+        if context.kind == .container {
+            targetURL = context.targetURL
+        } else if let firstSelected = context.selectedURLs.first {
+            targetURL = firstSelected.hasDirectoryPath
+                ? firstSelected
+                : firstSelected.deletingLastPathComponent()
+        } else {
+            targetURL = context.targetURL
+        }
+        NSWorkspace.shared.noteFileSystemChanged(targetURL.path)
+        logger.info("Finder refresh requested for \(targetURL.path, privacy: .public)")
     }
 
     func createTemplate(named displayName: String) {
