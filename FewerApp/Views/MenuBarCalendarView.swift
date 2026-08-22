@@ -38,17 +38,31 @@ final class CurrentDateProvider: NSObject, ObservableObject {
     }
 }
 
+/// 持久化日历浏览状态：popover 每次重建视图时保持滚动锚点和选中日期不变。
+@MainActor
+final class CalendarViewState: ObservableObject {
+    static let shared = CalendarViewState()
+
+    @Published var scrollAnchor: Date
+    @Published var selectedDate: Date
+
+    private init() {
+        let now = Date.now
+        scrollAnchor = Calendar.autoupdatingCurrent.dateInterval(of: .month, for: now)?.start ?? now
+        selectedDate = now
+    }
+}
+
 struct MenuBarCalendarView: View {
     static let preferredSize = NSSize(width: 400, height: 632)
+    var availableWidth: CGFloat = preferredSize.width
     /// 月份选择器（二级弹窗）窗口标识，用于失焦关闭时识别焦点是否仍在日历弹窗体系内。
     static let monthPickerWindowIdentifier = NSUserInterfaceItemIdentifier("fewer-month-picker")
 
     @StateObject private var scrollCoordinator = CalendarScrollCoordinator()
+    @ObservedObject private var calendarState = CalendarViewState.shared
     /// 网格的渲染偏移：滚动时跟随协调器像素偏移（无动画），手势结束时平滑回弹对齐。
     @State private var gridOffset: CGFloat = 0
-    /// 日历网格的滚动锚点：网格从该日期所在周开始，滚轮逐行滚动时每次移动一周。
-    @State private var scrollAnchor = Date.now
-    @State private var selectedDate = Date.now
     @State private var isShowingMonthPicker = false
     @State private var jumpYear = Calendar.autoupdatingCurrent.component(.year, from: .now)
     @State private var jumpMonth = Calendar.autoupdatingCurrent.component(.month, from: .now)
@@ -60,29 +74,27 @@ struct MenuBarCalendarView: View {
 
     var body: some View {
         calendarContent(today: currentDate.date)
-            .frame(width: Self.preferredSize.width, height: Self.preferredSize.height)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .frame(width: availableWidth, height: Self.preferredSize.height)
     }
 
     private func calendarContent(today: Date) -> some View {
-        let month = CalendarMonth(anchoredAt: scrollAnchor, today: today, calendar: calendar)
+        let month = CalendarMonth(anchoredAt: calendarState.scrollAnchor, today: today, calendar: calendar)
 
-        return VStack(spacing: 12) {
-            VStack(spacing: 12) {
+        return VStack(spacing: 10) {
+            VStack(spacing: 10) {
                 header(for: month)
 
-                // 星期标题行固定不动；日期网格随滚动像素平移（跟手顺滑），
-                // 网格固定 6 行等高（44 单元格 + 8 间距 = 52），行切换时余数偏移保证无缝衔接。
+                // 星期标题行
                 HStack(spacing: 4) {
                     ForEach(month.weekdaySymbols, id: \.self) { symbol in
                         Text(symbol)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity)
                     }
                 }
 
-                LazyVGrid(columns: columns, spacing: 8) {
+                LazyVGrid(columns: columns, spacing: 6) {
                     ForEach(month.days) { day in
                         dayCell(
                             day,
@@ -103,7 +115,7 @@ struct MenuBarCalendarView: View {
             selectedDateSummary(in: month)
 
             CalendarAgendaView(
-                events: systemCalendar.events(on: selectedDate, calendar: calendar),
+                events: systemCalendar.events(on: calendarState.selectedDate, calendar: calendar),
                 authorizationState: systemCalendar.authorizationState,
                 reminderAuthorizationState: systemCalendar.reminderAuthorizationState,
                 isLoading: systemCalendar.isLoading,
@@ -125,7 +137,7 @@ struct MenuBarCalendarView: View {
 
             footer
         }
-        .padding(16)
+        .padding(14)
         .onAppear {
             scrollCoordinator.onRowStep = { rows in
                 scrollByRows(rows)
@@ -146,7 +158,7 @@ struct MenuBarCalendarView: View {
                 gridOffset = 0
             }
         }
-        .onChange(of: month.days.first?.date) {
+        .onChange(of: calendarState.scrollAnchor) {
             loadSystemEvents(for: month)
         }
         .onChange(of: languageValue) {
@@ -164,72 +176,80 @@ struct MenuBarCalendarView: View {
     }
 
     private func header(for month: CalendarMonth) -> some View {
-        HStack(spacing: 6) {
-            Button {
-                prepareMonthJump(from: month.monthStart)
-                isShowingMonthPicker = true
-            } label: {
-                HStack(spacing: 4) {
-                    Text(month.monthStart.formatted(
-                        .dateTime.year().month(.wide).locale(language.locale)
-                    ))
-                        .font(.title2.weight(.semibold))
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
-            .help(language.text(chinese: "选择年份和月份", english: "Choose Year and Month"))
-            .popover(isPresented: $isShowingMonthPicker, arrowEdge: .top) {
-                CalendarMonthPickerView(
-                    year: $jumpYear,
-                    month: $jumpMonth,
-                    language: language,
-                    calendar: calendar,
-                    cancel: { isShowingMonthPicker = false },
-                    confirm: jumpToSelectedMonth
-                )
-                .background(
-                    WindowAccessor { window in
-                        window?.identifier = Self.monthPickerWindowIdentifier
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Button {
+                    prepareMonthJump(from: month.monthStart)
+                    isShowingMonthPicker = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(month.monthStart.formatted(
+                            .dateTime.year().month(.wide).locale(language.locale)
+                        ))
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.tertiary)
                     }
+                }
+                .buttonStyle(.plain)
+                .help(language.text(chinese: "选择年份和月份", english: "Choose Year and Month"))
+                .popover(isPresented: $isShowingMonthPicker, arrowEdge: .top) {
+                    CalendarMonthPickerView(
+                        year: $jumpYear,
+                        month: $jumpMonth,
+                        language: language,
+                        calendar: calendar,
+                        cancel: { isShowingMonthPicker = false },
+                        confirm: jumpToSelectedMonth
+                    )
+                    .background(
+                        WindowAccessor { window in
+                            window?.identifier = Self.monthPickerWindowIdentifier
+                        }
+                    )
+                }
+
+                Spacer()
+
+                Picker("", selection: languageBinding) {
+                    ForEach(CalendarLanguage.allCases) { option in
+                        Text(option.shortTitle)
+                            .tag(option)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 80)
+                .help(language.text(chinese: "切换日历语言", english: "Change Calendar Language"))
+            }
+
+            HStack(spacing: 4) {
+                Spacer()
+                monthButton(
+                    systemImage: "chevron.left",
+                    title: language.text(chinese: "上个月", english: "Previous Month"),
+                    offset: -1
+                )
+
+                Button {
+                    selectToday()
+                } label: {
+                    Text(language.text(chinese: "今天", english: "Today"))
+                        .font(.system(size: 11, weight: .medium))
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .background(Color.accentColor.opacity(0.1), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .help(language.text(chinese: "回到今天", english: "Go to Today"))
+
+                monthButton(
+                    systemImage: "chevron.right",
+                    title: language.text(chinese: "下个月", english: "Next Month"),
+                    offset: 1
                 )
             }
-
-            Spacer()
-
-            Picker("", selection: languageBinding) {
-                ForEach(CalendarLanguage.allCases) { option in
-                    Text(option.shortTitle)
-                        .tag(option)
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.segmented)
-            .frame(width: 86)
-            .help(language.text(chinese: "切换日历语言", english: "Change Calendar Language"))
-
-            monthButton(
-                systemImage: "chevron.left",
-                title: language.text(chinese: "上个月", english: "Previous Month"),
-                offset: -1
-            )
-
-            Button {
-                selectToday()
-            } label: {
-                Image(systemName: "circle")
-                    .frame(width: 24, height: 24)
-            }
-            .buttonStyle(.plain)
-            .help(language.text(chinese: "回到今天", english: "Go to Today"))
-
-            monthButton(
-                systemImage: "chevron.right",
-                title: language.text(chinese: "下个月", english: "Next Month"),
-                offset: 1
-            )
         }
     }
 
@@ -238,7 +258,9 @@ struct MenuBarCalendarView: View {
             stepMonth(by: offset)
         } label: {
             Image(systemName: systemImage)
-                .frame(width: 24, height: 24)
+                .font(.system(size: 11, weight: .medium))
+                .frame(width: 22, height: 22)
+                .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
         .help(title)
@@ -250,69 +272,70 @@ struct MenuBarCalendarView: View {
         calendar: Calendar,
         events: [CalendarEventItem]
     ) -> some View {
-        let isSelected = calendar.isDate(day.date, inSameDayAs: selectedDate)
+        let isSelected = calendar.isDate(day.date, inSameDayAs: calendarState.selectedDate)
         let holidayTitle = CalendarEventItem.holidayTitle(in: events)
 
         return Button {
-            selectedDate = day.date
+            calendarState.selectedDate = day.date
             if !day.isInDisplayedMonth {
-                scrollAnchor = day.date
+                calendarState.scrollAnchor = day.date
             }
         } label: {
-            VStack(spacing: 1) {
+            VStack(spacing: 2) {
                 Text(day.number, format: .number.grouping(.never))
-                    .font(.system(size: 15, weight: day.isToday || isSelected ? .bold : .medium, design: .rounded))
+                    .font(.system(size: 14, weight: day.isToday || isSelected ? .bold : .medium, design: .rounded))
                     .monospacedDigit()
 
                 Text(holidayTitle ?? day.lunarText)
-                    .font(.system(size: 10, weight: holidayTitle == nil ? .regular : .semibold))
+                    .font(.system(size: 9, weight: holidayTitle == nil ? .regular : .semibold))
                     .foregroundStyle(dayDetailColor(isSelected: isSelected, isHoliday: holidayTitle != nil))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                    .minimumScaleFactor(0.6)
 
                 HStack(spacing: 2) {
                     ForEach(Array(events.prefix(3))) { event in
                         Circle()
-                            .fill(isSelected ? Color.white.opacity(0.9) : color(for: event))
-                            .frame(width: 3.5, height: 3.5)
+                            .fill(isSelected ? Color.white.opacity(0.85) : color(for: event))
+                            .frame(width: 3, height: 3)
                     }
                 }
-                .frame(height: 4)
+                .frame(height: 3)
             }
             .foregroundStyle(isSelected ? Color.white : day.isToday ? Color.accentColor : Color.primary)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 42)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .fill(Color.accentColor)
+                } else if day.isToday {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.12))
                 }
             }
             .overlay {
                 if day.isToday && !isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.accentColor, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color.accentColor.opacity(0.5), lineWidth: 1)
                 }
             }
             .contentShape(Rectangle())
-            .opacity(day.isInDisplayedMonth ? 1 : 0.52)
+            .opacity(day.isInDisplayedMonth ? 1 : 0.4)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: day, events: events))
     }
 
     private var footer: some View {
-        HStack {
-            Button(language.text(chinese: "今天", english: "Today")) {
-                selectToday()
-            }
-
+        HStack(spacing: 12) {
             Spacer()
-
             Button {
                 SettingsWindowController.shared.show()
             } label: {
                 Image(systemName: "gearshape")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
             .help(language.text(chinese: "打开 Fewer 设置", english: "Open Fewer Settings"))
             .accessibilityLabel(language.text(chinese: "打开 Fewer 设置", english: "Open Fewer Settings"))
 
@@ -320,11 +343,13 @@ struct MenuBarCalendarView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Image(systemName: "power")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
             .help(language.text(chinese: "退出 Fewer", english: "Quit Fewer"))
             .accessibilityLabel(language.text(chinese: "退出 Fewer", english: "Quit Fewer"))
         }
-        .controlSize(.small)
     }
 
     private func accessibilityLabel(for day: CalendarDay, events: [CalendarEventItem]) -> String {
@@ -347,51 +372,54 @@ struct MenuBarCalendarView: View {
 
     private func selectedDateSummary(in month: CalendarMonth) -> some View {
         let lunarText = month.days.first {
-            calendar.isDate($0.date, inSameDayAs: selectedDate)
+            calendar.isDate($0.date, inSameDayAs: calendarState.selectedDate)
         }?.lunarText ?? ""
 
         return HStack(spacing: 8) {
             Image(systemName: "calendar.badge.checkmark")
+                .font(.system(size: 13))
                 .foregroundStyle(.tint)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(selectedDate.formatted(
+            VStack(alignment: .leading, spacing: 1) {
+                Text(calendarState.selectedDate.formatted(
                     .dateTime.weekday(.wide).year().month(.wide).day().locale(language.locale)
                 ))
-                    .font(.callout.weight(.semibold))
+                    .font(.system(size: 13, weight: .semibold))
 
                 if !lunarText.isEmpty {
                     Text(language == .chinese ? "农历 \(lunarText)" : "Lunar \(lunarText)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
                 }
             }
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
     private func selectToday() {
-        selectedDate = currentDate.date
-        let monthStart = calendar.dateInterval(of: .month, for: currentDate.date)?.start ?? currentDate.date
-        scrollAnchor = monthStart
+        calendarState.selectedDate = currentDate.date
+        calendarState.scrollAnchor = calendar.dateInterval(of: .month, for: currentDate.date)?.start ?? currentDate.date
     }
 
     /// 滚轮逐行滚动：每滚动一步，锚点移动一周（7 天），网格随之整体平移一行。
     private func scrollByRows(_ rows: Int) {
         guard rows != 0,
-              let newAnchor = calendar.date(byAdding: .day, value: rows * 7, to: scrollAnchor) else {
+              let newAnchor = calendar.date(byAdding: .day, value: rows * 7, to: calendarState.scrollAnchor) else {
             return
         }
-        scrollAnchor = newAnchor
+        calendarState.scrollAnchor = newAnchor
     }
 
     /// 通过月份按钮整月切换：锚点移动到目标月的第一天，展示完整月视图。
     private func stepMonth(by offset: Int) {
-        let currentMonth = calendar.dateInterval(of: .month, for: scrollAnchor)?.start ?? scrollAnchor
-        scrollAnchor = calendar.date(byAdding: .month, value: offset, to: currentMonth) ?? scrollAnchor
+        let currentMonth = calendar.dateInterval(of: .month, for: calendarState.scrollAnchor)?.start ?? calendarState.scrollAnchor
+        calendarState.scrollAnchor = calendar.date(byAdding: .month, value: offset, to: currentMonth) ?? calendarState.scrollAnchor
     }
 
     private func prepareMonthJump(from date: Date) {
@@ -405,8 +433,8 @@ struct MenuBarCalendarView: View {
             month: jumpMonth,
             calendar: calendar
         ) else { return }
-        scrollAnchor = date
-        selectedDate = date
+        calendarState.scrollAnchor = date
+        calendarState.selectedDate = date
         isShowingMonthPicker = false
     }
 
@@ -477,7 +505,7 @@ final class CalendarScrollCoordinator: ObservableObject {
     private var accumulatedDelta: CGFloat = 0
 
     /// 一行（一周）的高度：日期单元格 minHeight 44 + LazyVGrid 纵向间距 8。
-    private static let rowHeight: CGFloat = 52
+    private static let rowHeight: CGFloat = 48
     /// 滚动灵敏度：缩放触控板像素与鼠标滚轮格数对应的实际滚动量（越小越慢）。
     /// 默认 0.5：触控板滑动减半、鼠标滚轮每格滚半行（两格跨一周），跨行无缝性不受影响。
     private static let scrollSensitivity: CGFloat = 0.5

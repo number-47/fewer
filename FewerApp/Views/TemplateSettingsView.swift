@@ -7,9 +7,15 @@ struct TemplateSettingsView: View {
     @State private var importing = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            List {
+        ScrollView {
+            FewerSettingsCard {
+                FewerSettingsRow {
+                    Text("内置模板").fontWeight(.semibold)
+                    Spacer()
+                    Button("+ 导入模板") { importing = true }.buttonStyle(.plain).foregroundStyle(.blue)
+                }
                 ForEach(model.templates) { descriptor in
+                    Divider()
                     TemplateRow(
                         descriptor: descriptor,
                         onChange: model.updateTemplate,
@@ -18,17 +24,8 @@ struct TemplateSettingsView: View {
                     )
                 }
             }
-            Divider()
-            HStack {
-                Button("导入模板…") { importing = true }
-                Spacer()
-                Text("内置模板不可删除；自定义模板会复制到 Fewer 共享目录。")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
+            .padding(.bottom, 24)
         }
-        .navigationTitle("文件模板")
         .fileImporter(
             isPresented: $importing,
             allowedContentTypes: [.data],
@@ -78,6 +75,8 @@ private struct TemplateRow: View {
                 Button("删除", role: .destructive) { onDelete() }
             }
         }
-        .padding(.vertical, 3)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(minHeight: 40)
     }
 }

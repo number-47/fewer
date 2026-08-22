@@ -31,29 +31,58 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
     }
 
     func perform(_ command: MenuCommand) {
-        guard let services,
-              let context
-        else { return }
+        guard let services else {
+            logger.error("perform aborted: services is nil")
+            return
+        }
+        guard let context else {
+            logger.error("perform aborted: context is nil for command \(String(describing: command), privacy: .public)")
+            return
+        }
 
         logger.info("Handling Finder menu command: \(String(describing: command), privacy: .public)")
 
         switch command {
+        case .newFolder:
+            createFolder(in: context.targetURL)
         case .copyPath:
             // 空白处（容器）右键时无选中项，复制当前文件夹路径
             let urls = context.selectedURLs.isEmpty ? [context.targetURL] : context.selectedURLs
             copyPath(urls, settings: services.settingsStore.load().settings)
+        case let .copyAs(format):
+            let urls = context.selectedURLs.isEmpty ? [context.targetURL] : context.selectedURLs
+            let relativeBase = context.kind == .container
+                ? context.targetURL
+                : (context.selectedURLs.first?.deletingLastPathComponent() ?? context.targetURL)
+            copy(urls, as: format, relativeTo: relativeBase)
         case .cut:
             cut(context.selectedURLs, store: services.cutStore)
         case .pasteHere, .pasteIntoFolder:
             paste(to: context.targetURL, services: services)
         case .openInTerminal:
             openInTerminal()
+        case let .openWith(bundleIdentifier):
+            openWithApplication(bundleIdentifier: bundleIdentifier)
         case .refresh:
             refreshDirectory()
         case let .createFromTemplate(templateID):
             createFile(templateID: templateID, in: context.targetURL, services: services)
         case .newFile:
             break
+        }
+    }
+
+    private func createFolder(in directory: URL) {
+        let accessing = directory.startAccessingSecurityScopedResource()
+        defer { if accessing { directory.stopAccessingSecurityScopedResource() } }
+        let url = ConflictNameResolver.availableURL(named: "新建文件夹", in: directory) {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+        do {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+            NSWorkspace.shared.noteFileSystemChanged(directory.path)
+        } catch {
+            logger.error("Unable to create folder: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -107,9 +136,53 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
         )
     }
 
-    private func copyPath(_ urls: [URL], settings: FeatureSettings) {        let pasteboard = NSPasteboard.general
+    private func openWithApplication(bundleIdentifier: String) {
+        guard let context,
+              !bundleIdentifier.isEmpty,
+              let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else { return }
+        NSWorkspace.shared.open(
+            context.selectedURLs,
+            withApplicationAt: applicationURL,
+            configuration: NSWorkspace.OpenConfiguration()
+        )
+    }
+
+    private func copyPath(_ urls: [URL], settings: FeatureSettings) {
+        let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(PathFormatter.string(for: urls, format: settings.pathFormat), forType: .string)
+    }
+
+    private func copy(_ urls: [URL], as format: FinderCopyFormat, relativeTo baseURL: URL) {
+        let values = urls.map { url -> String in
+            switch format {
+            case .name:
+                url.lastPathComponent
+            case .absolutePath:
+                url.path
+            case .relativePath:
+                relativePath(from: baseURL, to: url)
+            case .shellEscapedPath:
+                "'\(url.path.replacingOccurrences(of: "'", with: "'\\''"))'"
+            case .fileURL:
+                url.absoluteString
+            }
+        }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(values.joined(separator: "\n"), forType: .string)
+    }
+
+    private func relativePath(from baseURL: URL, to url: URL) -> String {
+        let base = baseURL.standardizedFileURL.pathComponents
+        let target = url.standardizedFileURL.pathComponents
+        var common = 0
+        while common < min(base.count, target.count), base[common] == target[common] { common += 1 }
+        let upward = Array(repeating: "..", count: base.count - common)
+        let downward = Array(target.dropFirst(common))
+        let result = (upward + downward).joined(separator: "/")
+        return result.isEmpty ? "." : result
     }
 
     private func cut(_ urls: [URL], store: CutTransactionStore) {
@@ -123,6 +196,12 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
             try store.start(
                 urls: urls,
                 pasteboardChangeCount: NSPasteboard.general.changeCount
+            )
+            DistributedNotificationCenter.default().postNotificationName(
+                AppGroupConstants.cutTransactionDidChangeNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
             )
             logger.info("Finder cut transaction persisted")
         } catch {
@@ -146,6 +225,12 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
                 policy: policy
             )
             try? services.cutStore.keepRemaining(result.failedSourceURLs, for: transaction.id)
+            DistributedNotificationCenter.default().postNotificationName(
+                AppGroupConstants.cutTransactionDidChangeNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
             self.logger.info("Finder paste finished with \(result.items.count, privacy: .public) item results")
             _ = targetURL
         }

@@ -242,44 +242,93 @@ def append_log(path: Path, message: str) -> None:
         log.write(message)
 
 
-def validate_reviewer_config(root: Path) -> None:
-    """Validate the repository's deliberately small reviewer TOML schema on Python 3.9."""
-    path = root / ".codex" / "agents" / "reviewer.toml"
+def validate_agent_config(
+    root: Path,
+    filename: str,
+    expected_name: str,
+    expected_model: str,
+    expected_reasoning_effort: str,
+) -> None:
+    """Validate one deliberately small custom-agent TOML schema on Python 3.9."""
+    path = root / ".codex" / "agents" / filename
     lines = path.read_text(encoding="utf-8").splitlines()
-    expected_keys = ["name", "description", "model_reasoning_effort", "sandbox_mode"]
+    expected_keys = ["name", "description", "model", "model_reasoning_effort", "sandbox_mode"]
     values: Dict[str, str] = {}
     index = 0
 
     for key in expected_keys:
         if index >= len(lines) or not lines[index].startswith(key + " = "):
-            raise ValueError("reviewer.toml 缺少或错序字段：%s" % key)
+            raise ValueError("%s 缺少或错序字段：%s" % (filename, key))
         raw_value = lines[index].split(" = ", 1)[1]
         value = json.loads(raw_value)
         if not isinstance(value, str) or not value:
-            raise ValueError("reviewer.toml 字段必须是非空字符串：%s" % key)
+            raise ValueError("%s 字段必须是非空字符串：%s" % (filename, key))
         values[key] = value
         index += 1
 
     if index >= len(lines) or lines[index] != "":
-        raise ValueError("reviewer.toml 顶层字段后需要一个空行")
+        raise ValueError("%s 顶层字段后需要一个空行" % filename)
     index += 1
     if index >= len(lines) or lines[index] != 'developer_instructions = """':
-        raise ValueError("reviewer.toml 缺少 developer_instructions")
+        raise ValueError("%s 缺少 developer_instructions" % filename)
     index += 1
     try:
         closing = lines.index('"""', index)
     except ValueError as error:
-        raise ValueError("reviewer.toml 的 developer_instructions 未闭合") from error
+        raise ValueError("%s 的 developer_instructions 未闭合" % filename) from error
     if closing == index or any(line.strip() for line in lines[closing + 1 :]):
-        raise ValueError("reviewer.toml 的 developer_instructions 为空或存在多余内容")
+        raise ValueError("%s 的 developer_instructions 为空或存在多余内容" % filename)
     if any('"""' in line for line in lines[index:closing]):
-        raise ValueError("reviewer.toml 的 developer_instructions 含非法分隔符")
-    if values["name"] != "reviewer":
-        raise ValueError("reviewer.toml 的 name 必须是 reviewer")
-    if values["model_reasoning_effort"] != "high":
-        raise ValueError("reviewer.toml 必须使用 high reasoning")
-    if values["sandbox_mode"] != "read-only":
-        raise ValueError("reviewer.toml 必须保持 read-only")
+        raise ValueError("%s 的 developer_instructions 含非法分隔符" % filename)
+    if values["name"] != expected_name:
+        raise ValueError("%s 的 name 必须是 %s" % (filename, expected_name))
+    if values["model"] != expected_model:
+        raise ValueError("%s 必须使用 %s" % (filename, expected_model))
+    if values["model_reasoning_effort"] != expected_reasoning_effort:
+        raise ValueError(
+            "%s 必须使用 %s reasoning" % (filename, expected_reasoning_effort)
+        )
+    if values["sandbox_mode"] != "workspace-write":
+        raise ValueError("%s 必须使用 workspace-write" % filename)
+
+
+def validate_agent_configs(root: Path) -> None:
+    agents_dir = root / ".codex" / "agents"
+    expected_files = {"implementer.toml", "batch_worker.toml"}
+    actual_files = {path.name for path in agents_dir.glob("*.toml")}
+    if actual_files != expected_files:
+        raise ValueError(
+            ".codex/agents 必须且只能包含：%s" % ", ".join(sorted(expected_files))
+        )
+    validate_agent_config(root, "implementer.toml", "implementer", "gpt-5.6-terra", "high")
+    validate_agent_config(
+        root, "batch_worker.toml", "batch_worker", "gpt-5.6-luna", "medium"
+    )
+
+
+def validate_agent_runtime_config(root: Path) -> None:
+    path = root / ".codex" / "config.toml"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    try:
+        index = lines.index("[agents]") + 1
+    except ValueError as error:
+        raise ValueError(".codex/config.toml 缺少 [agents]") from error
+
+    values: Dict[str, object] = {}
+    while index < len(lines) and not lines[index].startswith("["):
+        line = lines[index].strip()
+        if line and not line.startswith("#"):
+            if " = " not in line:
+                raise ValueError(".codex/config.toml 的 [agents] 含无效配置")
+            key, raw_value = line.split(" = ", 1)
+            values[key] = json.loads(raw_value)
+        index += 1
+
+    if values.get("enabled") is not True:
+        raise ValueError(".codex/config.toml 必须启用 agents")
+    max_threads = values.get("max_concurrent_threads_per_session")
+    if isinstance(max_threads, bool) or not isinstance(max_threads, int) or not 1 <= max_threads <= 2:
+        raise ValueError("agents.max_concurrent_threads_per_session 必须在 1 到 2 之间")
 
 
 def validate_skill_config(root: Path) -> None:
@@ -328,7 +377,8 @@ def validate_skill_config(root: Path) -> None:
 
 
 def validate_codex_config(root: Path) -> None:
-    validate_reviewer_config(root)
+    validate_agent_configs(root)
+    validate_agent_runtime_config(root)
     validate_skill_config(root)
 
 

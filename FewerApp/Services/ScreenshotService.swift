@@ -36,6 +36,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
             return
         }
         guard let captureID = captureSessions.begin() else { return }
+        setKeycastSuppressed(true)
         // 上一张结果窗口不能继续留在屏幕上，否则新的区域/全屏截图会再次截到旧图。
         ScreenshotResultWindowController.shared.close()
         currentMode = mode
@@ -135,6 +136,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
                 self.rollingController = nil
                 self.captureSessions.cancel()
                 self.currentMode = nil
+                self.setKeycastSuppressed(false)
             }
         )
     }
@@ -145,6 +147,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         else { return }
         currentMode = nil
         dismissOverlay()
+        setKeycastSuppressed(false)
     }
 
     func overlayDidPin(_ pngData: Data) {
@@ -153,6 +156,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         else { return }
         currentMode = nil
         dismissOverlay()
+        setKeycastSuppressed(false)
         PinWindowController.shared.pin(pngData: pngData)
     }
 
@@ -166,6 +170,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         guard captureSessions.complete(captureID) else { return }
         Self.debugLog("finish")
         currentMode = nil
+        setKeycastSuppressed(false)
         guard let pngData = Self.pngData(from: image, pointSize: pointSize) else {
             captureFailed(message: "截图编码失败，请重试。")
             return
@@ -182,6 +187,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         captureSessions.cancel()
         currentMode = nil
         dismissOverlay()
+        setKeycastSuppressed(false)
     }
 
     private func dismissOverlay() {
@@ -194,6 +200,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         captureSessions.cancel()
         currentMode = nil
         dismissOverlay()
+        setKeycastSuppressed(false)
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "截图失败"
@@ -218,6 +225,15 @@ final class ScreenshotService: CaptureOverlayDelegate {
         default:
             break
         }
+    }
+
+    private func setKeycastSuppressed(_ suppressed: Bool) {
+        DistributedNotificationCenter.default().postNotificationName(
+            AppGroupConstants.inputEnhancementControlNotification,
+            object: nil,
+            userInfo: ["command": "screenshot-active", "enabled": suppressed],
+            deliverImmediately: true
+        )
     }
 
     private func showPermissionRecoveryOnce() {

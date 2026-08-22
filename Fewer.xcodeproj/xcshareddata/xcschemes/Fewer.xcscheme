@@ -35,6 +35,20 @@
                ReferencedContainer = "container:Fewer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "BFDC530239300C3E6B972D9A"
+               BuildableName = "FewerUITests.xctest"
+               BlueprintName = "FewerUITests"
+               ReferencedContainer = "container:Fewer.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -61,6 +75,17 @@
                BlueprintIdentifier = "DF500D2B12EBFB181A37F1D6"
                BuildableName = "FewerCoreTests.xctest"
                BlueprintName = "FewerCoreTests"
+               ReferencedContainer = "container:Fewer.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "BFDC530239300C3E6B972D9A"
+               BuildableName = "FewerUITests.xctest"
+               BlueprintName = "FewerUITests"
                ReferencedContainer = "container:Fewer.xcodeproj">
             </BuildableReference>
          </TestableReference>

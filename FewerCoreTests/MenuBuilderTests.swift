@@ -20,7 +20,10 @@ final class MenuBuilderTests: XCTestCase {
             templates: [TemplateDescriptor.builtInPlainText]
         )
 
-        XCTAssertEqual(entries.map(\.command), [.newFile, .copyPath, .pasteHere, .openInTerminal, .refresh])
+        XCTAssertEqual(entries.map(\.command), [
+            .newFile, .newFolder, .copyPath, .copyAs(.absolutePath),
+            .pasteHere, .openInTerminal, .refresh,
+        ])
         XCTAssertEqual(entries.first?.children.count, 1)
     }
 
@@ -34,7 +37,10 @@ final class MenuBuilderTests: XCTestCase {
         )
 
         let entries = MenuBuilder().entries(for: context, settings: .default, templates: [])
-        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut, .openInTerminal, .refresh])
+        XCTAssertEqual(entries.map(\.command), [
+            .copyPath, .copyAs(.absolutePath), .cut, .openInTerminal,
+            .openWith(bundleIdentifier: ""), .refresh,
+        ])
     }
 
     func testDisabledFeatureIsRemovedAndOrderIsRespected() {
@@ -69,7 +75,7 @@ final class MenuBuilderTests: XCTestCase {
         )
 
         // 复制路径是读操作，只读容器下仍可用
-        XCTAssertEqual(entries.map(\.isEnabled), [false, true, false, true, true])
+        XCTAssertEqual(entries.map(\.isEnabled), [false, false, true, true, false, true, true])
     }
 
     func testSelectedFolderShowsPasteIntoFolder() {
@@ -84,7 +90,10 @@ final class MenuBuilderTests: XCTestCase {
         )
 
         let entries = MenuBuilder().entries(for: context, settings: .default, templates: [])
-        XCTAssertEqual(entries.map(\.command), [.copyPath, .cut, .pasteIntoFolder, .openInTerminal, .refresh])
+        XCTAssertEqual(entries.map(\.command), [
+            .copyPath, .copyAs(.absolutePath), .cut, .pasteIntoFolder,
+            .openInTerminal, .openWith(bundleIdentifier: ""), .refresh,
+        ])
     }
 
     func testOpenInTerminalCanBeDisabledAndRepositioned() {
@@ -175,5 +184,43 @@ final class MenuBuilderTests: XCTestCase {
 
         let entries = MenuBuilder().entries(for: context, settings: settings, templates: [])
         XCTAssertFalse(entries.contains(where: { $0.command == .refresh }))
+    }
+
+    func testCopyAsContainsAllPrivacySafeFormats() {
+        let context = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [target.appendingPathComponent("A.txt")],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        let entry = MenuBuilder().entries(for: context, settings: .default, templates: [])
+            .first { $0.command == .copyAs(.absolutePath) }
+
+        XCTAssertEqual(entry?.children.map(\.command), [
+            .copyAs(.name), .copyAs(.absolutePath), .copyAs(.relativePath),
+            .copyAs(.shellEscapedPath), .copyAs(.fileURL),
+        ])
+    }
+
+    func testOpenWithFiltersBySelectedExtensions() {
+        var settings = FeatureSettings.default
+        settings.openWithApplications = [
+            OpenWithApplication(bundleIdentifier: "com.example.swift", displayName: "Swift", applicableExtensions: ["swift"]),
+            OpenWithApplication(bundleIdentifier: "com.example.image", displayName: "Image", applicableExtensions: ["png"]),
+        ]
+        let context = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [target.appendingPathComponent("A.swift")],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        let entry = MenuBuilder().entries(for: context, settings: settings, templates: [])
+            .first { $0.command == .openWith(bundleIdentifier: "") }
+
+        XCTAssertEqual(entry?.children.map(\.command), [.openWith(bundleIdentifier: "com.example.swift")])
     }
 }

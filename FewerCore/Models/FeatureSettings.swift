@@ -2,13 +2,30 @@ import Foundation
 
 public enum FewerFeature: String, Codable, CaseIterable, Identifiable, Sendable {
     case newFile
+    case newFolder
     case copyPath
+    case copyAs
     case cut
     case paste
     case openInTerminal
+    case openWith
     case refresh
 
     public var id: String { rawValue }
+}
+
+public struct OpenWithApplication: Codable, Equatable, Identifiable, Sendable {
+    public var bundleIdentifier: String
+    public var displayName: String
+    public var applicableExtensions: Set<String>
+
+    public var id: String { bundleIdentifier }
+
+    public init(bundleIdentifier: String, displayName: String, applicableExtensions: Set<String> = []) {
+        self.bundleIdentifier = bundleIdentifier
+        self.displayName = displayName
+        self.applicableExtensions = Set(applicableExtensions.map { $0.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")) })
+    }
 }
 
 public enum PathOutputFormat: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -29,7 +46,7 @@ public enum ConflictPolicy: String, Codable, CaseIterable, Identifiable, Sendabl
 
 public struct FeatureSettings: Codable, Equatable, Sendable {
     /// 当前配置结构版本：v2 起新增"在终端打开"功能；v3 起支持自定义终端应用；v4 起新增"刷新"功能。
-    public static let currentSchemaVersion = 4
+    public static let currentSchemaVersion = 5
 
     /// "在终端打开"默认使用的终端应用 Bundle Identifier。
     public static let defaultTerminalBundleID = "com.apple.Terminal"
@@ -43,6 +60,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var shortcutHelperEnabled: Bool
     public var launchHelperAtLogin: Bool
     public var terminalBundleID: String
+    public var openWithApplications: [OpenWithApplication]
 
     public init(
         schemaVersion: Int = currentSchemaVersion,
@@ -53,7 +71,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         notificationsEnabled: Bool = true,
         shortcutHelperEnabled: Bool = true,
         launchHelperAtLogin: Bool = false,
-        terminalBundleID: String = defaultTerminalBundleID
+        terminalBundleID: String = defaultTerminalBundleID,
+        openWithApplications: [OpenWithApplication] = [
+            OpenWithApplication(bundleIdentifier: "com.apple.TextEdit", displayName: "文本编辑"),
+            OpenWithApplication(bundleIdentifier: "com.apple.Preview", displayName: "预览", applicableExtensions: ["pdf", "png", "jpg", "jpeg", "gif"]),
+        ]
     ) {
         self.schemaVersion = schemaVersion
         self.enabledFeatures = enabledFeatures
@@ -64,6 +86,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.shortcutHelperEnabled = shortcutHelperEnabled
         self.launchHelperAtLogin = launchHelperAtLogin
         self.terminalBundleID = terminalBundleID
+        self.openWithApplications = openWithApplications
     }
 
     public static let `default` = FeatureSettings()
@@ -78,6 +101,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case shortcutHelperEnabled
         case launchHelperAtLogin
         case terminalBundleID
+        case openWithApplications
     }
 
     public init(from decoder: Decoder) throws {
@@ -102,6 +126,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ?? defaults.launchHelperAtLogin
         terminalBundleID = try values.decodeIfPresent(String.self, forKey: .terminalBundleID)
             ?? defaults.terminalBundleID
+        openWithApplications = try values.decodeIfPresent([OpenWithApplication].self, forKey: .openWithApplications)
+            ?? defaults.openWithApplications
 
         migrateIfNeeded()
     }
@@ -119,6 +145,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             enabledFeatures.insert(.refresh)
             if !menuOrder.contains(.refresh) {
                 menuOrder.append(.refresh)
+            }
+        }
+        if schemaVersion < 5 {
+            for feature in [FewerFeature.newFolder, .copyAs, .openWith] {
+                enabledFeatures.insert(feature)
+                if !menuOrder.contains(feature) { menuOrder.append(feature) }
             }
         }
         if schemaVersion < Self.currentSchemaVersion {

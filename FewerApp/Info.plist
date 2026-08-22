@@ -20,10 +20,14 @@
 	<string>1</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Fewer 仅在你点击快捷操作时通过系统事件切换深色模式。</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>Fewer 需要读取系统日历，以在菜单栏日历中展示节假日订阅和日程。</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>Fewer 需要读取系统日历，以在菜单栏日历中展示节假日订阅和日程。</string>
+	<key>NSLocationUsageDescription</key>
+	<string>Fewer 仅在你展开网络 Wi-Fi 详情时读取当前网络名称、BSSID 和信号强度。</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Fewer 需要读取提醒事项，以在菜单栏日历中展示带日期的计划任务。</string>
 </dict>

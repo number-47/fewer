@@ -27,17 +27,29 @@ def run_git(root: Path, *args: str) -> None:
 
 
 def write_valid_codex_config(root: Path) -> None:
-    reviewer = root / ".codex" / "agents" / "reviewer.toml"
-    reviewer.parent.mkdir(parents=True, exist_ok=True)
-    reviewer.write_text(
-        'name = "reviewer"\n'
-        'description = "Read-only reviewer"\n'
-        'model_reasoning_effort = "high"\n'
-        'sandbox_mode = "read-only"\n'
-        "\n"
-        'developer_instructions = """\n'
-        "Never modify files.\n"
-        '"""\n',
+    agents = root / ".codex" / "agents"
+    agents.mkdir(parents=True, exist_ok=True)
+    for filename, name, model, effort in (
+        ("implementer.toml", "implementer", "gpt-5.6-terra", "high"),
+        ("batch_worker.toml", "batch_worker", "gpt-5.6-luna", "medium"),
+    ):
+        (agents / filename).write_text(
+            'name = "%s"\n' % name
+            + 'description = "Scoped custom agent"\n'
+            + 'model = "%s"\n' % model
+            + 'model_reasoning_effort = "%s"\n' % effort
+            + 'sandbox_mode = "workspace-write"\n'
+            + "\n"
+            + 'developer_instructions = """\n'
+            + "Follow the assigned scope.\n"
+            + '"""\n',
+            encoding="utf-8",
+        )
+
+    (root / ".codex" / "config.toml").write_text(
+        "[agents]\n"
+        "enabled = true\n"
+        "max_concurrent_threads_per_session = 2\n",
         encoding="utf-8",
     )
 
@@ -204,32 +216,54 @@ class StopGateTests(unittest.TestCase):
         write_valid_codex_config(self.root)
         stop_gate.validate_codex_config(self.root)
 
-    def test_reviewer_required_fields_cannot_be_empty(self) -> None:
+    def test_agent_required_fields_cannot_be_empty(self) -> None:
         write_valid_codex_config(self.root)
-        reviewer = self.root / ".codex" / "agents" / "reviewer.toml"
-        reviewer.write_text(
-            reviewer.read_text(encoding="utf-8").replace(
-                'description = "Read-only reviewer"', 'description = ""'
+        implementer = self.root / ".codex" / "agents" / "implementer.toml"
+        implementer.write_text(
+            implementer.read_text(encoding="utf-8").replace(
+                'description = "Scoped custom agent"', 'description = ""'
             ),
             encoding="utf-8",
         )
         with self.assertRaises(ValueError):
             stop_gate.validate_codex_config(self.root)
 
-    def test_reviewer_reasoning_and_sandbox_are_enforced(self) -> None:
-        for original, replacement in (
-            ('model_reasoning_effort = "high"', 'model_reasoning_effort = "low"'),
-            ('sandbox_mode = "read-only"', 'sandbox_mode = "workspace-write"'),
+    def test_agent_model_reasoning_and_sandbox_are_enforced(self) -> None:
+        for filename, original, replacement in (
+            ("implementer.toml", 'model = "gpt-5.6-terra"', 'model = "gpt-5.6-luna"'),
+            ("implementer.toml", 'model_reasoning_effort = "high"', 'model_reasoning_effort = "low"'),
+            ("batch_worker.toml", 'model_reasoning_effort = "medium"', 'model_reasoning_effort = "low"'),
+            ("batch_worker.toml", 'sandbox_mode = "workspace-write"', 'sandbox_mode = "read-only"'),
         ):
             with self.subTest(replacement=replacement):
                 write_valid_codex_config(self.root)
-                reviewer = self.root / ".codex" / "agents" / "reviewer.toml"
-                reviewer.write_text(
-                    reviewer.read_text(encoding="utf-8").replace(original, replacement),
+                agent = self.root / ".codex" / "agents" / filename
+                agent.write_text(
+                    agent.read_text(encoding="utf-8").replace(original, replacement),
                     encoding="utf-8",
                 )
                 with self.assertRaises(ValueError):
                     stop_gate.validate_codex_config(self.root)
+
+    def test_only_two_custom_agents_are_allowed(self) -> None:
+        write_valid_codex_config(self.root)
+        extra = self.root / ".codex" / "agents" / "reviewer.toml"
+        extra.write_text('name = "reviewer"\n', encoding="utf-8")
+        with self.assertRaises(ValueError):
+            stop_gate.validate_codex_config(self.root)
+
+    def test_agent_concurrency_must_not_exceed_two(self) -> None:
+        write_valid_codex_config(self.root)
+        config = self.root / ".codex" / "config.toml"
+        config.write_text(
+            config.read_text(encoding="utf-8").replace(
+                "max_concurrent_threads_per_session = 2",
+                "max_concurrent_threads_per_session = 3",
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(ValueError):
+            stop_gate.validate_codex_config(self.root)
 
     def test_skill_frontmatter_and_default_prompt_are_enforced(self) -> None:
         write_valid_codex_config(self.root)

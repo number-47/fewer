@@ -12,6 +12,13 @@ public struct MenuBuilder: Sendable {
             guard settings.enabledFeatures.contains(feature) else { return nil }
 
             switch (context.kind, feature) {
+            case (.container, .newFolder):
+                return MenuEntry(
+                    command: .newFolder,
+                    title: "新建文件夹",
+                    isEnabled: context.isTargetWritable
+                )
+
             case (.container, .newFile):
                 let children = templates
                     .filter(\.isEnabled)
@@ -40,11 +47,37 @@ public struct MenuBuilder: Sendable {
             case (.items, .copyPath) where !context.selectedURLs.isEmpty:
                 return MenuEntry(command: .copyPath, title: "复制路径")
 
+            case (.items, .copyAs) where !context.selectedURLs.isEmpty:
+                return copyAsMenu()
+
+            case (.container, .copyAs):
+                return copyAsMenu()
+
             case (.items, .openInTerminal) where !context.selectedURLs.isEmpty:
                 return MenuEntry(command: .openInTerminal, title: "在终端打开")
 
             case (.container, .openInTerminal):
                 return MenuEntry(command: .openInTerminal, title: "在终端打开")
+
+            case (.items, .openWith) where !context.selectedURLs.isEmpty:
+                let children = settings.openWithApplications
+                    .filter { application in
+                        application.applicableExtensions.isEmpty || context.selectedURLs.allSatisfy {
+                            application.applicableExtensions.contains($0.pathExtension.lowercased())
+                        }
+                    }
+                    .map {
+                        MenuEntry(
+                            command: .openWith(bundleIdentifier: $0.bundleIdentifier),
+                            title: $0.displayName
+                        )
+                    }
+                guard !children.isEmpty else { return nil }
+                return MenuEntry(
+                    command: .openWith(bundleIdentifier: ""),
+                    title: "用应用打开",
+                    children: children
+                )
 
             case (.container, .copyPath):
                 // 空白处右键：复制当前文件夹路径
@@ -71,5 +104,15 @@ public struct MenuBuilder: Sendable {
                 return nil
             }
         }
+    }
+
+    private func copyAsMenu() -> MenuEntry {
+        MenuEntry(
+            command: .copyAs(.absolutePath),
+            title: "复制为",
+            children: FinderCopyFormat.allCases.map { format in
+                MenuEntry(command: .copyAs(format), title: format.menuTitle)
+            }
+        )
     }
 }

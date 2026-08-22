@@ -10,127 +10,38 @@ struct ScreenshotSettingsView: View {
     private let store = ScreenshotSettingsStore()
 
     var body: some View {
-        Form {
-            Section("立即截屏") {
-                HStack {
-                    Button {
-                        ScreenshotService.shared.begin(.region)
-                    } label: {
-                        Label("区域", systemImage: "viewfinder")
-                    }
-                    Button {
-                        ScreenshotService.shared.begin(.window)
-                    } label: {
-                        Label("窗口", systemImage: "macwindow")
-                    }
-                    Button {
-                        ScreenshotService.shared.begin(.fullscreen)
-                    } label: {
-                        Label("全屏", systemImage: "rectangle.inset.filled")
+        ScrollView {
+            VStack(spacing: 16) {
+                FewerSettingsCard {
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) { Text("屏幕录制权限"); Text("截图功能所需").font(.caption).foregroundStyle(.secondary) }
+                        Spacer(); Text(hasScreenCapturePermission ? "已授权" : "未授权").font(.caption).foregroundStyle(hasScreenCapturePermission ? .green : .orange)
                     }
                 }
-                Text("快捷键冲突或未记住时，可从这里直接开始截屏。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Label(
-                        permissionStatusText,
-                        systemImage: hasScreenCapturePermission ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(hasScreenCapturePermission ? .green : .orange)
-                    Spacer()
-                    if !hasScreenCapturePermission {
-                        if permissionWasRequested {
-                            Button("重新启动 Fewer") {
-                                ScreenshotCapture.restartApplication()
-                            }
-                        } else {
-                            Button("请求权限") {
-                                requestScreenCapturePermission()
-                            }
-                        }
-                        Button("打开系统设置") {
-                            ScreenshotCapture.openPermissionSettings()
-                        }
-                        Button("重新检查") {
-                            refreshScreenCapturePermission()
-                        }
-                    }
-                }
-                .font(.caption)
-            }
-
-            Section("快捷键") {
-                Toggle("启用截屏快捷键", isOn: Binding(
-                    get: { settings.shortcutsEnabled },
-                    set: { settings.shortcutsEnabled = $0 }
-                ))
-                HotKeyRecorder(title: "区域截屏", spec: $settings.regionHotKey)
-                HotKeyRecorder(title: "窗口截屏", spec: $settings.windowHotKey)
-                HotKeyRecorder(title: "全屏截屏", spec: $settings.fullscreenHotKey)
-                Text("录制快捷键时需包含至少一个修饰键；Esc 取消录制。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("滚动截图") {
-                Toggle("在区域截图工具条显示滚动截图", isOn: Binding(
-                    get: { settings.rollingCaptureEnabled },
-                    set: { settings.rollingCaptureEnabled = $0 }
-                ))
-                Text("选中后立即开始录制，可自行上下滚动；点击停止并生成后，会先处理已经捕获的剩余画面再生成长图。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("贴图") {
-                HStack {
-                    Text("默认透明度")
-                    Slider(
-                        value: Binding(
-                            get: { settings.pinDefaultOpacity },
-                            set: { settings.pinDefaultOpacity = $0 }
-                        ),
-                        in: 0.1...1.0
-                    )
-                    Text("\(Int((settings.pinDefaultOpacity * 100).rounded()))%")
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 44, alignment: .trailing)
-                }
-            }
-
-            Section("保存") {
-                Picker("保存位置", selection: Binding(
-                    get: { settings.saveLocation },
-                    set: { settings.saveLocation = $0 }
-                )) {
-                    ForEach(ScreenshotSaveLocation.allCases) { location in
-                        Text(location.title).tag(location)
-                    }
-                }
-
-                if settings.saveLocation == .custom {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("自定义文件夹")
-                            Text(settings.customSaveDirectory ?? "尚未选择")
-                                .font(.caption)
-                                .foregroundStyle(settings.customSaveDirectory == nil ? .red : .secondary)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
+                FewerSettingsCard {
+                    FewerSettingsRow { VStack(alignment: .leading, spacing: 2) { Text("滚动截图"); Text("自动拼接长图，支持上下双向滚动").font(.caption).foregroundStyle(.secondary) }; Spacer(); Toggle("", isOn: Binding(get: { settings.rollingCaptureEnabled }, set: { settings.rollingCaptureEnabled = $0 })).labelsHidden() }
+                    Divider()
+                    FewerSettingsRow { VStack(alignment: .leading, spacing: 2) { Text("自动贴图"); Text("截图后自动以浮动窗口置顶显示").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("当前版本不支持").font(.caption).foregroundStyle(.secondary) }
+                    Divider()
+                    FewerSettingsRow { Text("贴图默认透明度"); Spacer(); Slider(value: $settings.pinDefaultOpacity, in: 0.1...1.0).frame(width: 160); Text("\(Int((settings.pinDefaultOpacity * 100).rounded()))%").monospacedDigit().font(.caption) }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("保存位置")
+                            Text("截图文件的默认保存路径").font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button("选择…") {
-                            chooseSaveDirectory()
-                        }
+                        Picker("", selection: $settings.saveLocation) { ForEach(ScreenshotSaveLocation.allCases) { Text($0.title).tag($0) } }.labelsHidden().frame(width: 130)
                     }
                 }
-            }
+                FewerSettingsCard {
+                    FewerSettingsRow { Text("快捷键录制").fontWeight(.semibold) }
+                    Divider(); FewerSettingsRow { HotKeyRecorder(title: "区域截图", spec: $settings.regionHotKey) }
+                    Divider(); FewerSettingsRow { HotKeyRecorder(title: "窗口截图", spec: $settings.windowHotKey) }
+                    Divider(); FewerSettingsRow { HotKeyRecorder(title: "全屏截图", spec: $settings.fullscreenHotKey) }
+                }
+            }.padding(.bottom, 24)
         }
-        .formStyle(.grouped)
-        .navigationTitle("截屏")
         .onAppear {
             settings = store.load()
             refreshScreenCapturePermission()
@@ -140,6 +51,7 @@ struct ScreenshotSettingsView: View {
         }
         .onChange(of: settings) { _, _ in
             store.save(settings)
+            reconcileKeycastShortcutConflict()
             // 快捷键可能变化，重新注册全局热键
             if settings.shortcutsEnabled {
                 HotKeyManager.shared.install()
@@ -147,6 +59,23 @@ struct ScreenshotSettingsView: View {
                 HotKeyManager.shared.unregisterAll()
             }
         }
+    }
+
+    private func reconcileKeycastShortcutConflict() {
+        var inputSettings = InputEnhancementStore().load()
+        guard let shortcut = inputSettings.keycast.toggleShortcut else { return }
+        let reserved = settings.shortcutsEnabled
+            ? [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey].map(InputShortcut.init)
+            : []
+        guard !InputShortcutSafety.isAllowedGlobalToggle(shortcut, additionalReserved: reserved) else { return }
+        inputSettings.keycast.toggleShortcut = nil
+        try? InputEnhancementStore().save(inputSettings)
+        DistributedNotificationCenter.default().postNotificationName(
+            AppGroupConstants.inputEnhancementSettingsDidChangeNotification,
+            object: nil,
+            userInfo: nil,
+            deliverImmediately: true
+        )
     }
 
     private var permissionStatusText: String {

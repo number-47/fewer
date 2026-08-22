@@ -312,3 +312,41 @@ When information conflicts, follow this order:
 5. `.agent/PLAN.md`
 6. `.agent/CURRENT.md`
 7. Previous chat context
+
+---
+
+# Codex 子代理分工
+
+本节覆盖上文旧 Multi-Agent Workflow 中关于 `planner`、`reviewer`、`executor_terra`、`executor_luna` 的角色路由；其余 `.agent` 状态管理、任务状态机和验证规则继续生效。项目只配置 `implementer` 与 `batch_worker` 两个自定义子代理，主对话中的 Sol 负责理解需求、判断风险、拆分任务和最终验收，不创建额外的 Sol 子代理。
+
+## 主对话职责
+
+- 需求有歧义、涉及架构取舍或高风险改动时，留在主对话分析。
+- 高风险任务需要修改代码时，由主对话先给出方案、风险边界、禁止事项和验收标准，再交给 `implementer`；完成后回到主对话验收。
+- 一两处范围明确的简单改动可以由主对话直接处理，不必创建子代理。
+- 无法判断任务是否适合委派时，先澄清，不要猜测后交给 `batch_worker`。
+- 主对话负责最终检查实现结果、验证证据、范围控制和剩余风险；不再委派 `planner` 或 `reviewer` 子代理。
+
+## Implementer（Terra）
+
+- 普通开发默认交给 `implementer`。
+- `implementer` 负责目标和方案明确后的实现、调试、修复、补测试与验证。
+- 架构取舍、产品判断和未界定的高风险决策必须返回主对话处理。
+
+## Batch Worker（Luna）
+
+只有以下四个条件全部满足时，才能交给 `batch_worker`：
+
+1. 范围明确到目录、文件、字段或清单。
+2. 规则固定，不需要猜测业务。
+3. 结果能够快速验收。
+4. 做错后容易撤回，不影响核心业务。
+
+任一条件不满足时，改由主对话澄清或交给 `implementer`，不得为了追求并行而放宽条件。
+
+## 委派约束
+
+- 每次委派前说明选择该代理的原因，并给出目标、范围、禁止事项和验收标准。
+- 不要让多个可写代理同时修改重叠文件；存在重叠时必须串行执行。
+- 子代理不得自行扩大范围、选择下一个任务或修改未授权的协调状态。
+- 旧工作流或技能中若仍出现 `planner`、`reviewer`、`executor_terra`、`executor_luna`，以本节为准：规划与验收留在主对话，日常实现使用 `implementer`，严格受限的批量工作使用 `batch_worker`。

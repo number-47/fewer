@@ -31,6 +31,7 @@ final class HotKeyManager {
         unregisterAll()
         installEventHandlerIfNeeded()
 
+        guard ModulePreferencesStore().isEnabled(moduleID: "screenshot") else { return }
         let settings = store.load()
         guard settings.shortcutsEnabled else { return }
         register(id: 1, spec: settings.regionHotKey, mode: .smart)

@@ -13,33 +13,39 @@ struct ShortcutSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                Toggle("启用 Finder 快捷键助手", isOn: Binding(
-                    get: { model.settings.shortcutHelperEnabled },
-                    set: { model.setShortcutHelperEnabled($0) }
-                ))
-            }
-
-            Section("默认快捷键") {
-                LabeledContent("剪切") { Text("⌘X").monospaced() }
-                LabeledContent("粘贴") { Text("⌘V").monospaced() }
-            }
-
-            Section {
-                LabeledContent("状态", value: authorizationStatusText)
-                Button("请求权限") {
-                    PermissionService.requestAccessibility()
+        ScrollView {
+            VStack(spacing: 16) {
+                FewerSettingsCard {
+                    FewerSettingsRow { status("辅助功能权限", "全局快捷键监听所需", helperStatus.isAccessibilityTrusted ? "已授权" : "未授权", helperStatus.isAccessibilityTrusted) }
+                    Divider()
+                    FewerSettingsRow { status("⌘X 剪切支持", "Finder 中使用 ⌘X 剪切文件", authorizationStatusText, helperStatus.isFresh()) }
+                    Divider()
+                    FewerSettingsRow { status("⌘V 粘贴支持", "Finder 中使用 ⌘V 粘贴文件", authorizationStatusText, helperStatus.isFresh()) }
                 }
-                Button("打开系统设置") { PermissionService.openAccessibilitySettings() }
-            } header: {
-                Text("辅助功能权限")
-            } footer: {
-                Text("请在系统设置中授权 FewerShortcutHelper。助手只在 Finder 位于前台时处理 ⌘X/⌘V，不记录按键历史或文本输入。快捷键粘贴使用 Finder 原生冲突处理。")
-            }
+                FewerSettingsCard {
+                    FewerSettingsRow { Text("截图快捷键").fontWeight(.semibold) }
+                    Divider()
+                    FewerSettingsRow { Text("区域截图"); Spacer(); Text("⌘⌥A").monospaced().foregroundStyle(.secondary) }
+                    Divider()
+                    FewerSettingsRow { Text("窗口截图"); Spacer(); Text("⌘⌥W").monospaced().foregroundStyle(.secondary) }
+                    Divider()
+                    FewerSettingsRow { Text("全屏截图"); Spacer(); Text("⌘⌥F").monospaced().foregroundStyle(.secondary) }
+                }
+                FewerSettingsCard {
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) { Text("快捷键助手"); Text("辅助进程，负责监听与执行全局快捷键").font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { model.settings.shortcutHelperEnabled }, set: { model.setShortcutHelperEnabled($0) })).labelsHidden()
+                    }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) { Text("开机启动助手"); Text("登录时自动启动辅助进程").font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { model.settings.launchHelperAtLogin }, set: { model.setLaunchHelperAtLogin($0) })).labelsHidden()
+                    }
+                }
+            }.padding(.bottom, 24)
         }
-        .formStyle(.grouped)
-        .navigationTitle("快捷键")
         .task {
             if model.settings.shortcutHelperEnabled {
                 PermissionService.launchShortcutHelper()
@@ -51,6 +57,16 @@ struct ShortcutSettingsView: View {
                 helperStatus = PermissionService.shortcutHelperStatus
                 try? await Task.sleep(for: .seconds(1))
             }
+        }
+    }
+
+    private func status(_ title: String, _ detail: String, _ value: String, _ okay: Bool) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title); Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(value).font(.caption).foregroundStyle(okay ? .green : .orange)
         }
     }
 }

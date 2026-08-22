@@ -6,7 +6,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case templates
     case shortcuts
     case screenshot
+    case inputEnhancement
+    case modules
     case general
+    case about
 
     var id: String { rawValue }
 
@@ -17,7 +20,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .templates: "文件模板"
         case .shortcuts: "快捷键"
         case .screenshot: "截屏"
+        case .inputEnhancement: "输入增强"
+        case .modules: "模块"
         case .general: "通用"
+        case .about: "关于"
         }
     }
 
@@ -28,7 +34,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .templates: "doc.on.doc"
         case .shortcuts: "keyboard"
         case .screenshot: "camera"
+        case .inputEnhancement: "cursorarrow.motionlines"
+        case .modules: "square.grid.2x2"
         case .general: "gearshape"
+        case .about: "info.circle"
         }
     }
 }

@@ -18,8 +18,9 @@ final class PasteboardCutBridge: @unchecked Sendable {
         _ = try? store?.start(urls: urls, pasteboardChangeCount: pasteboard.changeCount)
     }
 
-    func hasValidTransaction() -> Bool {
-        guard let store else { return false }
-        return ((try? store.load(currentPasteboardChangeCount: NSPasteboard.general.changeCount)) ?? nil) != nil
+    func validTransactionPasteboardChangeCount() -> Int? {
+        guard let store else { return nil }
+        return ((try? store.load(currentPasteboardChangeCount: NSPasteboard.general.changeCount)) ?? nil)?
+            .pasteboardChangeCount
     }
 }

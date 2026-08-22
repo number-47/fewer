@@ -25,7 +25,7 @@ final class SharedSettingsStoreTests: XCTestCase {
         let result = store.load()
 
         XCTAssertNil(result.recoveryReason)
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.menuOrder, FewerFeature.allCases)
         XCTAssertEqual(result.settings.enabledFeatures, Set(FewerFeature.allCases))
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
         XCTAssertEqual(result.settings.pathFormat, .posix)
@@ -59,8 +59,10 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         let result = SharedSettingsStore(defaults: defaults).load()
 
-        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .openInTerminal, .refresh])
-        XCTAssertEqual(result.settings.menuOrder, [.newFile, .copyPath, .cut, .paste, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.enabledFeatures, [
+            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+        ])
+        XCTAssertEqual(result.settings.menuOrder, FewerFeature.allCases)
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
@@ -74,8 +76,12 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         // 新功能默认启用并追加到菜单末尾；用户已有开关与排序保持不变
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
-        XCTAssertEqual(result.settings.enabledFeatures, [.copyPath, .cut, .paste, .openInTerminal, .refresh])
-        XCTAssertEqual(result.settings.menuOrder, [.cut, .copyPath, .paste, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.enabledFeatures, [
+            .copyPath, .cut, .paste, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+        ])
+        XCTAssertEqual(result.settings.menuOrder, [
+            .cut, .copyPath, .paste, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+        ])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
 
@@ -99,8 +105,21 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
         XCTAssertTrue(result.settings.enabledFeatures.contains(.refresh))
-        XCTAssertEqual(result.settings.menuOrder, [.copyPath, .openInTerminal, .refresh])
+        XCTAssertEqual(result.settings.menuOrder, [
+            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+        ])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
+    }
+
+    func testV4PayloadMigratesFinderAdditionsWithoutReorderingChoices() throws {
+        let v4 = Data(#"{"schemaVersion":4,"enabledFeatures":["copyPath"],"menuOrder":["copyPath"]}"#.utf8)
+        defaults.set(v4, forKey: AppGroupConstants.featureSettingsKey)
+
+        let settings = SharedSettingsStore(defaults: defaults).load().settings
+
+        XCTAssertEqual(settings.enabledFeatures, [.copyPath, .newFolder, .copyAs, .openWith])
+        XCTAssertEqual(settings.menuOrder, [.copyPath, .newFolder, .copyAs, .openWith])
+        XCTAssertFalse(settings.openWithApplications.isEmpty)
     }
 
     func testCustomTerminalBundleIDRoundTrips() throws {

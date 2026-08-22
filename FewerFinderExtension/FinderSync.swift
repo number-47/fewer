@@ -7,6 +7,7 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     private let logger = Logger(subsystem: "com.number47.fewer", category: "finder-menu")
     private var actionHandler: FinderActionHandler!
     private var menuAdapter: FinderMenuAdapter!
+    private let modulePreferencesStore = ModulePreferencesStore()
 
     override init() {
         super.init()
@@ -19,6 +20,7 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
+        guard modulePreferencesStore.isEnabled(moduleID: "finder") else { return nil }
         guard let context = makeContext(for: menuKind) else {
             logger.error("Unable to resolve Finder menu context for kind \(menuKind.rawValue, privacy: .public)")
             return nil
@@ -37,13 +39,22 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
         )
         actionHandler.context = context
         logger.info("Built Finder menu with \(entries.count, privacy: .public) root entries")
-        return menuAdapter.menu(from: entries)
+        return menuAdapter.menu(from: entries, target: self)
     }
 
     @IBAction nonisolated func copyPathCommand(_ sender: AnyObject?) {
-        Task { @MainActor [weak self] in
-            self?.actionHandler.perform(.copyPath)
-        }
+        actionHandler.perform(.copyPath)
+    }
+
+    @IBAction nonisolated func copyAsCommand(_ sender: AnyObject?) {
+        guard let title = sender?.value(forKey: "title") as? String,
+              let format = FinderCopyFormat(menuTitle: title)
+        else { return }
+        actionHandler.perform(.copyAs(format))
+    }
+
+    @IBAction nonisolated func newFolderCommand(_ sender: AnyObject?) {
+        Task { @MainActor [weak self] in self?.actionHandler.perform(.newFolder) }
     }
 
     @IBAction nonisolated func cutCommand(_ sender: AnyObject?) {
@@ -57,6 +68,15 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
            self?.actionHandler.perform(.openInTerminal)
        }
    }
+
+    @IBAction nonisolated func openWithCommand(_ sender: AnyObject?) {
+        guard let tagNumber = sender?.value(forKey: "tag") as? NSNumber,
+              let bundleIdentifier = menuAdapter.openWithBundleIDs[tagNumber.intValue]
+        else { return }
+        Task { @MainActor [weak self] in
+            self?.actionHandler.perform(.openWith(bundleIdentifier: bundleIdentifier))
+        }
+    }
 
     @IBAction nonisolated func refreshCommand(_ sender: AnyObject?) {
         Task { @MainActor [weak self] in

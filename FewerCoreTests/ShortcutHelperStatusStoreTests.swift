@@ -40,6 +40,15 @@ final class ShortcutHelperStatusStoreTests: XCTestCase {
         XCTAssertNil(ShortcutHelperStatusStore(fileURL: fileURL).load())
     }
 
+    func testDecodesLegacyStatusWithSafeEngineDefaults() throws {
+        let data = Data(#"{"isAccessibilityTrusted":true,"processIdentifier":47,"updatedAt":0}"#.utf8)
+        let status = try JSONDecoder().decode(ShortcutHelperStatus.self, from: data)
+
+        XCTAssertFalse(status.isEventTapActive)
+        XCTAssertFalse(status.isInputMonitoringTrusted)
+        XCTAssertNil(status.lastError)
+    }
+
     func testFreshnessRequiresRunningProcessAndRecentHeartbeat() {
         let now = Date(timeIntervalSince1970: 100)
         XCTAssertTrue(ShortcutHelperStatus(

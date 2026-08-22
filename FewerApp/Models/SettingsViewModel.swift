@@ -55,6 +55,11 @@ final class SettingsViewModel: ObservableObject {
         saveSettings()
     }
 
+    func setOpenWithApplications(_ applications: [OpenWithApplication]) {
+        settings.openWithApplications = applications
+        saveSettings()
+    }
+
     func setConflictPolicy(_ policy: ConflictPolicy) {
         settings.conflictPolicy = policy
         saveSettings()
@@ -144,6 +149,12 @@ final class SettingsViewModel: ObservableObject {
     private func saveSettings() {
         do {
             try settingsStore?.save(settings)
+            DistributedNotificationCenter.default().postNotificationName(
+                AppGroupConstants.featureSettingsDidChangeNotification,
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         } catch {
             errorMessage = "无法保存设置：\(error.localizedDescription)"
         }

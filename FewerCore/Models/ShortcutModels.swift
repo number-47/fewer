@@ -6,7 +6,7 @@ public enum ShortcutKey: Equatable, Sendable {
     case other
 }
 
-public struct ShortcutModifiers: OptionSet, Equatable, Sendable {
+public struct ShortcutModifiers: OptionSet, Codable, Hashable, Sendable {
     public let rawValue: Int
 
     public init(rawValue: Int) {

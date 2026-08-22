@@ -15,12 +15,12 @@ enum ShortcutHelperApp {
 }
 
 final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
-    private var eventTapController: EventTapController?
+    private var inputEventCoordinator: InputEventCoordinator?
     private var heartbeatTimer: Timer?
     private let statusStore = ShortcutHelperStatusStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        eventTapController = EventTapController()
+        inputEventCoordinator = InputEventCoordinator()
         DistributedNotificationCenter.default().addObserver(
             self,
             selector: #selector(requestAccessibility),
@@ -45,9 +45,11 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         heartbeatTimer?.invalidate()
+        inputEventCoordinator?.stop()
         DistributedNotificationCenter.default().removeObserver(self)
         let status = ShortcutHelperStatus(
             isAccessibilityTrusted: AXIsProcessTrusted(),
+            isInputMonitoringTrusted: CGPreflightListenEventAccess(),
             processIdentifier: 0,
             updatedAt: Date()
         )
@@ -62,14 +64,26 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func refreshStatus() {
         let isTrusted = AXIsProcessTrusted()
+        inputEventCoordinator?.refreshCachedState()
+        let runtimeStatus = inputEventCoordinator?.status() ?? InputEventRuntimeStatus()
         let status = ShortcutHelperStatus(
             isAccessibilityTrusted: isTrusted,
+            isInputMonitoringTrusted: CGPreflightListenEventAccess(),
+            isEventTapActive: runtimeStatus.isEventTapActive,
+            isScrollEngineActive: runtimeStatus.isScrollEngineActive,
+            isGestureEngineActive: runtimeStatus.isGestureEngineActive,
+            isKeycastActive: runtimeStatus.isKeycastActive,
+            detectedScrollDevice: runtimeStatus.detectedScrollDevice,
+            emergencyDisabled: runtimeStatus.emergencyDisabled,
+            lastError: runtimeStatus.lastError,
             processIdentifier: ProcessInfo.processInfo.processIdentifier,
             updatedAt: Date()
         )
         try? statusStore.save(status)
         if isTrusted {
-            eventTapController?.start()
+            inputEventCoordinator?.start()
+        } else {
+            inputEventCoordinator?.stop()
         }
     }
 }

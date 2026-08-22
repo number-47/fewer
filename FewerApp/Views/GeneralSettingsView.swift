@@ -6,54 +6,58 @@ struct GeneralSettingsView: View {
     @ObservedObject private var presentationController = AppPresentationController.shared
 
     var body: some View {
-        Form {
-            Section("显示位置") {
-                Picker("运行时显示在", selection: presentationModeBinding) {
+        ScrollView {
+            VStack(spacing: 16) {
+                FewerSettingsCard {
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) { Text("显示位置"); Text("应用以菜单栏模式或 Dock 模式运行").font(.caption).foregroundStyle(.secondary) }
+                        Spacer()
+                        Picker("", selection: presentationModeBinding) {
                     ForEach(AppPresentationMode.allCases) { mode in
                         Label(mode.title, systemImage: mode.systemImage)
                             .tag(mode)
                     }
+                        }.labelsHidden().pickerStyle(.segmented).frame(width: 180)
+                    }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("重名处理")
+                            Text("截图文件名冲突时的处理方式").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { model.settings.conflictPolicy },
+                            set: { model.setConflictPolicy($0) }
+                        )) {
+                            Text("添加序号").tag(ConflictPolicy.keepBoth)
+                            Text("跳过").tag(ConflictPolicy.skip)
+                            Text("替换").tag(ConflictPolicy.replace)
+                        }
+                        .labelsHidden()
+                        .frame(width: 130)
+                    }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("通知")
+                            Text("截图完成、操作完成等通知").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { model.settings.notificationsEnabled }, set: { model.setNotificationsEnabled($0) })).labelsHidden()
+                    }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("登录时启动助手")
+                            Text("FewerShortcutHelper 开机自启动").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { model.settings.launchHelperAtLogin }, set: { model.setLaunchHelperAtLogin($0) })).labelsHidden()
+                    }
                 }
-                .pickerStyle(.segmented)
-
-                Text(presentationController.mode == .menuBar
-                     ? "Fewer 显示在屏幕顶部菜单栏，不占用 Dock 位置。"
-                     : "Fewer 显示在 Dock；点击 Dock 图标可重新打开设置。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("重名处理") {
-                Picker("新建文件与右键粘贴", selection: Binding(
-                    get: { model.settings.conflictPolicy },
-                    set: { model.setConflictPolicy($0) }
-                )) {
-                    Text("保留两者").tag(ConflictPolicy.keepBoth)
-                    Text("跳过").tag(ConflictPolicy.skip)
-                    Text("替换（移入废纸篓）").tag(ConflictPolicy.replace)
-                }
-            }
-
-            Section("行为") {
-                Toggle("显示操作结果通知", isOn: Binding(
-                    get: { model.settings.notificationsEnabled },
-                    set: { model.setNotificationsEnabled($0) }
-                ))
-                Toggle("登录时启动快捷键助手", isOn: Binding(
-                    get: { model.settings.launchHelperAtLogin },
-                    set: { model.setLaunchHelperAtLogin($0) }
-                ))
-            }
-
-            Section("关于") {
-                LabeledContent("应用", value: "Fewer")
-                LabeledContent("版本", value: "\(FewerVersion.current)")
-                Text("More tools. Fewer apps.")
-                    .foregroundStyle(.secondary)
-            }
+            }.padding(.bottom, 24)
         }
-        .formStyle(.grouped)
-        .navigationTitle("通用")
     }
 
     private var presentationModeBinding: Binding<AppPresentationMode> {

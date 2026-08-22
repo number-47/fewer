@@ -1,20 +1,67 @@
 import SwiftUI
 
+/// 设置窗口与原型一致使用固定 200pt 侧栏；各 pane 继续复用现有的真实设置绑定。
 struct RootSettingsView: View {
     @StateObject private var model = SettingsViewModel()
-    @State private var selection: SettingsSection? = .overview
+    @State private var selection: SettingsSection = .overview
 
     var body: some View {
-        NavigationSplitView {
-            List(SettingsSection.allCases, selection: $selection) { section in
-                Label(section.title, systemImage: section.systemImage)
-                    .tag(section)
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            detail
+        }
+        .frame(minWidth: 880, minHeight: 600)
+        .background(Color.white)
+        .tint(Color(red: 0, green: 113 / 255, blue: 227 / 255))
+        .preferredColorScheme(.light)
+    }
+
+    private var sidebar: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach([
+                    SettingsSection.overview, .contextMenu, .templates, .shortcuts,
+                    .screenshot, .inputEnhancement, .modules, .general
+                ]) { sidebarItem($0) }
+                divider
+                sidebarItem(.about)
             }
-            .listStyle(.sidebar)
-            .navigationTitle("Fewer")
-        } detail: {
+            .padding(.horizontal, 8)
+            .padding(.vertical, 12)
+        }
+        .frame(width: 200)
+        .background(Color(red: 251 / 255, green: 251 / 255, blue: 253 / 255))
+    }
+
+    private func sidebarItem(_ section: SettingsSection) -> some View {
+        Button { selection = section } label: {
+            Label(section.title, systemImage: section.systemImage)
+                .font(.system(size: 14))
+                .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                .padding(.horizontal, 12)
+                .foregroundStyle(selection == section ? .white : .primary)
+                .background(selection == section ? Color(red: 0, green: 113 / 255, blue: 227 / 255) : .clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var divider: some View {
+        Divider().padding(.horizontal, 12).padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            if selection != .about {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(selection.title).font(.system(size: 21, weight: .semibold))
+                    Text(selection.subtitle).font(.system(size: 14)).foregroundStyle(.secondary)
+                }
+            }
             Group {
-                switch selection ?? .overview {
+                switch selection {
                 case .overview:
                     OverviewView(model: model)
                 case .contextMenu:
@@ -25,19 +72,71 @@ struct RootSettingsView: View {
                     ShortcutSettingsView(model: model)
                 case .screenshot:
                     ScreenshotSettingsView()
+                case .inputEnhancement:
+                    InputEnhancementSettingsView()
+                case .modules:
+                    ModuleSettingsView()
                 case .general:
                     GeneralSettingsView(model: model)
+                case .about:
+                    AboutSettingsView()
                 }
             }
+            .environment(\.defaultMinListRowHeight, 44)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .alert("Fewer", isPresented: Binding(
-                get: { model.errorMessage != nil },
-                set: { if !$0 { model.errorMessage = nil } }
-            )) {
-                Button("好") { model.errorMessage = nil }
-            } message: {
-                Text(model.errorMessage ?? "")
-            }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 24)
+        .alert("Fewer", isPresented: Binding(
+            get: { model.errorMessage != nil },
+            set: { if !$0 { model.errorMessage = nil } }
+        )) {
+            Button("好") { model.errorMessage = nil }
+        } message: {
+            Text(model.errorMessage ?? "")
+        }
+    }
+}
+
+private extension SettingsSection {
+    var subtitle: String {
+        switch self {
+        case .overview: "查看组件状态与权限，快速定位需要配置的项目。"
+        case .contextMenu: "配置 Finder 右键菜单项的排序、开关与路径格式。"
+        case .templates: "管理“新建文件”可用的模板，支持导入自定义模板。"
+        case .shortcuts: "配置全局快捷键与剪切粘贴辅助功能。"
+        case .screenshot: "配置截图快捷键、滚动截图与贴图行为。"
+        case .inputEnhancement: "配置鼠标滚动增强、手势、按键展示与诊断。"
+        case .modules: "启用或关闭模块，配置面板显示与菜单栏独立图标。"
+        case .general: "配置应用显示模式、通知与启动行为。"
+        case .about: "Fewer 版本与应用信息。"
+        }
+    }
+}
+
+struct FewerSettingsCard<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content
+        }
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+    }
+}
+
+struct FewerSettingsRow<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 16) {
+            content
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(minHeight: 44)
     }
 }
