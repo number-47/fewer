@@ -1,144 +1,123 @@
 import FewerCore
 import SwiftUI
 
-/// 主工具箱按独立监控模块组织，其余工具入口保持不变。
+/// 工具箱使用瞬态路由；每次新建视图都从日历开始，不写入用户偏好。
 struct ToolboxPanelView: View {
-    private let prototypeAccent = Color(red: 0, green: 113 / 255, blue: 227 / 255)
-    private enum Tab: String, CaseIterable, Identifiable {
-        case cpu, gpu, memory, disk, network, calendar, screenshot, input, finder, system
+    private enum ToolboxDestination: String, CaseIterable, Identifiable {
+        case calendar, screenshot, input, cpu, gpu, memory, disk, network, finder, system
 
         var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .cpu: "CPU"
-            case .gpu: "GPU"
-            case .memory: "内存"
-            case .disk: "磁盘"
-            case .network: "网络"
-            case .calendar: "日历"
-            case .screenshot: "截图"
-            case .input: "输入"
-            case .finder: "Finder"
-            case .system: "系统"
-            }
-        }
-
-        var systemImage: String {
-            switch self {
-            case .cpu: "cpu"
-            case .gpu, .memory: "memorychip"
-            case .disk: "internaldrive"
-            case .network: "network"
-            case .calendar: "calendar"
-            case .screenshot: "camera.viewfinder"
-            case .input: "cursorarrow.motionlines"
-            case .finder: "folder"
-            case .system: "switch.2"
-            }
-        }
+        var monitorID: SystemMonitorModuleID? { SystemMonitorModuleID(rawValue: rawValue) }
     }
 
-    @State private var tab: Tab = .calendar
+    @State private var destination: ToolboxDestination = .calendar
     @State private var screenshotSettings = ScreenshotSettings.default
+    @ObservedObject private var host = ModuleHost.shared
     @ObservedObject private var input = InputEnhancementViewModel.shared
     @ObservedObject private var metrics = SystemMetricsService.shared
     @ObservedObject private var actions = SystemActionsService.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            tabStrip
-            Divider()
-            ViewThatFits(in: .vertical) {
-                moduleContent.padding(.horizontal, 12).padding(.vertical, tab == .calendar ? 0 : 12).frame(maxHeight: .infinity)
-                ScrollView { moduleContent.padding(.horizontal, 12).padding(.vertical, tab == .calendar ? 0 : 12) }
+        MenuBarPopoverChrome(
+            title: destinationTitle,
+            systemImage: destinationImage,
+            openSettings: { SettingsWindowController.shared.show() },
+            quitAction: {
+                MenuBarController.shared.closePopover()
+                NSApp.terminate(nil)
             }
-            .frame(maxHeight: .infinity)
-            footer
+        ) {
+            VStack(spacing: 0) {
+                tabBar
+                Divider()
+                ViewThatFits(in: .vertical) {
+                    moduleContent
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, destination == .calendar ? 0 : 12)
+                        .frame(maxHeight: .infinity)
+
+                    ScrollView {
+                        moduleContent
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, destination == .calendar ? 0 : 12)
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
         }
         .frame(width: 400)
-        .background(Color(red: 251 / 255, green: 251 / 255, blue: 253 / 255))
-        .tint(prototypeAccent)
-        .preferredColorScheme(.light)
-        .onAppear {
-            metrics.start()
-            screenshotSettings = ScreenshotSettingsStore().load()
-        }
+        .onAppear { screenshotSettings = ScreenshotSettingsStore().load() }
         .alert("Fewer", isPresented: Binding(
             get: { actions.lastError != nil },
             set: { if !$0 { actions.lastError = nil } }
         )) { Button("好") { actions.lastError = nil } } message: { Text(actions.lastError ?? "") }
     }
 
-    @ViewBuilder
-    private var moduleContent: some View {
-        switch tab {
-        case .cpu: monitor(.cpu)
-        case .gpu: monitor(.gpu)
-        case .memory: monitor(.memory)
-        case .disk: monitor(.disk)
-        case .network: monitor(.network)
-        case .calendar: calendar
-        case .screenshot: screenshot
-        case .input: inputEnhancement
-        case .finder: finder
-        case .system: system
-        }
+    private var destinationTitle: String {
+        descriptor(for: destination)?.title ?? "Fewer"
     }
 
-    private func monitor(_ moduleID: SystemMonitorModuleID) -> some View {
-        MonitorModulePopoverView(moduleID: moduleID, openSettings: {
-            SettingsWindowController.shared.show()
-        })
+    private var destinationImage: String {
+        descriptor(for: destination)?.systemImage ?? "square.grid.2x2"
     }
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "square.grid.2x2.fill")
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(prototypeAccent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-            Text("Fewer").font(.system(size: 14, weight: .semibold))
-            Spacer()
-            Button { SettingsWindowController.shared.show() } label: { Image(systemName: "gearshape") }
-                .buttonStyle(.borderless).frame(width: 28, height: 28).help("设置")
-            Button {
-                MenuBarController.shared.closePopover()
-                NSApp.terminate(nil)
-            } label: { Image(systemName: "power") }
-                .buttonStyle(.borderless).frame(width: 28, height: 28).help("退出 Fewer（⌘Q）")
-        }
-        .padding(.top, 16)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
-    }
-
-    private var tabStrip: some View {
+    private var tabBar: some View {
         HStack(spacing: 2) {
-            ForEach(Tab.allCases) { item in
-                Button { tab = item } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: item.systemImage).font(.system(size: 18, weight: .regular))
-                        Text(item.title).font(.system(size: 10, weight: tab == item ? .semibold : .regular))
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 44)
-                    .foregroundStyle(tab == item ? prototypeAccent : Color.secondary)
-                    .background(tab == item ? prototypeAccent.opacity(0.10) : .clear,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(alignment: .bottom) {
-                        if tab == item {
-                            Capsule().fill(prototypeAccent).frame(width: 20, height: 2).padding(.bottom, 1)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
+            ForEach(ToolboxDestination.allCases) { item in
+                tabButton(for: item)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
     }
 
+    private func tabButton(for item: ToolboxDestination) -> some View {
+        let isSelected = destination == item
+        let desc = descriptor(for: item)
+        return Button {
+            destination = item
+        } label: {
+            Image(systemName: desc?.systemImage ?? "square.grid.2x2")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                .frame(width: 34, height: 28)
+                .background(
+                    isSelected ? Color.accentColor.opacity(0.12) : .clear,
+                    in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(desc?.title ?? item.rawValue)
+        .accessibilityIdentifier("toolbox.tab.\(item.rawValue)")
+        .accessibilityLabel(desc?.title ?? item.rawValue)
+    }
+
+    @ViewBuilder
+    private var moduleContent: some View {
+        switch destination {
+        case .cpu, .gpu, .memory, .disk, .network:
+            if let monitorID = destination.monitorID {
+                MonitorModuleContent(moduleID: monitorID)
+                    .id(monitorID)
+            }
+        case .calendar:
+            MenuBarCalendarView(presentation: .embedded, availableWidth: 352)
+        case .screenshot:
+            screenshot
+        case .input:
+            inputEnhancement
+        case .finder:
+            finder
+        case .system:
+            system
+        }
+    }
+
+    private func descriptor(for destination: ToolboxDestination) -> ModuleDescriptor? {
+        host.descriptor(for: destination.rawValue)
+    }
+
+    // 旧仪表盘辅助视图在本次改造前已经未参与路由，保留以避免扩大清理范围。
     private var dashboard: some View {
         VStack(spacing: 10) {
             card("系统状态", trailing: "实时") {
@@ -167,10 +146,6 @@ struct ToolboxPanelView: View {
         }
     }
 
-    private var calendar: some View {
-        MenuBarCalendarView(availableWidth: 352)
-    }
-
     private var screenshot: some View {
         VStack(spacing: 10) {
             LazyVGrid(columns: [.init(.flexible()), .init(.flexible())], spacing: 8) {
@@ -179,9 +154,7 @@ struct ToolboxPanelView: View {
                 captureButton("窗口截图", "macwindow", .window, "⌘⌥W")
                 captureButton("全屏截图", "display", .fullscreen, "⌘⌥F")
             }
-            card("最近截图", trailing: "暂无") {
-                prototypeUnavailable("当前版本未保存最近截图列表")
-            }
+            card("最近截图", trailing: "暂无") { unavailable("当前版本未保存最近截图列表") }
             card("截图设置") {
                 Toggle("滚动截图", isOn: Binding(
                     get: { screenshotSettings.rollingCaptureEnabled },
@@ -202,8 +175,8 @@ struct ToolboxPanelView: View {
             }
             card("应用规则") {
                 HStack { Text("当前应用"); Spacer(); Text(NSWorkspace.shared.frontmostApplication?.localizedName ?? "未检测到").foregroundStyle(.secondary) }
-            Button("管理应用规则") { SettingsWindowController.shared.show() }
-                    .buttonStyle(.plain).foregroundStyle(prototypeAccent)
+                Button("管理应用规则") { SettingsWindowController.shared.show() }
+                    .buttonStyle(.plain).foregroundStyle(Color.accentColor)
             }
             card("诊断") {
                 statusRow("辅助功能权限", input.helperStatus.isAccessibilityTrusted ? "已授权" : "未授权", input.helperStatus.isAccessibilityTrusted)
@@ -224,7 +197,7 @@ struct ToolboxPanelView: View {
             }
             card("右键菜单") {
                 Button("打开 Finder 设置") { SettingsWindowController.shared.show() }
-                    .buttonStyle(.plain).foregroundStyle(prototypeAccent)
+                    .buttonStyle(.plain).foregroundStyle(Color.accentColor)
             }
         }
     }
@@ -237,7 +210,7 @@ struct ToolboxPanelView: View {
             }
             card("外置设备") {
                 if actions.removableVolumes.isEmpty {
-                    prototypeUnavailable("没有可推出的外置磁盘")
+                    unavailable("没有可推出的外置磁盘")
                 } else {
                     ForEach(actions.removableVolumes, id: \.self) { volume in
                         Button(volume.lastPathComponent) { actions.eject(volume) }
@@ -263,44 +236,26 @@ struct ToolboxPanelView: View {
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 6) {
-            Circle().fill(Color.green).frame(width: 6, height: 6)
-            Text("Fewer 正在运行").font(.system(size: 10)).foregroundStyle(.secondary)
-            Spacer()
-            Button("打开设置") { SettingsWindowController.shared.show() }
-                .buttonStyle(.plain).font(.system(size: 10, weight: .medium)).foregroundStyle(prototypeAccent)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .overlay(alignment: .top) { Divider() }
-    }
-
     private func card<Content: View>(_ title: String, trailing: String? = nil, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .tracking(0.24)
+                Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(.secondary).tracking(0.24)
                 Spacer()
                 if let trailing { Text(trailing).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary) }
             }
             content()
         }
         .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+        .padding(.vertical, 12)
+        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.primary.opacity(0.08)))
     }
 
     private func gauge(_ title: String, value: Double, detail: String) -> some View {
         VStack(spacing: 5) {
             ZStack {
                 Circle().stroke(Color.secondary.opacity(0.15), lineWidth: 6)
-                Circle().trim(from: 0, to: max(0.01, value)).stroke(value > 0.85 ? Color.orange : prototypeAccent, style: .init(lineWidth: 6, lineCap: .round)).rotationEffect(.degrees(-90))
+                Circle().trim(from: 0, to: max(0.01, value)).stroke(value > 0.85 ? Color.orange : Color.accentColor, style: .init(lineWidth: 6, lineCap: .round)).rotationEffect(.degrees(-90))
                 Text(detail).font(.system(size: 14, weight: .semibold, design: .rounded)).monospacedDigit()
             }.frame(width: 62, height: 62)
             Text(title).font(.caption).foregroundStyle(.secondary)
@@ -310,7 +265,7 @@ struct ToolboxPanelView: View {
     private func progressRow(_ title: String, value: Double) -> some View {
         HStack {
             Text(title).font(.caption)
-            ProgressView(value: value).tint(value > 0.75 ? .orange : prototypeAccent)
+            ProgressView(value: value).tint(value > 0.75 ? .orange : Color.accentColor)
             Text(percent(value)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 34, alignment: .trailing)
         }
     }
@@ -329,7 +284,7 @@ struct ToolboxPanelView: View {
         HStack { Circle().fill(okay ? .green : .orange).frame(width: 7, height: 7); Text(title); Spacer(); Text(value).font(.caption).foregroundStyle(.secondary) }
     }
 
-    private func prototypeUnavailable(_ message: String) -> some View {
+    private func unavailable(_ message: String) -> some View {
         Text(message).font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
     }
 

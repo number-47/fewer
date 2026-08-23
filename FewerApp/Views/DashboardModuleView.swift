@@ -169,21 +169,28 @@ final class MonitorStatusItemView: NSView {
 struct MonitorModulePopoverView: View {
     let moduleID: SystemMonitorModuleID
     let openSettings: () -> Void
+
+    var body: some View {
+        MenuBarPopoverChrome(
+            title: moduleID.title,
+            systemImage: moduleID.systemImage,
+            openSettings: openSettings
+        ) {
+            MonitorModuleContent(moduleID: moduleID)
+        }
+    }
+}
+
+/// 监控详情内容可嵌入工具箱；采样可见性随该内容的出现和消失更新。
+struct MonitorModuleContent: View {
+    let moduleID: SystemMonitorModuleID
     @ObservedObject private var metrics = SystemMetricsService.shared
     @StateObject private var wifiDetails = NetworkWiFiDetailsService()
     @State private var showsWiFiDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Label(title, systemImage: image).font(.headline)
-                Spacer()
-                Button(action: openSettings) { Image(systemName: "gearshape") }.buttonStyle(.borderless)
-            }
-            .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 8)
-            Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
             switch moduleID {
             case .cpu: CPUDetailsView(
                 snapshot: metrics.current.cpu,
@@ -223,19 +230,16 @@ struct MonitorModulePopoverView: View {
                 }
             }
             if moduleID == .network {
-                    Text("详细采样将在对应监控模块启用后显示。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                }
-                .padding(14)
+                Text("详细采样将在对应监控模块启用后显示。")
+                    .font(.caption).foregroundStyle(.secondary)
             }
+        }
+            .padding(14)
         }
         .onAppear { metrics.setModuleVisible(moduleID, isVisible: true) }
         .onDisappear { metrics.setModuleVisible(moduleID, isVisible: false) }
     }
 
-    private var title: String { switch moduleID { case .cpu: "CPU"; case .gpu: "GPU"; case .memory: "内存"; case .disk: "磁盘"; case .network: "网络" } }
-    private var image: String { switch moduleID { case .cpu: "cpu"; case .gpu, .memory: "memorychip"; case .disk: "internaldrive"; case .network: "network" } }
     private var gpuHistory: [Double] {
         guard let deviceID = metrics.current.gpu?.selectedDevice?.id else { return [] }
         return metrics.history.compactMap { $0.gpu?.device(id: deviceID)?.utilization }
@@ -243,6 +247,16 @@ struct MonitorModulePopoverView: View {
     private func row(_ name: String, _ value: String) -> some View { HStack { Text(name).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() } }
     private func percentage(_ value: Double) -> String { "\(Int((value * 100).rounded()))%" }
     private func rate(_ value: Double) -> String { ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file) + "/s" }
+}
+
+private extension SystemMonitorModuleID {
+    var title: String {
+        switch self { case .cpu: "CPU"; case .gpu: "GPU"; case .memory: "内存"; case .disk: "磁盘"; case .network: "网络" }
+    }
+
+    var systemImage: String {
+        switch self { case .cpu: "cpu"; case .gpu, .memory: "memorychip"; case .disk: "internaldrive"; case .network: "network" }
+    }
 }
 
 private struct DiskDetailsView: View {

@@ -53,14 +53,26 @@ final class FewerUITests: XCTestCase {
     func testMenuBarCommandPanel() {
         continueAfterFailure = false
         let app = launchApp()
-        let statusItem = app.statusItems.firstMatch
+        let statusItem = app.statusItems["Fewer 工具箱"]
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5))
         statusItem.click()
-        XCTAssertTrue(app.buttons["仪表盘"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["日历"].exists)
-        XCTAssertTrue(app.buttons["截图"].exists)
-        XCTAssertTrue(app.buttons["输入"].exists)
-        XCTAssertTrue(app.buttons["Finder"].exists)
-        XCTAssertTrue(app.buttons["系统"].exists)
+        XCTAssertTrue(app.staticTexts["日历"].waitForExistence(timeout: 2))
+
+        XCTAssertTrue(app.buttons["popover.settings"].exists)
+        ["calendar", "screenshot", "input", "cpu", "gpu", "memory", "disk", "network", "finder", "system"].forEach { moduleID in
+            XCTAssertTrue(app.buttons["toolbox.tab.\(moduleID)"].exists, "缺少工具箱标签：\(moduleID)")
+        }
+
+        app.buttons["toolbox.tab.cpu"].click()
+        XCTAssertTrue(app.staticTexts["CPU"].waitForExistence(timeout: 2))
+
+        app.buttons["toolbox.tab.screenshot"].click()
+        XCTAssertTrue(app.buttons["智能截图"].waitForExistence(timeout: 2))
+
+        app.buttons["toolbox.tab.system"].click()
+        XCTAssertTrue(app.staticTexts["防休眠"].waitForExistence(timeout: 2))
+
+        app.buttons["toolbox.tab.calendar"].click()
+        XCTAssertTrue(app.staticTexts["日历"].waitForExistence(timeout: 2))
     }
 }

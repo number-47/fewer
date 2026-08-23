@@ -97,6 +97,7 @@
 		AF3E095DCF2309015DC5340F /* FinderMenuContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF3F67DB14875969F7570D7E /* FinderMenuContext.swift */; };
 		B0624FEC28DC32EDB0AF762B /* ReminderRecurrence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E2B3ACB55D29C834C963456 /* ReminderRecurrence.swift */; };
 		B0E1FF8A3FB0A493DEC44375 /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = EA2D10252461A2630E1E7272 /* .gitkeep */; };
+		B16DEB9C7853DAF9BF504175 /* MenuBarPopoverChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF4315B1A186CC0B94F6DF1 /* MenuBarPopoverChrome.swift */; };
 		B50C3C2339D97F70D64308D3 /* FewerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F40E178A5381E4C89D4E2A /* FewerApp.swift */; };
 		B539B2512349EA081679F4C6 /* FinderMenuAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D12004B26EBB220F3925A0 /* FinderMenuAdapter.swift */; };
 		BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F16C21A119618BD4EED9C6 /* AppGroupConstants.swift */; };
@@ -279,6 +280,7 @@
 		69831F1DF4FC88827B4AEE87 /* ShortcutHelperStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutHelperStatus.swift; sourceTree = "<group>"; };
 		6B14690F0109FC1301C39F29 /* CutTransaction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutTransaction.swift; sourceTree = "<group>"; };
 		6B9902E5F19DB16D8E1E8D4A /* ModuleModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleModels.swift; sourceTree = "<group>"; };
+		6BF4315B1A186CC0B94F6DF1 /* MenuBarPopoverChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPopoverChrome.swift; sourceTree = "<group>"; };
 		71A478AA0E53057EBBD40FEB /* SettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSection.swift; sourceTree = "<group>"; };
 		71C31F15DCABF7FD0A23C98A /* DashboardModuleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardModuleView.swift; sourceTree = "<group>"; };
 		726CC1F5787677155743F432 /* PasteboardCutBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteboardCutBridge.swift; sourceTree = "<group>"; };
@@ -413,6 +415,7 @@
 				3262BCD2A97C69B5B26F2BED /* InputEnhancementSettingsView.swift */,
 				B2AC9B9C02E48E8627288D96 /* MarkupEditorWindowController.swift */,
 				AD1807550C64BF6502E2F7E7 /* MenuBarCalendarView.swift */,
+				6BF4315B1A186CC0B94F6DF1 /* MenuBarPopoverChrome.swift */,
 				CFEE5C3899774ECADEF93BBD /* ModuleSettingsView.swift */,
 				D664B4F5CC892E173398ED51 /* OverviewView.swift */,
 				5D034E874E2BDACE96E1B216 /* PinWindowController.swift */,
@@ -1037,6 +1040,7 @@
 				62FCD3477530AFED4C4D79BB /* InputEnhancementViewModel.swift in Sources */,
 				9E658EF1F327048DCE515838 /* MarkupEditorWindowController.swift in Sources */,
 				671B1A9860428EC1A9410D2E /* MenuBarCalendarView.swift in Sources */,
+				B16DEB9C7853DAF9BF504175 /* MenuBarPopoverChrome.swift in Sources */,
 				BEFD4DB9434010F84E3715CE /* ModuleCommandXPCServer.swift in Sources */,
 				4EBB18DE347FC059146C0603 /* ModuleHost.swift in Sources */,
 				841011E027F2B8455D9627BF /* ModuleSettingsView.swift in Sources */,

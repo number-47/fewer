@@ -812,7 +812,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
     }
 
     private func scheduleGestureTimeout(identifier: UUID) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+        DispatchQueue.global().asyncAfter(deadline: .now() + 3) { [weak self] in
             guard let self else { return }
             self.stateLock.lock()
             let runLoop = self.tapRunLoop

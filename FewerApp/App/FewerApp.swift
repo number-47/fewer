@@ -51,6 +51,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         if mainStatusItem == nil {
             let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
             configureStatusItem(item, symbol: "square.grid.2x2", tooltip: "Fewer 工具箱", action: #selector(toggleToolboxPopover(_:)))
+            item.button?.identifier = NSUserInterfaceItemIdentifier("toolbox")
             mainStatusItem = item
         }
         installModuleStatusItems()
@@ -418,17 +419,32 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             moduleID: "calendar",
             anchor: button,
             size: MenuBarCalendarView.preferredSize,
-            content: AnyView(MenuBarCalendarView())
+            content: AnyView(
+                MenuBarPopoverChrome(
+                    title: "日历",
+                    systemImage: "calendar",
+                    openSettings: { [weak self] in
+                        self?.closePopover()
+                        SettingsWindowController.shared.show()
+                    },
+                    quitAction: { [weak self] in
+                        self?.closePopover()
+                        NSApp.terminate(nil)
+                    }
+                ) {
+                    MenuBarCalendarView(presentation: .standalone)
+                }
+            )
         )
     }
 
     private func showMonitorPopover(moduleID: SystemMonitorModuleID, anchor: NSView) {
         let size: NSSize = switch moduleID {
         case .cpu: NSSize(width: 360, height: 470)
-        case .memory: NSSize(width: 320, height: 500)
-        case .gpu: NSSize(width: 300, height: 420)
-        case .network: NSSize(width: 300, height: 360)
-        case .disk: NSSize(width: 340, height: 500)
+        case .memory: NSSize(width: 360, height: 500)
+        case .gpu: NSSize(width: 360, height: 420)
+        case .network: NSSize(width: 360, height: 360)
+        case .disk: NSSize(width: 360, height: 500)
         }
         showPopover(
             moduleID: moduleID.rawValue,

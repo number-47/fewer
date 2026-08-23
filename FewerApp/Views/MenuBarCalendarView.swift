@@ -54,7 +54,13 @@ final class CalendarViewState: ObservableObject {
 }
 
 struct MenuBarCalendarView: View {
+    enum Presentation {
+        case standalone
+        case embedded
+    }
+
     static let preferredSize = NSSize(width: 400, height: 632)
+    var presentation: Presentation = .standalone
     var availableWidth: CGFloat = preferredSize.width
     /// 月份选择器（二级弹窗）窗口标识，用于失焦关闭时识别焦点是否仍在日历弹窗体系内。
     static let monthPickerWindowIdentifier = NSUserInterfaceItemIdentifier("fewer-month-picker")
@@ -74,7 +80,7 @@ struct MenuBarCalendarView: View {
 
     var body: some View {
         calendarContent(today: currentDate.date)
-            .frame(width: availableWidth, height: Self.preferredSize.height)
+            .frame(width: availableWidth)
     }
 
     private func calendarContent(today: Date) -> some View {
@@ -133,11 +139,10 @@ struct MenuBarCalendarView: View {
                 }
             )
 
-            Divider()
-
-            footer
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, presentation == .embedded ? 8 : 14)
         .onAppear {
             scrollCoordinator.onRowStep = { rows in
                 scrollByRows(rows)
@@ -323,33 +328,6 @@ struct MenuBarCalendarView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel(for: day, events: events))
-    }
-
-    private var footer: some View {
-        HStack(spacing: 12) {
-            Spacer()
-            Button {
-                SettingsWindowController.shared.show()
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(language.text(chinese: "打开 Fewer 设置", english: "Open Fewer Settings"))
-            .accessibilityLabel(language.text(chinese: "打开 Fewer 设置", english: "Open Fewer Settings"))
-
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Image(systemName: "power")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(language.text(chinese: "退出 Fewer", english: "Quit Fewer"))
-            .accessibilityLabel(language.text(chinese: "退出 Fewer", english: "Quit Fewer"))
-        }
     }
 
     private func accessibilityLabel(for day: CalendarDay, events: [CalendarEventItem]) -> String {

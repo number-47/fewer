@@ -86,7 +86,7 @@ struct InputEnhancementSettingsView: View {
                     Spacer(); Button("管理") { chooseExcludedApplication(forKeycast: false) }
                 }
             }
-            prototypeNotice("手势路径与动作编辑器保留在本页高级设置中。")
+            gestureRules
         }.padding(.bottom, 24)
     }
 
