@@ -23,6 +23,7 @@
 		1E86D3F59D758C3C521DA27E /* RecoverableReplace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63795DE993E5F86D362303FF /* RecoverableReplace.swift */; };
 		1F73E77350163DDF9AA17F1B /* ToolboxPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABF687E8CA41F612B935809E /* ToolboxPanelView.swift */; };
 		20A1E4E474F66E540BE68EA9 /* PinWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D034E874E2BDACE96E1B216 /* PinWindowController.swift */; };
+		20A9BC6A26233F69D74ED451 /* SystemMetricsSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2E229E0B9013C6448C106E4 /* SystemMetricsSampler.swift */; };
 		2342D58AA1DB24043B49A79A /* TerminalAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DEFAF443B5AD48FB7BFA793 /* TerminalAppTests.swift */; };
 		260E232621F12FBC0961ED83 /* JSON.json in Resources */ = {isa = PBXBuildFile; fileRef = E486E0C370001BDD1F254F2D /* JSON.json */; };
 		26405D23D1CE516DCDBB93F0 /* RootSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2627C6E9227CE2954509FB90 /* RootSettingsView.swift */; };
@@ -96,6 +97,7 @@
 		9E37B0BD3764CB6462BF6C0F /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = EA2D10252461A2630E1E7272 /* .gitkeep */; };
 		9E658EF1F327048DCE515838 /* MarkupEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AC9B9C02E48E8627288D96 /* MarkupEditorWindowController.swift */; };
 		A20E509BFC7AD19DF6E32A6C /* CalendarEventCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E434E159A866F7B5BABE75B1 /* CalendarEventCache.swift */; };
+		A4627EF033384AEDFF503CE8 /* MetricsSamplingPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1313770A8247A163E7AEECC /* MetricsSamplingPlanTests.swift */; };
 		A484496FFE810A8097BF50FC /* PlainText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */; };
 		A716777F20D5CBB58F3835B5 /* FeatureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DDE5E3ADB8E59CDC65169A /* FeatureSettings.swift */; };
 		A7CB0C190185C07EF533E540 /* SystemMetricsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454640B87CA27F65EBED2608 /* SystemMetricsService.swift */; };
@@ -109,6 +111,7 @@
 		B16DEB9C7853DAF9BF504175 /* MenuBarPopoverChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BF4315B1A186CC0B94F6DF1 /* MenuBarPopoverChrome.swift */; };
 		B50C3C2339D97F70D64308D3 /* FewerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F40E178A5381E4C89D4E2A /* FewerApp.swift */; };
 		B539B2512349EA081679F4C6 /* FinderMenuAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D12004B26EBB220F3925A0 /* FinderMenuAdapter.swift */; };
+		B59B30F6F689166B42CF2A8B /* MetricsSamplingPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F232C562EFEC723921834DCB /* MetricsSamplingPlan.swift */; };
 		BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F16C21A119618BD4EED9C6 /* AppGroupConstants.swift */; };
 		BE4A3EDA08B513201EBE1C81 /* TemplateStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75CB2C7EF7DD29381B6E49AB /* TemplateStoreTests.swift */; };
 		BEFD4DB9434010F84E3715CE /* ModuleCommandXPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F926F2072F7E9017BCF59734 /* ModuleCommandXPCServer.swift */; };
@@ -143,6 +146,7 @@
 		E67B4389B778FA74A3D68A27 /* ShortcutHelperStatusStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3985AE20B1B2CD840FB31025 /* ShortcutHelperStatusStoreTests.swift */; };
 		E7FAA772E82E10F05526985C /* FinderMenuActionRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF5FDCD7399E41A25353DC1 /* FinderMenuActionRegistryTests.swift */; };
 		E91F78B00A40266EF205B84F /* PinItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9BCAB8874C03C7E03DA17F6 /* PinItem.swift */; };
+		E9FFB701B7BDB0939F5C440B /* StitchByteBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C48BCB20BA7B9B8352062558 /* StitchByteBudgetTests.swift */; };
 		EA48CDB82BB25FD9F2246DD7 /* InputEnhancementStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B261E24E1E6A05DC57986A98 /* InputEnhancementStore.swift */; };
 		EAB8BC6D5DDAB41ECEBFB976 /* ContextMenuSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A72C6C0607F552A371AB6D27 /* ContextMenuSettingsView.swift */; };
 		EDCF248BA290E912AB9E3272 /* SharedSettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EC575139904B0CFCF160C8F /* SharedSettingsStoreTests.swift */; };
@@ -339,6 +343,8 @@
 		B9BCAB8874C03C7E03DA17F6 /* PinItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinItem.swift; sourceTree = "<group>"; };
 		BC6B0C5A1CF3E12AB3D1FAF8 /* FileOperationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationResult.swift; sourceTree = "<group>"; };
 		BFE6149A04358B6C689E3D64 /* SystemCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCalendarService.swift; sourceTree = "<group>"; };
+		C2E229E0B9013C6448C106E4 /* SystemMetricsSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMetricsSampler.swift; sourceTree = "<group>"; };
+		C48BCB20BA7B9B8352062558 /* StitchByteBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StitchByteBudgetTests.swift; sourceTree = "<group>"; };
 		C6AF197593715C455F9C20EC /* InputEnhancementStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnhancementStoreTests.swift; sourceTree = "<group>"; };
 		C864487E86BD16E7CA22FC1C /* FewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerUITests.swift; sourceTree = "<group>"; };
 		CBF6ABD6CF2C6836E7F083EF /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
@@ -347,6 +353,7 @@
 		CF3F67DB14875969F7570D7E /* FinderMenuContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderMenuContext.swift; sourceTree = "<group>"; };
 		CFEE5C3899774ECADEF93BBD /* ModuleSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleSettingsView.swift; sourceTree = "<group>"; };
 		D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CutTransactionStore.swift; sourceTree = "<group>"; };
+		D1313770A8247A163E7AEECC /* MetricsSamplingPlanTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsSamplingPlanTests.swift; sourceTree = "<group>"; };
 		D3044175E13BAA149D682285 /* PathFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathFormatter.swift; sourceTree = "<group>"; };
 		D4046491CFD3E0513E895554 /* TemplateFileCreatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateFileCreatorTests.swift; sourceTree = "<group>"; };
 		D5102A12B26C94C57EE52096 /* ScreenshotSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotSettingsView.swift; sourceTree = "<group>"; };
@@ -371,6 +378,7 @@
 		EE591EFA55DE0E9FABBE4237 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		EE74DD0E6128977929468F55 /* CalendarMonth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarMonth.swift; sourceTree = "<group>"; };
 		EFBB4F813A3A147AA9852877 /* SharedStoreMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedStoreMigrator.swift; sourceTree = "<group>"; };
+		F232C562EFEC723921834DCB /* MetricsSamplingPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricsSamplingPlan.swift; sourceTree = "<group>"; };
 		F660A6AF69A4B53BD4DE2C74 /* PowerPointPresentation.pptx */ = {isa = PBXFileReference; path = PowerPointPresentation.pptx; sourceTree = "<group>"; };
 		F6FBDA306F4F73BB93F4F839 /* FewerShortcutHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FewerShortcutHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F91F1C5A0DD960438621471A /* InputActionExecutor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputActionExecutor.swift; sourceTree = "<group>"; };
@@ -571,6 +579,7 @@
 				294AC02ACCFDE5220DE9343E /* ScreenshotService.swift */,
 				67D90C6E40E0B8C0D1D9EB6A /* SystemActionsService.swift */,
 				BFE6149A04358B6C689E3D64 /* SystemCalendarService.swift */,
+				C2E229E0B9013C6448C106E4 /* SystemMetricsSampler.swift */,
 				454640B87CA27F65EBED2608 /* SystemMetricsService.swift */,
 			);
 			path = Services;
@@ -625,6 +634,7 @@
 				904E61E09A7F8B1CF52F5BC5 /* InputProcessingTests.swift */,
 				4EB47938DDA58799FBCE1E72 /* MarkupShapeTests.swift */,
 				D82FC1E5CEE5597FE0CBFDD1 /* MenuBuilderTests.swift */,
+				D1313770A8247A163E7AEECC /* MetricsSamplingPlanTests.swift */,
 				E0738D89E0050CEC3B200CD3 /* ModuleModelsTests.swift */,
 				FFF1411645E54268D5850CE1 /* PathFormatterTests.swift */,
 				E1F191DC65B8D98D2F8F5AF1 /* ReminderRecurrenceTests.swift */,
@@ -634,6 +644,7 @@
 				8EC575139904B0CFCF160C8F /* SharedSettingsStoreTests.swift */,
 				E3B93AF4647F5FA48880ED15 /* SharedStoreMigratorTests.swift */,
 				3985AE20B1B2CD840FB31025 /* ShortcutHelperStatusStoreTests.swift */,
+				C48BCB20BA7B9B8352062558 /* StitchByteBudgetTests.swift */,
 				D4046491CFD3E0513E895554 /* TemplateFileCreatorTests.swift */,
 				75CB2C7EF7DD29381B6E49AB /* TemplateStoreTests.swift */,
 				5DEFAF443B5AD48FB7BFA793 /* TerminalAppTests.swift */,
@@ -717,6 +728,7 @@
 				9F863D7932F128746147257D /* FinderMenuDiagnostic.swift */,
 				83050A5E7BAB4B2680FAF634 /* InputEnhancementSettings.swift */,
 				2661963B517F8A726EB97406 /* MarkupModels.swift */,
+				F232C562EFEC723921834DCB /* MetricsSamplingPlan.swift */,
 				6B9902E5F19DB16D8E1E8D4A /* ModuleModels.swift */,
 				B9BCAB8874C03C7E03DA17F6 /* PinItem.swift */,
 				5E2B3ACB55D29C834C963456 /* ReminderRecurrence.swift */,
@@ -1035,6 +1047,7 @@
 				5E01C1923E629ECF161122FA /* MarkupModels.swift in Sources */,
 				608B865F831C295B1CF3AEE0 /* MenuBuilder.swift in Sources */,
 				6536B8877F98B388F48C1AF0 /* MenuModels.swift in Sources */,
+				B59B30F6F689166B42CF2A8B /* MetricsSamplingPlan.swift in Sources */,
 				E45BFC63BCC7EA231125125E /* ModuleCommandIPC.swift in Sources */,
 				1DFC7FF6359EA6ABDD1D51F6 /* ModuleModels.swift in Sources */,
 				9CB978BA4E8129813A55AE22 /* ModulePreferencesStore.swift in Sources */,
@@ -1102,6 +1115,7 @@
 				97F8EA3907AB5835EDB71A6D /* ShortcutSettingsView.swift in Sources */,
 				3230381418AE4D0A23ED55B1 /* SystemActionsService.swift in Sources */,
 				703F7BE908A5EDBBA5CD11A0 /* SystemCalendarService.swift in Sources */,
+				20A9BC6A26233F69D74ED451 /* SystemMetricsSampler.swift in Sources */,
 				A7CB0C190185C07EF533E540 /* SystemMetricsService.swift in Sources */,
 				17090C268020FF5F08184A30 /* TemplateSettingsView.swift in Sources */,
 				1F73E77350163DDF9AA17F1B /* ToolboxPanelView.swift in Sources */,
@@ -1149,6 +1163,7 @@
 				13A825BA2A79E26CCB29DA98 /* InputProcessingTests.swift in Sources */,
 				96D59D73ECCD4A9A40119BEB /* MarkupShapeTests.swift in Sources */,
 				D3C75378A1CB2C4F5A8D61DC /* MenuBuilderTests.swift in Sources */,
+				A4627EF033384AEDFF503CE8 /* MetricsSamplingPlanTests.swift in Sources */,
 				D0D6B53C5A8909275877254A /* ModuleModelsTests.swift in Sources */,
 				EE44B73DB9EEDFFC29862E20 /* PathFormatterTests.swift in Sources */,
 				BF58CBC1EBAA43F12A794783 /* ReminderRecurrenceTests.swift in Sources */,
@@ -1158,6 +1173,7 @@
 				EDCF248BA290E912AB9E3272 /* SharedSettingsStoreTests.swift in Sources */,
 				DE7F9D439FAE029A18B1B177 /* SharedStoreMigratorTests.swift in Sources */,
 				E67B4389B778FA74A3D68A27 /* ShortcutHelperStatusStoreTests.swift in Sources */,
+				E9FFB701B7BDB0939F5C440B /* StitchByteBudgetTests.swift in Sources */,
 				909BCBEBA186ED6E9D6D13C0 /* TemplateFileCreatorTests.swift in Sources */,
 				BE4A3EDA08B513201EBE1C81 /* TemplateStoreTests.swift in Sources */,
 				2342D58AA1DB24043B49A79A /* TerminalAppTests.swift in Sources */,

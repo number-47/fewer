@@ -408,6 +408,8 @@ public struct StitchConfiguration: Equatable, Sendable {
     public var maximumPixelCount: Int
     public var maximumHeight: Int
     public var maximumFrameCount: Int
+    /// 最终输出缓冲字节预算。在 CGContext 分配前用溢出安全乘法检查。
+    public var outputByteBudget: Int
 
     public init(
     minimumShift: Int = 4,
@@ -421,7 +423,8 @@ public struct StitchConfiguration: Equatable, Sendable {
     minimumScoreMargin: Double = 0.02,
         maximumPixelCount: Int = 64_000_000,
         maximumHeight: Int = 32_000,
-        maximumFrameCount: Int = 120
+        maximumFrameCount: Int = 120,
+        outputByteBudget: Int = 768_000_000
     ) {
         self.minimumShift = max(minimumShift, 1)
         self.minimumOverlapRatio = min(max(minimumOverlapRatio, 0.05), 0.95)
@@ -435,6 +438,7 @@ public struct StitchConfiguration: Equatable, Sendable {
         self.maximumPixelCount = max(maximumPixelCount, 1)
         self.maximumHeight = max(maximumHeight, 1)
         self.maximumFrameCount = max(maximumFrameCount, 1)
+        self.outputByteBudget = max(outputByteBudget, 0)
     }
 
     public static let `default` = StitchConfiguration()
@@ -1015,6 +1019,11 @@ public enum StitchEngine {
               width <= configuration.maximumPixelCount / height,
               frameCount <= configuration.maximumFrameCount
         else {
+            return .outputLimitExceeded
+        }
+        let bytesPerRow = width * 4
+        let (totalBytes, overflow) = bytesPerRow.multipliedReportingOverflow(by: height)
+        if overflow || totalBytes > configuration.outputByteBudget {
             return .outputLimitExceeded
         }
         return nil

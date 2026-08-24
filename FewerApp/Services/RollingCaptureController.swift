@@ -63,6 +63,8 @@ final class RollingCaptureController: ObservableObject {
     private var guideWindow: NSWindow?
     private var hudWindow: NSPanel?
     private var didEnd = false
+    private var compositionGeneration = 0
+    private var compositionTask: Task<Void, Never>?
     private var completion: ((CGImage) -> Void)?
     private var cancellation: (() -> Void)?
 
@@ -121,20 +123,42 @@ final class RollingCaptureController: ObservableObject {
     private func completeComposition() {
         guard !didEnd, state == .finishing else { return }
         statusText = "正在生成长图…"
+
+        compositionGeneration += 1
+        let generation = compositionGeneration
         let snapshot = compositionSnapshot()
-        switch StitchEngine.compose(
-            frames: snapshot.frames,
-            placements: snapshot.placements,
-            confirmedTopHeight: confirmedTop,
-            confirmedBottomHeight: confirmedBottom,
-            configuration: configuration
-        ) {
+        let config = configuration
+        let topHeight = confirmedTop
+        let bottomHeight = confirmedBottom
+
+        compositionTask?.cancel()
+        compositionTask = Task { [weak self] in
+            let result = await Task.detached(priority: .userInitiated) {
+                StitchEngine.compose(
+                    frames: snapshot.frames,
+                    placements: snapshot.placements,
+                    confirmedTopHeight: topHeight,
+                    confirmedBottomHeight: bottomHeight,
+                    configuration: config
+                )
+            }.value
+
+            await MainActor.run {
+                guard let self, self.compositionGeneration == generation, !self.didEnd else { return }
+                self.handleCompositionResult(result)
+            }
+        }
+    }
+
+    private func handleCompositionResult(_ result: Result<CGImage, StitchFailure>) {
+        switch result {
         case .success(let image):
             Self.logger.info("completed frames=\(self.frameCount) height=\(image.height)")
             didEnd = true
             task = nil
             previewTask?.cancel()
             previewTask = nil
+            compositionTask = nil
             transition(.complete)
             cleanupWindows()
             let completion = completion
@@ -142,6 +166,7 @@ final class RollingCaptureController: ObservableObject {
             cancellation = nil
             completion?(image)
         case .failure:
+            compositionTask = nil
             pause(for: .captureFailed("长图合成失败，已保留当前会话。"))
         }
     }
@@ -153,6 +178,8 @@ final class RollingCaptureController: ObservableObject {
         task = nil
         previewTask?.cancel()
         previewTask = nil
+        compositionTask?.cancel()
+        compositionTask = nil
         stopCaptureSession()
         transition(.cancel)
         cleanupWindows()

@@ -21,14 +21,14 @@
 | T022 | R2 — 权限与扩展启用中心 | DONE | P0 | T013, T020 |
 | T023 | R3 — Finder 菜单可见性与生命周期修复 | DONE | P0 | T013, T020, T021, T022 |
 | T024 | R4 — 菜单栏日历滚动性能 | DONE | P1 | T013, T020 |
-| T025 | R5 — 设置窗口响应与后台状态刷新 | REVIEW | P1 | T013, T020, T022 |
-| T026 | R6 — 稳定性回归与第二轮问题收敛 | BACKLOG | P0 | T021, T022, T023, T024, T025 |
+| T025 | R5 — 设置窗口响应与后台状态刷新 | DONE | P1 | T013, T020, T022 |
+| T026 | R6 — 稳定性回归与第二轮问题收敛 | DONE | P0 | T021, T022, T023, T024, T025 |
 | T014 | PR2 — App Group 共享存储与保守迁移 | DONE | P0 | T013 |
 | T015 | PR3 — Finder 动作快照隔离与 MainActor 边界 | DONE | P0 | T013, T023 |
 | T016 | PR4 — 可回滚 replace、文件协调与移除 `/` 例外 | DONE | P0 | T014, T015 |
 | T017 | PR5 — 经签名验证的双向 XPC 命令通道 | BLOCKED | P0 | T013 |
-| T018 | PR6 — SystemMetrics 后台采样与频率分层 | READY | P1 | T013 |
-| T019 | PR7 — 滚动截图后台合成与显式内存预算 | READY | P1 | T013 |
+| T018 | PR6 — SystemMetrics 后台采样与频率分层 | DONE | P1 | T013 |
+| T019 | PR7 — 滚动截图后台合成与显式内存预算 | DONE | P1 | T013 |
 | T012 | 集成与发布验收 | BACKLOG | P0 | T004-T010, T013-T026 |
 
 ## Review Queue
@@ -57,4 +57,4 @@ T015（PR3）、T016（PR4）已 DONE（T016：FewerCore 309 tests/0 failures、
 
 ## Last Updated
 
-2026-08-24
+2026-08-24（T018 进入 REVIEW：SystemMetrics 采样移入 actor，16 个新测试通过，325 tests/0 failures，Fewer BUILD SUCCEEDED）
