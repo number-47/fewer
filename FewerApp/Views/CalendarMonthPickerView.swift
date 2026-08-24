@@ -4,7 +4,6 @@ struct CalendarMonthPickerView: View {
     @Binding var year: Int
     @Binding var month: Int
 
-    let language: CalendarLanguage
     let calendar: Calendar
     let cancel: () -> Void
     let confirm: () -> Void
@@ -13,18 +12,18 @@ struct CalendarMonthPickerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(language.text(chinese: "跳转到年月", english: "Jump to Month"))
+            Text("跳转到年月")
                 .font(.headline)
 
             HStack(spacing: 10) {
-                Picker(language.text(chinese: "年份", english: "Year"), selection: $year) {
+                Picker("年份", selection: $year) {
                     ForEach(years, id: \.self) { value in
                         Text(value, format: .number.grouping(.never))
                             .tag(value)
                     }
                 }
 
-                Picker(language.text(chinese: "月份", english: "Month"), selection: $month) {
+                Picker("月份", selection: $month) {
                     ForEach(1...12, id: \.self) { value in
                         Text(monthTitle(value))
                             .tag(value)
@@ -34,8 +33,8 @@ struct CalendarMonthPickerView: View {
 
             HStack {
                 Spacer()
-                Button(language.text(chinese: "取消", english: "Cancel"), action: cancel)
-                Button(language.text(chinese: "跳转", english: "Go"), action: confirm)
+                Button("取消", action: cancel)
+                Button("跳转", action: confirm)
                     .keyboardShortcut(.defaultAction)
             }
         }

@@ -57,10 +57,6 @@ struct OverviewView: View {
             .padding(.bottom, 24)
         }
         .task {
-            if model.settings.shortcutHelperEnabled {
-                PermissionService.launchShortcutHelper()
-                PermissionService.ensureShortcutHelperRunning()
-            }
             await refreshStatuses()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

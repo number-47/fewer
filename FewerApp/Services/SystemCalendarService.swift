@@ -26,6 +26,7 @@ final class SystemCalendarService: NSObject, ObservableObject {
 
     private let eventKitWorker = EventKitWorker()
     private var eventCache = CalendarEventCache()
+    private var eventDayIndex = CalendarEventDayIndex()
     private var coalescedLoadTask: Task<Void, Never>?
     private var loadGeneration = 0
     private var lastCalendarKey: String = ""
@@ -84,18 +85,20 @@ final class SystemCalendarService: NSObject, ObservableObject {
         if calendarKey != lastCalendarKey {
             lastCalendarKey = calendarKey
             eventCache.clear()
+            eventDayIndex = CalendarEventDayIndex()
         }
 
         guard let endDate = calendar.date(byAdding: .day, value: 1, to: lastVisibleDate),
               authorizationState == .fullAccess || reminderAuthorizationState == .fullAccess else {
             events = []
+            eventDayIndex = CalendarEventDayIndex()
             isLoading = false
             return
         }
 
         let visibleRange = DateInterval(start: firstVisibleDate, end: endDate)
         if let cached = eventCache.events(for: visibleRange) {
-            events = cached
+            publish(cached, visibleRange: visibleRange, calendar: calendar)
             isLoading = false
             return
         }
@@ -119,7 +122,7 @@ final class SystemCalendarService: NSObject, ObservableObject {
             guard generation == loadGeneration else { return }
         }
 
-        events = Self.sorted(eventItems)
+        publish(Self.sorted(eventItems), visibleRange: visibleRange, calendar: calendar)
 
         guard reminderAuthorizationState == .fullAccess else {
             isLoading = false
@@ -131,13 +134,13 @@ final class SystemCalendarService: NSObject, ObservableObject {
         guard generation == loadGeneration else { return }
 
         let combined = Self.sorted(eventItems + reminderItems)
-        events = combined
+        publish(combined, visibleRange: visibleRange, calendar: calendar)
         isLoading = false
         eventCache.insert(combined, for: visibleRange)
     }
 
     func events(on date: Date, calendar: Calendar) -> [CalendarEventItem] {
-        events.filter { $0.overlaps(dayContaining: date, calendar: calendar) }
+        eventDayIndex.events(on: date, calendar: calendar)
     }
 
     func openPrivacySettings() {
@@ -156,7 +159,18 @@ final class SystemCalendarService: NSObject, ObservableObject {
     @objc private func eventStoreDidChange() {
         refreshAuthorizationState()
         eventCache.clear()
+        eventDayIndex = CalendarEventDayIndex()
         changeRevision &+= 1
+    }
+
+    private func publish(_ items: [CalendarEventItem], visibleRange: DateInterval, calendar: Calendar) {
+        events = items
+        eventDayIndex = CalendarEventDayIndex(
+            events: items,
+            firstDate: visibleRange.start,
+            lastDate: visibleRange.end.addingTimeInterval(-1),
+            calendar: calendar
+        )
     }
 
     private static func authorizationState(for entityType: EKEntityType) -> SystemCalendarAuthorizationState {

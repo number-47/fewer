@@ -32,6 +32,34 @@ final class CalendarEventItemTests: XCTestCase {
         XCTAssertFalse(event.overlaps(dayContaining: end, calendar: calendar))
     }
 
+    func testDayIndexReturnsOnlyEventsForRequestedDay() throws {
+        let august5 = try date(year: 2026, month: 8, day: 5)
+        let august6 = try date(year: 2026, month: 8, day: 6)
+        let overnight = makeEvent(
+            start: august5.addingTimeInterval(22 * 60 * 60),
+            end: august6.addingTimeInterval(2 * 60 * 60)
+        )
+        let august6Only = CalendarEventItem(
+            id: "august6",
+            title: "August 6",
+            startDate: august6.addingTimeInterval(9 * 60 * 60),
+            endDate: august6.addingTimeInterval(10 * 60 * 60),
+            isAllDay: false,
+            calendarTitle: "Calendar",
+            isSubscription: false,
+            color: CalendarEventColor(red: 1, green: 0.5, blue: 0)
+        )
+        let index = CalendarEventDayIndex(
+            events: [overnight, august6Only],
+            firstDate: august5,
+            lastDate: august6,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(index.events(on: august5, calendar: calendar).map(\.id), [overnight.id])
+        XCTAssertEqual(index.events(on: august6, calendar: calendar).map(\.id), [overnight.id, august6Only.id])
+    }
+
     func testItemKindDefaultsToEventAndSupportsReminder() throws {
         let start = try date(year: 2026, month: 8, day: 5, hour: 9)
         let event = makeEvent(start: start, end: start.addingTimeInterval(60))

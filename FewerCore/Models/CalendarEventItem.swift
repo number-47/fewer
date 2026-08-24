@@ -74,3 +74,32 @@ public struct CalendarEventItem: Identifiable, Equatable, Sendable {
         }.first
     }
 }
+
+/// 将当前可见范围内的日程按日期预先归类，避免日历视图重绘时重复扫描全部日程。
+public struct CalendarEventDayIndex: Sendable {
+    private var eventsByDay: [Date: [CalendarEventItem]] = [:]
+
+    public init() {}
+
+    public init(
+        events: [CalendarEventItem],
+        firstDate: Date,
+        lastDate: Date,
+        calendar: Calendar
+    ) {
+        var index: [Date: [CalendarEventItem]] = [:]
+        var day = calendar.startOfDay(for: firstDate)
+        let lastDay = calendar.startOfDay(for: lastDate)
+
+        while day <= lastDay {
+            index[day] = events.filter { $0.overlaps(dayContaining: day, calendar: calendar) }
+            guard let nextDay = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = nextDay
+        }
+        eventsByDay = index
+    }
+
+    public func events(on date: Date, calendar: Calendar) -> [CalendarEventItem] {
+        eventsByDay[calendar.startOfDay(for: date)] ?? []
+    }
+}

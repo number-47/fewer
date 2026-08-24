@@ -19,6 +19,8 @@ actor SystemMetricsSampler {
     private var lastCoreCPU: [Int: CPUTicks] = [:]
     private var lastNetwork: (interfaceName: String, inBytes: UInt64, outBytes: UInt64, date: Date)?
     private var lastDiskIO: (identifier: String, counters: DiskIOCounters, date: Date)?
+    private let cpuFrequencyReader = CPUFrequencyReader()
+    private let cpuTemperatureReader = CPUTemperatureReader()
     private let gpuReportReader = GPUReportReader()
 
     private var isSampling = false
@@ -117,6 +119,8 @@ actor SystemMetricsSampler {
     // MARK: - CPU
 
     private func cpuSnapshot(at date: Date) -> CPUSnapshot? {
+        let frequencyHz = cpuFrequencyReader.sample() ?? sysctlUInt64(named: "hw.cpufrequency")
+        let temperatureCelsius = cpuTemperatureReader.sample()
         var info = host_cpu_load_info()
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info_data_t>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &info) {
@@ -145,8 +149,8 @@ actor SystemMetricsSampler {
             clusters: cpuClusters(),
             loadAverage: loadAverage(),
             uptime: systemUptime(at: date),
-            temperatureCelsius: nil,
-            frequencyHz: sysctlUInt64(named: "hw.cpufrequency")
+            temperatureCelsius: temperatureCelsius,
+            frequencyHz: frequencyHz
         )
     }
 
@@ -681,11 +685,23 @@ actor SystemMetricsSampler {
     }
 
     private static func diskIOCounters(for device: io_registry_entry_t) -> DiskIOCounters? {
-        guard let statistics = registryProperties(for: device)?["Statistics"] as? [String: Any],
-              let read = uint64Value(statistics["Bytes read from block device"] ?? statistics["Bytes (Read)"] ?? statistics["Bytes read by user"]),
-              let write = uint64Value(statistics["Bytes written to block device"] ?? statistics["Bytes (Write)"] ?? statistics["Bytes written by user"])
-        else { return nil }
-        return DiskIOCounters(readBytes: read, writeBytes: write)
+        var entry: io_registry_entry_t = device
+        var ownsEntry = false
+        defer { if ownsEntry { IOObjectRelease(entry) } }
+
+        while entry != 0 {
+            if let statistics = registryProperties(for: entry)?["Statistics"] as? [String: Any],
+               let read = uint64Value(statistics["Bytes read from block device"] ?? statistics["Bytes (Read)"] ?? statistics["Bytes read by user"]),
+               let write = uint64Value(statistics["Bytes written to block device"] ?? statistics["Bytes (Write)"] ?? statistics["Bytes written by user"]) {
+                return DiskIOCounters(readBytes: read, writeBytes: write)
+            }
+            var parent: io_registry_entry_t = 0
+            guard IORegistryEntryGetParentEntry(entry, kIOServicePlane, &parent) == KERN_SUCCESS, parent != 0 else { return nil }
+            if ownsEntry { IOObjectRelease(entry) }
+            entry = parent
+            ownsEntry = true
+        }
+        return nil
     }
 
     private static func diskConnectionType(for device: io_registry_entry_t) -> String? {

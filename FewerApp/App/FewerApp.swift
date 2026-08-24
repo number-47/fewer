@@ -17,6 +17,7 @@ enum FewerApp {
 @MainActor
 final class MenuBarController: NSObject, NSPopoverDelegate {
     static let shared = MenuBarController()
+    private static let calendarPopoverAnchorOffset: CGFloat = 8
 
     private var mainStatusItem: NSStatusItem?
     private var statusBarItems: [String: NSStatusItem] = [:]
@@ -387,7 +388,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         // Close any existing popover (module or stale) before showing toolbox
         closePopover()
         let popover = toolboxPopover(for: sender.window?.screen)
-        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+        popover.show(
+            relativeTo: sender.bounds.offsetBy(dx: 0, dy: Self.calendarPopoverAnchorOffset),
+            of: sender,
+            preferredEdge: .minY
+        )
     }
 
     private func toolboxPopover(for screen: NSScreen?) -> NSPopover {
@@ -395,14 +400,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         let height = min(780, max(520, availableHeight - 64))
 
         let hostingController = NSHostingController(
-            rootView: AnyView(ToolboxPanelView().frame(width: 400, height: height))
+            rootView: AnyView(
+                ToolboxPanelView()
+                    .frame(width: ToolboxLayout.width, height: height)
+            )
         )
 
         let popover = NSPopover()
         popover.behavior = .transient
         popover.animates = false
         popover.delegate = self
-        popover.contentSize = NSSize(width: 400, height: height)
+        popover.contentSize = NSSize(width: ToolboxLayout.width, height: height)
         popover.contentViewController = hostingController
         self.popover = popover
         self.popoverModuleID = nil
@@ -446,6 +454,16 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         case .network: NSSize(width: 360, height: 360)
         case .disk: NSSize(width: 360, height: 500)
         }
+        let openActivityMonitor: (() -> Void)? = switch moduleID {
+        case .cpu, .disk, .network: { [weak self] in
+            self?.closePopover()
+            NSWorkspace.shared.openApplication(
+                at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
+                configuration: NSWorkspace.OpenConfiguration()
+            )
+        }
+        case .gpu, .memory: nil
+        }
         showPopover(
             moduleID: moduleID.rawValue,
             anchor: anchor,
@@ -455,7 +473,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 openSettings: { [weak self] in
                     self?.closePopover()
                     SettingsWindowController.shared.show()
-                }
+                },
+                openActivityMonitor: openActivityMonitor
             ))
         )
     }
@@ -484,7 +503,10 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         self.popover = popover
         self.popoverModuleID = moduleID
         refreshMetricsSampling()
-        popover.show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+        let positioningRect = moduleID == "calendar"
+            ? anchor.bounds.offsetBy(dx: 0, dy: Self.calendarPopoverAnchorOffset)
+            : anchor.bounds
+        popover.show(relativeTo: positioningRect, of: anchor, preferredEdge: .minY)
     }
 
     // MARK: - Close helpers
@@ -980,10 +1002,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var window: NSWindow?
+    static let navigateNotification = Notification.Name("FewerSettingsNavigate")
 
     private override init() {}
 
     func show() {
+        show(section: nil)
+    }
+
+    func show(section: SettingsSection?) {
         let settingsWindow: NSWindow
         if let window {
             settingsWindow = window
@@ -998,6 +1025,15 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow.orderFrontRegardless()
         settingsWindow.makeKeyAndOrderFront(nil)
+        if let section {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: Self.navigateNotification,
+                    object: nil,
+                    userInfo: ["section": section.rawValue]
+                )
+            }
+        }
     }
 
     private func makeWindow() -> NSWindow {

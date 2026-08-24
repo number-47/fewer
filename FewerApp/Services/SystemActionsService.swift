@@ -66,8 +66,18 @@ final class SystemActionsService: ObservableObject {
     }
 
     func refreshRemovableVolumes() {
+        Task { [weak self] in
+            let volumes = await Task.detached(priority: .utility) {
+                Self.removableVolumeURLs()
+            }.value
+            guard !Task.isCancelled else { return }
+            self?.removableVolumes = volumes
+        }
+    }
+
+    nonisolated private static func removableVolumeURLs() -> [URL] {
         let keys: Set<URLResourceKey> = [.volumeIsRemovableKey, .volumeIsInternalKey]
-        removableVolumes = (FileManager.default.mountedVolumeURLs(
+        return (FileManager.default.mountedVolumeURLs(
             includingResourceValuesForKeys: Array(keys)
         ) ?? []).filter { volume in
             guard let values = try? volume.resourceValues(forKeys: keys) else { return false }

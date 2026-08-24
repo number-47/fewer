@@ -14,7 +14,13 @@ public enum SharedStoreBootstrap {
         Self.runLock.withLock { $0 = true }
 
         let newRoot = AppGroupConstants.sharedDataDirectory()
-        let oldRoot = AppGroupConstants.legacySharedDataDirectory()
+        let completionMarkerURL = newRoot.appendingPathComponent(SharedStoreMigrator.completionMarkerName)
+        guard !FileManager.default.fileExists(atPath: completionMarkerURL.path) else { return }
+
+        let oldAppGroupRoot = AppGroupConstants.legacyAppGroupSharedDataDirectory()
+        let oldRoot = FileManager.default.fileExists(atPath: oldAppGroupRoot.path)
+            ? oldAppGroupRoot
+            : AppGroupConstants.legacySharedDataDirectory()
         let containerRoot = newRoot.deletingLastPathComponent()
         let lockFileURL = containerRoot.appendingPathComponent(".fewer-migration.lock")
 

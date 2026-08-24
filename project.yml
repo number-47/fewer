@@ -44,11 +44,12 @@ targets:
       properties:
         LSUIElement: true
         CFBundleIconName: AppIcon
+        FewerAppGroupIdentifier: $(FEWER_APP_GROUP_IDENTIFIER)
     entitlements:
       path: FewerShortcutHelper/FewerShortcutHelper.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.number47.fewer
+          - $(FEWER_APP_GROUP_IDENTIFIER)
     configFiles:
       Debug: Config/Base.xcconfig
       Release: Config/Base.xcconfig
@@ -77,12 +78,13 @@ targets:
           NSExtensionAttributes: {}
           NSExtensionPointIdentifier: com.apple.FinderSync
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).FinderSync
+        FewerAppGroupIdentifier: $(FEWER_APP_GROUP_IDENTIFIER)
     entitlements:
       path: FewerFinderExtension/FewerFinderExtension.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.application-groups:
-          - group.com.number47.fewer
+          - $(FEWER_APP_GROUP_IDENTIFIER)
         com.apple.security.temporary-exception.files.absolute-path.read-write:
           - "/"
     configFiles:
@@ -114,11 +116,12 @@ targets:
         NSRemindersFullAccessUsageDescription: Fewer 需要读取提醒事项，以在菜单栏日历中展示带日期的计划任务。
         NSAppleEventsUsageDescription: Fewer 仅在你点击快捷操作时通过系统事件切换深色模式。
         NSLocationUsageDescription: Fewer 仅在你展开网络 Wi-Fi 详情时读取当前网络名称、BSSID 和信号强度。
+        FewerAppGroupIdentifier: $(FEWER_APP_GROUP_IDENTIFIER)
     entitlements:
       path: FewerApp/Fewer.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.number47.fewer
+          - $(FEWER_APP_GROUP_IDENTIFIER)
         com.apple.security.personal-information.calendars: true
         com.apple.security.automation.apple-events: true
     configFiles:

@@ -47,6 +47,7 @@
 		4A8FA2B0137CA41C7134CA33 /* StatusBarMetricsOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53A7491B371B25E37B03F074 /* StatusBarMetricsOptions.swift */; };
 		4D2B48D069475F59BC68BEBA /* AppPresentationMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7645E579480968FF99EA3994 /* AppPresentationMode.swift */; };
 		4EBB18DE347FC059146C0603 /* ModuleHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97455FA6FDC73795186E7341 /* ModuleHost.swift */; };
+		4F154DFD4FF0B8609DC846F6 /* CPUTemperatureReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF5B0FB6AEF995E2F1C98838 /* CPUTemperatureReader.swift */; };
 		502589B2177ED0C6FCE349CA /* Markdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 5DCBAB18206B48A164123D21 /* Markdown.md */; };
 		542E572929FDB232A7AA413F /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA5E301AF55F9B6EE11F99F2 /* PermissionService.swift */; };
 		57BEFDF0DD4772CDA4A816E5 /* libFewerCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3854C15E4503AB3F4DAA3E14 /* libFewerCore.a */; };
@@ -61,10 +62,10 @@
 		63B1D982E15CEC2F3A0144EF /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B490C440F5353AE794E4F567 /* CoreLocation.framework */; };
 		63D406BC5D4AAF210BFF9D9F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D748A2A7AA7B727ED681025A /* Assets.xcassets */; };
 		64580F7771F1CE0F527ADB42 /* InputActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91F1C5A0DD960438621471A /* InputActionExecutor.swift */; };
-		6508D1C3C33BA2BF757B1E94 /* CalendarLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */; };
 		6536B8877F98B388F48C1AF0 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9D9E5D45B52039A847259B /* MenuModels.swift */; };
 		65C9CE1FFA425348658927F5 /* ScreenshotCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB7C76B98FE31FB9257E5BF /* ScreenshotCore.swift */; };
 		671B1A9860428EC1A9410D2E /* MenuBarCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1807550C64BF6502E2F7E7 /* MenuBarCalendarView.swift */; };
+		68A312F9DB7E7D6DE9B5F07D /* CPUFrequencyCalculatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF37BDC503E4485A27B1EBA /* CPUFrequencyCalculatorTests.swift */; };
 		69CBBC320B95981532A118A9 /* FinderMenuDiagnosticTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34127DCDC84A40DF942D6A1C /* FinderMenuDiagnosticTests.swift */; };
 		6B88FFE67A4095218C9519E1 /* FinderShortcutRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034A2AEFFDCF559A28935C8B /* FinderShortcutRouter.swift */; };
 		6DAC2F5E0D4CD263A3621E12 /* ScreenshotSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D38763A98D1C3BC0C3F5353 /* ScreenshotSettings.swift */; };
@@ -97,6 +98,7 @@
 		9E37B0BD3764CB6462BF6C0F /* .gitkeep in Resources */ = {isa = PBXBuildFile; fileRef = EA2D10252461A2630E1E7272 /* .gitkeep */; };
 		9E658EF1F327048DCE515838 /* MarkupEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2AC9B9C02E48E8627288D96 /* MarkupEditorWindowController.swift */; };
 		A20E509BFC7AD19DF6E32A6C /* CalendarEventCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = E434E159A866F7B5BABE75B1 /* CalendarEventCache.swift */; };
+		A234CF10753CD02E78478EC6 /* CPUFrequencyCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAF73F5AACFD5B9A89ABEBC3 /* CPUFrequencyCalculator.swift */; };
 		A4627EF033384AEDFF503CE8 /* MetricsSamplingPlanTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1313770A8247A163E7AEECC /* MetricsSamplingPlanTests.swift */; };
 		A484496FFE810A8097BF50FC /* PlainText.txt in Resources */ = {isa = PBXBuildFile; fileRef = 4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */; };
 		A716777F20D5CBB58F3835B5 /* FeatureSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3DDE5E3ADB8E59CDC65169A /* FeatureSettings.swift */; };
@@ -155,6 +157,7 @@
 		EFBEC7C035C6C02DDB8A5826 /* ShortcutHelperStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69831F1DF4FC88827B4AEE87 /* ShortcutHelperStatus.swift */; };
 		F05E9AD9CC16CF42D2661C56 /* libIOReport.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 61C628141F0BF3D5E92BF206 /* libIOReport.tbd */; };
 		F475E5E48D568B1326A6C020 /* TemplateFileCreator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A47411330D7B10DE342D95 /* TemplateFileCreator.swift */; };
+		F5191DB9C5ECC37D34E2D46A /* CPUFrequencyReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E8E41E71F08EDEEEF23F24 /* CPUFrequencyReader.swift */; };
 		F736DEBCD6A403EA73ACFCD0 /* InputEnhancementSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83050A5E7BAB4B2680FAF634 /* InputEnhancementSettings.swift */; };
 		F7F75A54BBD375202A1948AE /* EventTapController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84FF39755B17BFEC9FB885B /* EventTapController.swift */; };
 		F859001DB2E8E82AADDD25B2 /* TemplateManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004F4C2A39A8BF5043549D0A /* TemplateManifest.swift */; };
@@ -277,11 +280,11 @@
 		47F40E178A5381E4C89D4E2A /* FewerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerApp.swift; sourceTree = "<group>"; };
 		4B4811BEC760F14C4DF93D57 /* ShortcutSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutSettingsView.swift; sourceTree = "<group>"; };
 		4BAA6F16E7BCDB7EAE702FE1 /* PlainText.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = PlainText.txt; sourceTree = "<group>"; };
+		4DF37BDC503E4485A27B1EBA /* CPUFrequencyCalculatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUFrequencyCalculatorTests.swift; sourceTree = "<group>"; };
 		4E6276D0DA23D6D927F49DC9 /* CoreWLAN.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreWLAN.framework; path = System/Library/Frameworks/CoreWLAN.framework; sourceTree = SDKROOT; };
 		4EB47938DDA58799FBCE1E72 /* MarkupShapeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkupShapeTests.swift; sourceTree = "<group>"; };
 		52BDCE7A09C42B34E4EA696A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		53A7491B371B25E37B03F074 /* StatusBarMetricsOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarMetricsOptions.swift; sourceTree = "<group>"; };
-		53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarLanguage.swift; sourceTree = "<group>"; };
 		5555E76441DC981E08EB8844 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		56DA24F4D226A37160911449 /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
 		57ADD7A9253836626A46F7B4 /* Stats.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Stats.txt; sourceTree = "<group>"; };
@@ -334,9 +337,11 @@
 		ABF687E8CA41F612B935809E /* ToolboxPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolboxPanelView.swift; sourceTree = "<group>"; };
 		AD1807550C64BF6502E2F7E7 /* MenuBarCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarCalendarView.swift; sourceTree = "<group>"; };
 		ADDDAB82FC4FD5AA342676BD /* ConflictNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictNameResolver.swift; sourceTree = "<group>"; };
+		AF5B0FB6AEF995E2F1C98838 /* CPUTemperatureReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUTemperatureReader.swift; sourceTree = "<group>"; };
 		B0477C6094215DC045F54CFB /* KeycastPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeycastPanelController.swift; sourceTree = "<group>"; };
 		B261E24E1E6A05DC57986A98 /* InputEnhancementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnhancementStore.swift; sourceTree = "<group>"; };
 		B2AC9B9C02E48E8627288D96 /* MarkupEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkupEditorWindowController.swift; sourceTree = "<group>"; };
+		B2E8E41E71F08EDEEEF23F24 /* CPUFrequencyReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUFrequencyReader.swift; sourceTree = "<group>"; };
 		B40FAD864CDBF83CEE13AEF6 /* FewerShortcutHelper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FewerShortcutHelper.entitlements; sourceTree = "<group>"; };
 		B490C440F5353AE794E4F567 /* CoreLocation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreLocation.framework; path = System/Library/Frameworks/CoreLocation.framework; sourceTree = SDKROOT; };
 		B5100E86C99EAF672AA83AA5 /* CalendarEventCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarEventCacheTests.swift; sourceTree = "<group>"; };
@@ -362,6 +367,7 @@
 		D748A2A7AA7B727ED681025A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D7D83F8016118A27A45DD9D0 /* FinderActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderActionHandler.swift; sourceTree = "<group>"; };
 		D82FC1E5CEE5597FE0CBFDD1 /* MenuBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilderTests.swift; sourceTree = "<group>"; };
+		DAF73F5AACFD5B9A89ABEBC3 /* CPUFrequencyCalculator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUFrequencyCalculator.swift; sourceTree = "<group>"; };
 		DC9D9E5D45B52039A847259B /* MenuModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuModels.swift; sourceTree = "<group>"; };
 		E0738D89E0050CEC3B200CD3 /* ModuleModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModuleModelsTests.swift; sourceTree = "<group>"; };
 		E0A0155D67E2F30B665E379D /* FewerVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FewerVersion.swift; sourceTree = "<group>"; };
@@ -529,6 +535,7 @@
 		55B4382E3A3E33F2427F8A2C /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				DAF73F5AACFD5B9A89ABEBC3 /* CPUFrequencyCalculator.swift */,
 				D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */,
 				E2B5D5B09515F2B4D82DA2AB /* FileOperationCoordinator.swift */,
 				20A01F1F0B83CBD00C238657 /* FinderMenuDiagnosticStore.swift */,
@@ -567,6 +574,8 @@
 		646E94963BBBFF737006E6DA /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				B2E8E41E71F08EDEEEF23F24 /* CPUFrequencyReader.swift */,
+				AF5B0FB6AEF995E2F1C98838 /* CPUTemperatureReader.swift */,
 				8F2EF8FDEEFC61D6AFF04566 /* EventKitWorker.swift */,
 				0142F0BB91E18752AA48161B /* ExtensionStatusService.swift */,
 				5AA4EB7E77FB676160EFC97E /* HotKeyManager.swift */,
@@ -624,6 +633,7 @@
 				1997D67E5E6F93AF2A35ABBB /* CalendarEventItemTests.swift */,
 				670BAEAFBCAEA461D7DB6583 /* CalendarMonthTests.swift */,
 				751E7709532065ED071D6A32 /* ConflictNameResolverTests.swift */,
+				4DF37BDC503E4485A27B1EBA /* CPUFrequencyCalculatorTests.swift */,
 				CE26BBF7A5FC7385D5E1537F /* CutTransactionStoreTests.swift */,
 				57DF1E903FFD79FEA38D3F4D /* FewerVersionTests.swift */,
 				222B85A537EDCCB6ACA874E4 /* FileOperationCoordinatorTests.swift */,
@@ -695,7 +705,6 @@
 			isa = PBXGroup;
 			children = (
 				7645E579480968FF99EA3994 /* AppPresentationMode.swift */,
-				53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */,
 				37C08C924F1D71948D136989 /* InputEnhancementViewModel.swift */,
 				00597E6D68228B4D72B770F3 /* PermissionRow.swift */,
 				71A478AA0E53057EBBD40FEB /* SettingsSection.swift */,
@@ -1026,6 +1035,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */,
+				A234CF10753CD02E78478EC6 /* CPUFrequencyCalculator.swift in Sources */,
 				A20E509BFC7AD19DF6E32A6C /* CalendarEventCache.swift in Sources */,
 				E66B2EF2A05A09B504495B6A /* CalendarEventItem.swift in Sources */,
 				107D6B9D13E4E5D245F522C3 /* CalendarMonth.swift in Sources */,
@@ -1079,8 +1089,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D2B48D069475F59BC68BEBA /* AppPresentationMode.swift in Sources */,
+				F5191DB9C5ECC37D34E2D46A /* CPUFrequencyReader.swift in Sources */,
+				4F154DFD4FF0B8609DC846F6 /* CPUTemperatureReader.swift in Sources */,
 				3EA0C1690D1355B6B0D54111 /* CalendarAgendaView.swift in Sources */,
-				6508D1C3C33BA2BF757B1E94 /* CalendarLanguage.swift in Sources */,
 				1CE6AA89F4E574715D7ACB7F /* CalendarMonthPickerView.swift in Sources */,
 				6215339CB01FDD27B2E4960C /* CaptureOverlayView.swift in Sources */,
 				EAB8BC6D5DDAB41ECEBFB976 /* ContextMenuSettingsView.swift in Sources */,
@@ -1149,6 +1160,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				68A312F9DB7E7D6DE9B5F07D /* CPUFrequencyCalculatorTests.swift in Sources */,
 				8E7CF123BB4ED443C901662A /* CalendarEventCacheTests.swift in Sources */,
 				CED849B3951D17337BB31B52 /* CalendarEventItemTests.swift in Sources */,
 				0F940A4DA43062C240F0BBAC /* CalendarMonthTests.swift in Sources */,

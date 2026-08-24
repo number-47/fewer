@@ -169,14 +169,18 @@ final class MonitorStatusItemView: NSView {
 struct MonitorModulePopoverView: View {
     let moduleID: SystemMonitorModuleID
     let openSettings: () -> Void
+    var openActivityMonitor: (() -> Void)? = nil
 
     var body: some View {
         MenuBarPopoverChrome(
             title: moduleID.title,
             systemImage: moduleID.systemImage,
-            openSettings: openSettings
+            openSettings: openSettings,
+            openActivityMonitor: openActivityMonitor
         ) {
-            MonitorModuleContent(moduleID: moduleID)
+            ScrollView {
+                MonitorModuleContent(moduleID: moduleID)
+            }
         }
     }
 }
@@ -189,8 +193,7 @@ struct MonitorModuleContent: View {
     @State private var showsWiFiDetails = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 14) {
             switch moduleID {
             case .cpu: CPUDetailsView(
                 snapshot: metrics.current.cpu,
@@ -234,8 +237,7 @@ struct MonitorModuleContent: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-            .padding(14)
-        }
+        .padding(14)
         .onAppear { metrics.setModuleVisible(moduleID, isVisible: true) }
         .onDisappear { metrics.setModuleVisible(moduleID, isVisible: false) }
     }
@@ -249,15 +251,6 @@ struct MonitorModuleContent: View {
     private func rate(_ value: Double) -> String { ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file) + "/s" }
 }
 
-private extension SystemMonitorModuleID {
-    var title: String {
-        switch self { case .cpu: "CPU"; case .gpu: "GPU"; case .memory: "内存"; case .disk: "磁盘"; case .network: "网络" }
-    }
-
-    var systemImage: String {
-        switch self { case .cpu: "cpu"; case .gpu, .memory: "memorychip"; case .disk: "internaldrive"; case .network: "network" }
-    }
-}
 
 private struct DiskDetailsView: View {
     let snapshot: DiskSnapshot?
@@ -519,8 +512,12 @@ private struct CPUDetailsView: View {
                     }
                     detail("负载", loadAverage(snapshot.loadAverage))
                     detail("运行时间", snapshot.uptime.map(uptime) ?? "不可用")
-                    detail("频率", snapshot.frequencyHz.map(frequency) ?? "不可用")
-                    detail("温度", snapshot.temperatureCelsius.map { String(format: "%.0f℃", $0) } ?? "不可用")
+                    if let frequencyHz = snapshot.frequencyHz {
+                        detail("频率", frequency(frequencyHz))
+                    }
+                    if let temperatureCelsius = snapshot.temperatureCelsius {
+                        detail("温度", String(format: "%.0f℃", temperatureCelsius))
+                    }
                     coreDetails(snapshot.cores)
                     clusterDetails(snapshot.clusters)
                 }

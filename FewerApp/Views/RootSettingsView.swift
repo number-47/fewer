@@ -17,6 +17,12 @@ struct RootSettingsView: View {
         .tint(Color(red: 0, green: 113 / 255, blue: 227 / 255))
         .preferredColorScheme(.light)
         .task { await model.load() }
+        .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.navigateNotification)) { notification in
+            if let raw = notification.userInfo?["section"] as? String,
+               let section = SettingsSection(rawValue: raw) {
+                selection = section
+            }
+        }
         .onDisappear { InputEnhancementViewModel.shared.flushPendingSave() }
     }
 
@@ -39,10 +45,11 @@ struct RootSettingsView: View {
 
     private func sidebarItem(_ section: SettingsSection) -> some View {
         Button { selection = section } label: {
-            Label(section.title, systemImage: section.systemImage)
-                .font(.system(size: 14))
-                .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-                .padding(.horizontal, 12)
+           Label(section.title, systemImage: section.systemImage)
+               .font(.system(size: 14))
+               .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+               .contentShape(Rectangle())
+               .padding(.horizontal, 12)
                 .foregroundStyle(selection == section ? .white : .primary)
                 .background(selection == section ? Color(red: 0, green: 113 / 255, blue: 227 / 255) : .clear,
                             in: RoundedRectangle(cornerRadius: 8, style: .continuous))

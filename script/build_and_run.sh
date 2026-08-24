@@ -33,9 +33,45 @@ if [[ -z "$SIGNING_IDENTITY" ]]; then
   exit 1
 fi
 
+SIGNING_ENTITLEMENTS_DIR="$(mktemp -d "$PROJECT_ROOT/.build/Fewer-signing-entitlements.XXXXXX")"
+cleanup_signing_entitlements() {
+  /bin/rm -rf "$SIGNING_ENTITLEMENTS_DIR"
+}
+trap cleanup_signing_entitlements EXIT
+
+resolved_entitlements_for_bundle() {
+  local bundle="$1"
+  local source_entitlements="$2"
+  local info_plist="$bundle/Contents/Info.plist"
+  local group_identifier
+  local resolved_entitlements
+
+  if [[ ! -f "$info_plist" ]]; then
+    echo "Missing built Info.plist for signing: $info_plist" >&2
+    return 1
+  fi
+  group_identifier="$(/usr/bin/plutil -extract FewerAppGroupIdentifier raw -o - "$info_plist" 2>/dev/null || true)"
+  if [[ ! "$group_identifier" =~ ^[A-Z0-9]{10}\.group\.com\.number47\.fewer$ ]]; then
+    echo "Invalid FewerAppGroupIdentifier in $info_plist: expected a resolved Team ID-prefixed App Group." >&2
+    return 1
+  fi
+
+  resolved_entitlements="$(mktemp "$SIGNING_ENTITLEMENTS_DIR/entitlements.XXXXXX")"
+  /bin/cp "$source_entitlements" "$resolved_entitlements"
+  if ! /usr/libexec/PlistBuddy \
+    -c "Set :com.apple.security.application-groups:0 $group_identifier" \
+    "$resolved_entitlements"; then
+    echo "Failed to resolve App Group entitlement for $bundle." >&2
+    return 1
+  fi
+  printf '%s\n' "$resolved_entitlements"
+}
+
 sign_macos_bundle() {
   local bundle="$1"
   local entitlements="$2"
+  local resolved_entitlements
+  resolved_entitlements="$(resolved_entitlements_for_bundle "$bundle" "$entitlements")"
   while IFS= read -r binary; do
     /usr/bin/codesign --force --sign "$SIGNING_IDENTITY" --timestamp=none "$binary"
   done < <(/usr/bin/find "$bundle/Contents/MacOS" -type f \( -name '*.dylib' -o -perm -111 \))
@@ -44,7 +80,7 @@ sign_macos_bundle() {
     --sign "$SIGNING_IDENTITY" \
     --timestamp=none \
     --options runtime \
-    --entitlements "$entitlements" \
+    --entitlements "$resolved_entitlements" \
     "$bundle"
 }
 

@@ -8,14 +8,14 @@ struct CalendarAgendaView: View {
     let isLoading: Bool
     let isRequestingAccess: Bool
     let errorMessage: String?
-    let language: CalendarLanguage
+    var expandsToFill: Bool = false
     let requestAccess: () -> Void
     let openSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(language.text(chinese: "日程与节假日", english: "Schedule & Holidays"))
+                Text("日程与节假日")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
@@ -29,7 +29,12 @@ struct CalendarAgendaView: View {
 
             content
         }
-        .frame(maxWidth: .infinity, minHeight: 96, maxHeight: 112, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 96,
+            maxHeight: expandsToFill ? .infinity : 112,
+            alignment: .topLeading
+        )
     }
 
     @ViewBuilder
@@ -54,20 +59,14 @@ struct CalendarAgendaView: View {
             }
         } else if canRequestAccess {
             permissionPrompt(
-                message: language.text(
-                    chinese: "允许读取系统日历和提醒事项后，可展示节假日、日程与计划任务。",
-                    english: "Allow Calendar and Reminders access to show holidays, events, and planned tasks."
-                ),
-                buttonTitle: language.text(chinese: "允许访问", english: "Allow Access"),
+                message: "允许读取系统日历和提醒事项后，可展示节假日、日程与计划任务。",
+                buttonTitle: "允许访问",
                 action: requestAccess
             )
         } else {
             permissionPrompt(
-                message: language.text(
-                    chinese: "需要系统日历或提醒事项的完整读取权限。",
-                    english: "Full Calendar or Reminders read access is required."
-                ),
-                buttonTitle: language.text(chinese: "打开系统设置", english: "Open System Settings"),
+                message: "需要系统日历或提醒事项的完整读取权限。",
+                buttonTitle: "打开系统设置",
                 action: openSettings
             )
         }
@@ -84,13 +83,13 @@ struct CalendarAgendaView: View {
     private var missingAccessPrompt: MissingAccessPrompt? {
         if reminderAuthorizationState != .fullAccess {
             return MissingAccessPrompt(
-                title: language.text(chinese: "显示计划事项", english: "Show Planned Tasks"),
+                title: "显示计划事项",
                 action: isRequestable(reminderAuthorizationState) ? requestAccess : openSettings
             )
         }
         if authorizationState != .fullAccess {
-            return MissingAccessPrompt(
-                title: language.text(chinese: "显示日历日程", english: "Show Calendar Events"),
+           return MissingAccessPrompt(
+                title: "显示日历日程",
                 action: isRequestable(authorizationState) ? requestAccess : openSettings
             )
         }
@@ -115,7 +114,7 @@ struct CalendarAgendaView: View {
         HStack(spacing: 8) {
             Image(systemName: "calendar.badge.minus")
                 .foregroundStyle(.secondary)
-            Text(language.text(chinese: "当天没有日程或节假日", english: "No events or holidays"))
+            Text("当天没有日程或节假日")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -149,7 +148,7 @@ struct CalendarAgendaView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.title.isEmpty
-                     ? language.text(chinese: "无标题日程", english: "Untitled Event")
+                     ? "无标题日程"
                      : event.title)
                     .font(.caption.weight(.medium))
                     .lineLimit(1)
@@ -160,18 +159,18 @@ struct CalendarAgendaView: View {
                         .lineLimit(1)
 
                     if event.kind == .reminder {
-                        Label(
-                            event.isCompleted
-                                ? language.text(chinese: "已完成", english: "Completed")
-                                : language.text(chinese: "计划", english: "Planned"),
+                       Label(
+                           event.isCompleted
+                               ? "已完成"
+                               : "计划",
                             systemImage: event.isCompleted ? "checkmark.circle.fill" : "checklist"
                         )
                         .labelStyle(.titleAndIcon)
                     }
 
                     if event.isSubscription {
-                        Label(
-                            language.text(chinese: "订阅", english: "Subscription"),
+                       Label(
+                            "订阅",
                             systemImage: "dot.radiowaves.left.and.right"
                         )
                         .labelStyle(.titleAndIcon)
@@ -188,10 +187,10 @@ struct CalendarAgendaView: View {
 
     private func timeText(for event: CalendarEventItem) -> String {
         if event.isAllDay {
-            return language.text(chinese: "全天", english: "All-day")
+            return "全天"
         }
         return event.startDate.formatted(
-            .dateTime.hour().minute().locale(language.locale)
+            .dateTime.hour().minute()
         )
     }
 

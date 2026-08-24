@@ -252,6 +252,32 @@ public enum MouseGestureClickTolerance {
     }
 }
 
+/// 保留手势轨迹的整体形状，同时限制实时渲染的工作量。
+public struct MouseGestureTrail: Sendable {
+    public static let maximumPointCount = 128
+
+    public private(set) var points: [GesturePoint] = []
+
+    public init() {}
+
+    public mutating func begin(at point: GesturePoint) {
+        points = [point]
+    }
+
+    public mutating func append(_ point: GesturePoint) {
+        if points.count == Self.maximumPointCount {
+            points = points.enumerated().compactMap { index, point in
+                index.isMultiple(of: 2) ? point : nil
+            }
+        }
+        points.append(point)
+    }
+
+    public mutating func reset() {
+        points = []
+    }
+}
+
 public enum MouseGestureCancellationReason: Equatable, Sendable {
     case applicationChanged
     case timedOut

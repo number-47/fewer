@@ -6,6 +6,7 @@ final class GestureHUDController {
     private let panel: NSPanel
     private let pathView = GesturePathView(frame: .zero)
     private var hideGeneration = 0
+    private var trail = MouseGestureTrail()
 
     init() {
         let frame = NSScreen.screens.first?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
@@ -29,14 +30,16 @@ final class GestureHUDController {
     func begin(at point: CGPoint) {
         hideGeneration += 1
         panel.alphaValue = 1
-        pathView.points = [point]
+        trail.begin(at: GesturePoint(x: point.x, y: point.y))
+        pathView.points = trail.points.map { CGPoint(x: $0.x, y: $0.y) }
         pathView.directions = []
         pathView.needsDisplay = true
         panel.orderFrontRegardless()
     }
 
     func append(point: CGPoint, directions: [MouseGestureDirection]) {
-        pathView.points.append(point)
+        trail.append(GesturePoint(x: point.x, y: point.y))
+        pathView.points = trail.points.map { CGPoint(x: $0.x, y: $0.y) }
         pathView.directions = directions
         pathView.needsDisplay = true
     }
@@ -52,6 +55,7 @@ final class GestureHUDController {
                 guard let self, self.hideGeneration == generation else { return }
                 self.panel.orderOut(nil)
                 self.panel.alphaValue = 1
+                self.trail.reset()
                 self.pathView.points = []
                 self.pathView.directions = []
                 self.pathView.needsDisplay = true

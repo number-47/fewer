@@ -3,7 +3,14 @@ import Darwin
 import os
 
 public enum AppGroupConstants {
-    public static let groupIdentifier = "group.com.number47.fewer"
+    private static let legacyGroupIdentifier = "group.com.number47.fewer"
+    public static let groupIdentifier: String = {
+        guard let configuredIdentifier = Bundle.main.object(forInfoDictionaryKey: "FewerAppGroupIdentifier") as? String else {
+            return legacyGroupIdentifier
+        }
+        let identifier = configuredIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
+        return identifier.isEmpty ? legacyGroupIdentifier : identifier
+    }()
     public static let featureSettingsKey = "feature-settings-v1"
     public static let cutTransactionKey = "cut-transaction-v1"
     public static let requestShortcutHelperAccessibilityNotification = Notification.Name(
@@ -30,7 +37,7 @@ public enum AppGroupConstants {
 
     /// Current shared storage root. File-backed Stores resolve here.
     ///
-    /// Preferred location is the App Group container `group.com.number47.fewer/Shared`
+    /// Preferred location is the configured App Group container's `Shared` directory
     /// so the app, Finder extension, and shortcut helper share one store. When the
     /// container URL is unavailable (unsigned local builds without the entitlement)
     /// it falls back to `~/Library/Application Support/Fewer/Shared` and logs a
@@ -50,6 +57,17 @@ public enum AppGroupConstants {
     public static func legacySharedDataDirectory(fileManager: FileManager = .default) -> URL {
         homeDirectory(for: fileManager)
             .appendingPathComponent("Library/Application Support/Fewer/Shared", isDirectory: true)
+    }
+
+    /// Previous App Group storage location, used only while migrating to the
+    /// Team ID-prefixed App Group identifier.
+    static func legacyAppGroupSharedDataDirectory(fileManager: FileManager = .default) -> URL {
+        resolveLegacyAppGroupSharedDirectory(homeDirectory: homeDirectory(for: fileManager))
+    }
+
+    static func resolveLegacyAppGroupSharedDirectory(homeDirectory: URL) -> URL {
+        homeDirectory
+            .appendingPathComponent("Library/Group Containers/\(legacyGroupIdentifier)/Shared", isDirectory: true)
     }
 
     /// Pure resolution of the shared data directory. Returns the resolved directory

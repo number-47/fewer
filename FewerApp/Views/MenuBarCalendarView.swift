@@ -72,7 +72,6 @@ struct MenuBarCalendarView: View {
     @State private var jumpMonth = Calendar.autoupdatingCurrent.component(.month, from: .now)
     @ObservedObject private var currentDate = CurrentDateProvider.shared
     @ObservedObject private var systemCalendar = SystemCalendarService.shared
-    @AppStorage(CalendarLanguage.storageKey) private var languageValue = CalendarLanguage.chinese.rawValue
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -124,8 +123,8 @@ struct MenuBarCalendarView: View {
                 reminderAuthorizationState: systemCalendar.reminderAuthorizationState,
                 isLoading: systemCalendar.isLoading,
                 isRequestingAccess: systemCalendar.isRequestingAccess,
-                errorMessage: systemCalendar.errorMessage,
-                language: language,
+               errorMessage: systemCalendar.errorMessage,
+                expandsToFill: presentation == .embedded,
                 requestAccess: {
                     Task {
                         await systemCalendar.requestFullAccess()
@@ -139,8 +138,9 @@ struct MenuBarCalendarView: View {
 
         }
         .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, presentation == .embedded ? 8 : 14)
+        .padding(.top, presentation == .embedded ? 6 : 14)
+        .padding(.bottom, presentation == .embedded ? 4 : 14)
+        .frame(maxHeight: presentation == .embedded ? .infinity : nil, alignment: .top)
         .onAppear {
             scrollCoordinator.onRowStep = { rows in
                 scrollByRows(rows)
@@ -152,9 +152,6 @@ struct MenuBarCalendarView: View {
             scrollCoordinator.stop()
         }
         .onChange(of: calendarState.scrollAnchor) {
-            loadSystemEvents(for: month)
-        }
-        .onChange(of: languageValue) {
             loadSystemEvents(for: month)
         }
         .onChange(of: systemCalendar.changeRevision) {
@@ -176,9 +173,9 @@ struct MenuBarCalendarView: View {
                     isShowingMonthPicker = true
                 } label: {
                     HStack(spacing: 4) {
-                        Text(month.monthStart.formatted(
-                            .dateTime.year().month(.wide).locale(language.locale)
-                        ))
+                       Text(month.monthStart.formatted(
+                            .dateTime.year().month(.wide)
+                       ))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                         Image(systemName: "chevron.down")
                             .font(.system(size: 10, weight: .semibold))
@@ -186,12 +183,11 @@ struct MenuBarCalendarView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help(language.text(chinese: "选择年份和月份", english: "Choose Year and Month"))
+                .help("选择年份和月份")
                 .popover(isPresented: $isShowingMonthPicker, arrowEdge: .top) {
                     CalendarMonthPickerView(
                         year: $jumpYear,
                         month: $jumpMonth,
-                        language: language,
                         calendar: calendar,
                         cancel: { isShowingMonthPicker = false },
                         confirm: jumpToSelectedMonth
@@ -203,43 +199,31 @@ struct MenuBarCalendarView: View {
                     )
                 }
 
-                Spacer()
-
-                Picker("", selection: languageBinding) {
-                    ForEach(CalendarLanguage.allCases) { option in
-                        Text(option.shortTitle)
-                            .tag(option)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 80)
-                .help(language.text(chinese: "切换日历语言", english: "Change Calendar Language"))
             }
 
             HStack(spacing: 4) {
                 Spacer()
                 monthButton(
                     systemImage: "chevron.left",
-                    title: language.text(chinese: "上个月", english: "Previous Month"),
+                    title: "上个月",
                     offset: -1
                 )
 
                 Button {
                     selectToday()
                 } label: {
-                    Text(language.text(chinese: "今天", english: "Today"))
+                    Text("今天")
                         .font(.system(size: 11, weight: .medium))
                         .padding(.horizontal, 8)
                         .frame(height: 22)
                         .background(Color.accentColor.opacity(0.1), in: Capsule())
                 }
                 .buttonStyle(.plain)
-                .help(language.text(chinese: "回到今天", english: "Go to Today"))
+                .help("回到今天")
 
                 monthButton(
                     systemImage: "chevron.right",
-                    title: language.text(chinese: "下个月", english: "Next Month"),
+                    title: "下个月",
                     offset: 1
                 )
             }
@@ -320,20 +304,16 @@ struct MenuBarCalendarView: View {
 
     private func accessibilityLabel(for day: CalendarDay, events: [CalendarEventItem]) -> String {
         let dateText = day.date.formatted(
-            .dateTime.weekday(.wide).year().month(.wide).day().locale(language.locale)
+            .dateTime.weekday(.wide).year().month(.wide).day()
         )
-        let baseText = day.lunarText.isEmpty ? dateText : language == .chinese
-            ? "\(dateText)，农历\(day.lunarText)"
-            : "\(dateText), Lunar \(day.lunarText)"
+        let baseText = day.lunarText.isEmpty ? dateText : "\(dateText)，农历\(day.lunarText)"
         let eventTitles = events.prefix(3).map {
             $0.title.isEmpty
-                ? language.text(chinese: "无标题日程", english: "Untitled Event")
+                ? "无标题日程"
                 : $0.title
         }
         guard !eventTitles.isEmpty else { return baseText }
-        return language == .chinese
-            ? "\(baseText)，日程：\(eventTitles.joined(separator: "、"))"
-            : "\(baseText), Events: \(eventTitles.joined(separator: ", "))"
+        return "\(baseText)，日程：\(eventTitles.joined(separator: "、"))"
     }
 
     private func selectedDateSummary(in month: CalendarMonth) -> some View {
@@ -348,12 +328,12 @@ struct MenuBarCalendarView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(calendarState.selectedDate.formatted(
-                    .dateTime.weekday(.wide).year().month(.wide).day().locale(language.locale)
+                    .dateTime.weekday(.wide).year().month(.wide).day()
                 ))
                     .font(.system(size: 13, weight: .semibold))
 
                 if !lunarText.isEmpty {
-                    Text(language == .chinese ? "农历 \(lunarText)" : "Lunar \(lunarText)")
+                    Text("农历 \(lunarText)")
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
@@ -432,20 +412,9 @@ struct MenuBarCalendarView: View {
         return isHoliday ? .red : .secondary
     }
 
-    private var language: CalendarLanguage {
-        CalendarLanguage(rawValue: languageValue) ?? .chinese
-    }
-
-    private var languageBinding: Binding<CalendarLanguage> {
-        Binding(
-            get: { language },
-            set: { languageValue = $0.rawValue }
-        )
-    }
-
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = language.locale
+        calendar.locale = .current
         calendar.timeZone = .autoupdatingCurrent
         return calendar
     }

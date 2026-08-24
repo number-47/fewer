@@ -45,6 +45,8 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
     private var cutTransactionPasteboardChangeCount: Int?
     private var frontmostBundleIdentifier: String?
     private var mainDisplayHeight: CGFloat = 0
+    private var pendingGestureHUDUpdate: (point: CGPoint, directions: [MouseGestureDirection])?
+    private var gestureHUDUpdateToken: UUID?
 
     private let bridge = PasteboardCutBridge()
     private let finderSettingsStore = try? SharedSettingsStore()
@@ -406,6 +408,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
                   bundleIdentifier != "com.number47.fewer",
                   !settings.gestureExcludedBundleIdentifiers.contains(bundleIdentifier ?? "")
             else { return nil }
+            cancelPendingGestureHUDUpdate()
             let point = appKitPoint(from: event.location)
             var recognizer = MouseGestureRecognizer()
             recognizer.begin(at: GesturePoint(x: point.x, y: point.y))
@@ -435,9 +438,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
                 || MouseGestureClickTolerance.isExceeded(from: session.initialPoint, to: currentPoint)
             _ = session.recognizer.append(currentPoint)
             gestureSession = session
-            let directions = session.recognizer.directions
-            let hudPoint = event.location
-            Task { @MainActor [weak self] in self?.gestureHUD.append(point: hudPoint, directions: directions) }
+            queueGestureHUDUpdate(point: event.location, directions: session.recognizer.directions)
             return true
         }
         if isMouseUp(type), event.getIntegerValueField(.mouseEventButtonNumber) == session.button {
@@ -451,6 +452,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
                 hasExceededClickTolerance: session.hasExceededClickTolerance
             )
             gestureSession = nil
+            cancelPendingGestureHUDUpdate()
             updateRuntimeStatus { $0.isGestureEngineActive = false }
             Task { @MainActor [weak self] in self?.gestureHUD.hide() }
             switch completion {
@@ -614,6 +616,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
 
     private func clearTransientState(replayGesture: Bool) {
         if gestureSession != nil { cancelGesture(replayClick: replayGesture) }
+        cancelPendingGestureHUDUpdate()
         lastScrollBundleIdentifier = nil
         stateLock.lock()
         temporaryAllKeys = false
@@ -633,6 +636,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
     private func cancelGesture(replayClick shouldReplayClick: Bool) {
         guard let session = gestureSession else { return }
         gestureSession = nil
+        cancelPendingGestureHUDUpdate()
         if shouldReplayClick,
            MouseGestureCompletionPolicy.completion(
                rule: nil,
@@ -828,6 +832,41 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
             }
             CFRunLoopWakeUp(runLoop)
         }
+    }
+
+    private func queueGestureHUDUpdate(point: CGPoint, directions: [MouseGestureDirection]) {
+        stateLock.lock()
+        pendingGestureHUDUpdate = (point, directions)
+        guard gestureHUDUpdateToken == nil else {
+            stateLock.unlock()
+            return
+        }
+        let token = UUID()
+        gestureHUDUpdateToken = token
+        stateLock.unlock()
+
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let update = self.dequeueGestureHUDUpdate(token: token)
+            else { return }
+            self.gestureHUD.append(point: update.point, directions: update.directions)
+        }
+    }
+
+    private func dequeueGestureHUDUpdate(token: UUID) -> (point: CGPoint, directions: [MouseGestureDirection])? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        guard gestureHUDUpdateToken == token else { return nil }
+        gestureHUDUpdateToken = nil
+        defer { pendingGestureHUDUpdate = nil }
+        return pendingGestureHUDUpdate
+    }
+
+    private func cancelPendingGestureHUDUpdate() {
+        stateLock.lock()
+        pendingGestureHUDUpdate = nil
+        gestureHUDUpdateToken = nil
+        stateLock.unlock()
     }
 
     private func temporaryAllKeysSnapshot() -> Bool {

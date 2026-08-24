@@ -61,10 +61,12 @@ PACKAGE_DIST="$PACKAGE_ROOT/dist"
 PACKAGE_VERSION="$(awk '/^MARKETING_VERSION[[:space:]]*=/{print $3; exit}' "$PACKAGE_ROOT/Config/Base.xcconfig")"
 mkdir -p "$PACKAGE_ROOT/.build"
 PACKAGE_STAGING="$(mktemp -d "$PACKAGE_ROOT/.build/Fewer-package.XXXXXX")"
+PACKAGE_ENTITLEMENTS_DIR="$(mktemp -d "$PACKAGE_ROOT/.build/Fewer-package-entitlements.XXXXXX")"
 PACKAGE_NOTARY_ZIP="$PACKAGE_ROOT/.build/Fewer-$PACKAGE_VERSION-notary.zip"
 
 cleanup_package_staging() {
   /bin/rm -rf "$PACKAGE_STAGING"
+  /bin/rm -rf "$PACKAGE_ENTITLEMENTS_DIR"
 }
 trap cleanup_package_staging EXIT
 
@@ -122,6 +124,9 @@ test -d "$PACKAGE_APP/Contents/Library/LoginItems/FewerShortcutHelper.app"
 sign_macos_bundle() {
   local bundle="$1"
   local entitlements="$2"
+  local info_plist="$bundle/Contents/Info.plist"
+  local group_identifier
+  local resolved_entitlements
   local sign_args=(--force --sign "$PACKAGE_IDENTITY")
 
   if [[ "$PACKAGE_MODE" == "signed" ]]; then
@@ -130,11 +135,29 @@ sign_macos_bundle() {
     sign_args+=(--options runtime --timestamp=none)
   fi
 
+  if [[ ! -f "$info_plist" ]]; then
+    echo "缺少用于签名的构建 Info.plist：$info_plist" >&2
+    return 1
+  fi
+  group_identifier="$(/usr/bin/plutil -extract FewerAppGroupIdentifier raw -o - "$info_plist" 2>/dev/null || true)"
+  if [[ ! "$group_identifier" =~ ^[A-Z0-9]{10}\.group\.com\.number47\.fewer$ ]]; then
+    echo "构建产物中的 FewerAppGroupIdentifier 无效；需要已解析的 Team ID 前缀 App Group。" >&2
+    return 1
+  fi
+  resolved_entitlements="$(mktemp "$PACKAGE_ENTITLEMENTS_DIR/entitlements.XXXXXX")"
+  /bin/cp "$entitlements" "$resolved_entitlements"
+  if ! /usr/libexec/PlistBuddy \
+    -c "Set :com.apple.security.application-groups:0 $group_identifier" \
+    "$resolved_entitlements"; then
+    echo "无法为 $bundle 解析 App Group entitlement。" >&2
+    return 1
+  fi
+
   while IFS= read -r binary; do
     /usr/bin/codesign "${sign_args[@]}" "$binary"
   done < <(/usr/bin/find "$bundle/Contents/MacOS" -type f \( -name '*.dylib' -o -perm -111 \))
 
-  /usr/bin/codesign "${sign_args[@]}" --entitlements "$entitlements" "$bundle"
+  /usr/bin/codesign "${sign_args[@]}" --entitlements "$resolved_entitlements" "$bundle"
 }
 
 echo "[3/5] 按由内到外的顺序签名"

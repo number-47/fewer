@@ -50,6 +50,17 @@ final class SharedStoreMigratorTests: XCTestCase {
         )
     }
 
+    func testResolveLegacyAppGroupSharedDirectoryUsesUnprefixedContainer() {
+        let home = URL(fileURLWithPath: "/Users/test", isDirectory: true)
+        XCTAssertEqual(
+            AppGroupConstants.resolveLegacyAppGroupSharedDirectory(homeDirectory: home),
+            home.appendingPathComponent(
+                "Library/Group Containers/group.com.number47.fewer/Shared",
+                isDirectory: true
+            )
+        )
+    }
+
     // MARK: - Migration behavior
 
     func testNoOldDataDoesNotCreateMarkerOrFiles() throws {

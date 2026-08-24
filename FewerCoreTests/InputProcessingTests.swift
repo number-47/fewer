@@ -345,6 +345,19 @@ final class InputProcessingTests: XCTestCase {
         ))
     }
 
+    func testGestureTrailBoundsRenderedPointsWhileRetainingEndpoints() {
+        var trail = MouseGestureTrail()
+        trail.begin(at: GesturePoint(x: 0, y: 0))
+
+        for index in 1...1_000 {
+            trail.append(GesturePoint(x: Double(index), y: Double(index)))
+        }
+
+        XCTAssertLessThanOrEqual(trail.points.count, MouseGestureTrail.maximumPointCount)
+        XCTAssertEqual(trail.points.first, GesturePoint(x: 0, y: 0))
+        XCTAssertEqual(trail.points.last, GesturePoint(x: 1_000, y: 1_000))
+    }
+
     func testGestureCompletionOnlyReplaysClickBeforeClickToleranceIsExceeded() {
         let rule = MouseGestureRule(
             triggerButton: 1,
