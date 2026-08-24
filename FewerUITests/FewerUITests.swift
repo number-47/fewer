@@ -75,4 +75,43 @@ final class FewerUITests: XCTestCase {
         app.buttons["toolbox.tab.calendar"].click()
         XCTAssertTrue(app.staticTexts["日历"].waitForExistence(timeout: 2))
     }
+
+    @MainActor
+    func testPermissionsSettingsPageNavigation() {
+        continueAfterFailure = false
+        let app = launchApp()
+
+        let permissions = app.staticTexts["权限与扩展"].firstMatch
+        XCTAssertTrue(permissions.waitForExistence(timeout: 5))
+        permissions.click()
+
+        XCTAssertTrue(app.staticTexts["Fewer 主应用"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["FewerShortcutHelper"].exists)
+        XCTAssertTrue(app.staticTexts["Finder 扩展"].exists)
+
+        XCTAssertTrue(app.staticTexts["屏幕录制"].exists)
+        XCTAssertTrue(app.staticTexts["日历与提醒事项"].exists)
+        XCTAssertTrue(app.staticTexts["辅助功能"].exists)
+        XCTAssertTrue(app.staticTexts["输入监控"].exists)
+
+        XCTAssertTrue(app.staticTexts["Event Tap 运行状态"].exists)
+
+        XCTAssertTrue(app.buttons["重新检测全部"].exists)
+    }
+
+    @MainActor
+    func testOverviewJumpToPermissions() {
+        continueAfterFailure = false
+        let app = launchApp()
+
+        let overview = app.staticTexts["概览"].firstMatch
+        XCTAssertTrue(overview.waitForExistence(timeout: 5))
+        overview.click()
+
+        let jumpButton = app.buttons["前往"].firstMatch
+        XCTAssertTrue(jumpButton.waitForExistence(timeout: 3))
+        jumpButton.click()
+
+        XCTAssertTrue(app.staticTexts["Fewer 主应用"].waitForExistence(timeout: 3))
+    }
 }

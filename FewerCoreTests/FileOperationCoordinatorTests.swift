@@ -64,4 +64,115 @@ final class FileOperationCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.items.first?.status, .failed)
         XCTAssertEqual(result.items.first?.error, .destinationInsideSource)
     }
+
+    // MARK: - Recoverable replace
+
+    private enum TestReplaceError: Error { case simulated }
+
+    func testReplaceSucceedsWithCorrectContentAndNoBackup() async throws {
+        let item = source.appendingPathComponent("Report.txt")
+        try Data("new content".utf8).write(to: item)
+        try Data("old content".utf8).write(to: target.appendingPathComponent("Report.txt"))
+
+        let result = await FileOperationCoordinator().move([item], to: target, policy: .replace)
+
+        XCTAssertEqual(result.items.first?.status, .moved)
+        let dest = target.appendingPathComponent("Report.txt")
+        XCTAssertEqual(try Data(contentsOf: dest), Data("new content".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: item.path))
+        XCTAssertFalse(hasBackupRemnant(in: target), "不应残留备份文件")
+    }
+
+    func testReplaceInstallFailureRecoversOriginalByteForByte() async throws {
+        let item = source.appendingPathComponent("Report.txt")
+        let oldData = Data("old content".utf8)
+        try Data("new content".utf8).write(to: item)
+        try oldData.write(to: target.appendingPathComponent("Report.txt"))
+
+        let injector = ReplaceFailureInjector { phase in
+            if phase == .install { throw TestReplaceError.simulated }
+        }
+
+        let result = await FileOperationCoordinator().move([item], to: target, policy: .replace, replaceFailureInjector: injector)
+
+        let first = result.items.first!
+        XCTAssertEqual(first.status, .failed)
+        XCTAssertEqual(first.error, .systemError)
+        XCTAssertEqual(try Data(contentsOf: target.appendingPathComponent("Report.txt")), oldData)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: item.path), "源文件未被移动")
+        XCTAssertFalse(hasBackupRemnant(in: target), "回滚成功后不应残留备份")
+    }
+
+    func testReplaceRollbackFailureReturnsNotRecoverable() async throws {
+        let item = source.appendingPathComponent("Report.txt")
+        let oldData = Data("old content".utf8)
+        try Data("new content".utf8).write(to: item)
+        try oldData.write(to: target.appendingPathComponent("Report.txt"))
+
+        let injector = ReplaceFailureInjector { phase in
+            switch phase {
+            case .install, .rollback: throw TestReplaceError.simulated
+            case .cleanup: break
+            }
+        }
+
+        let result = await FileOperationCoordinator().move([item], to: target, policy: .replace, replaceFailureInjector: injector)
+
+        let first = result.items.first!
+        XCTAssertEqual(first.status, .failed)
+        XCTAssertEqual(first.error, .replacementNotRecoverable)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: target.appendingPathComponent("Report.txt").path), "目标已被重命名为备份，回滚失败后目标不存在")
+        let backups = backupRemnants(in: target)
+        XCTAssertEqual(backups.count, 1, "应保留唯一备份（旧内容）")
+        XCTAssertEqual(try Data(contentsOf: backups[0]), oldData, "备份包含旧内容")
+    }
+
+    func testReplaceCleanupFailureLeavesNewContentAndBackup() async throws {
+        let item = source.appendingPathComponent("Report.txt")
+        try Data("new content".utf8).write(to: item)
+        try Data("old content".utf8).write(to: target.appendingPathComponent("Report.txt"))
+
+        let injector = ReplaceFailureInjector { phase in
+            if phase == .cleanup { throw TestReplaceError.simulated }
+        }
+
+        let result = await FileOperationCoordinator().move([item], to: target, policy: .replace, replaceFailureInjector: injector)
+
+        let first = result.items.first!
+        XCTAssertEqual(first.status, .moved, "安装成功后报告 moved")
+        let dest = target.appendingPathComponent("Report.txt")
+        XCTAssertEqual(try Data(contentsOf: dest), Data("new content".utf8), "目标已含新内容")
+        let backups = backupRemnants(in: target)
+        XCTAssertEqual(backups.count, 1, "清理失败后残留一个备份")
+        XCTAssertEqual(try Data(contentsOf: backups[0]), Data("old content".utf8), "备份含旧内容")
+    }
+
+    func testReplaceDirectorySucceeds() async throws {
+        let srcDir = source.appendingPathComponent("Project", isDirectory: true)
+        try FileManager.default.createDirectory(at: srcDir, withIntermediateDirectories: true)
+        try Data("new file".utf8).write(to: srcDir.appendingPathComponent("file.txt"))
+
+        let destDir = target.appendingPathComponent("Project", isDirectory: true)
+        try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
+        try Data("old file".utf8).write(to: destDir.appendingPathComponent("legacy.txt"))
+
+        let result = await FileOperationCoordinator().move([srcDir], to: target, policy: .replace)
+
+        XCTAssertEqual(result.items.first?.status, .moved)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: destDir.appendingPathComponent("file.txt").path))
+        XCTAssertEqual(try Data(contentsOf: destDir.appendingPathComponent("file.txt")), Data("new file".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destDir.appendingPathComponent("legacy.txt").path), "旧目录内容应被替换")
+        XCTAssertFalse(hasBackupRemnant(in: target), "不应残留备份目录")
+    }
+
+    // MARK: - Helpers
+
+    private func hasBackupRemnant(in directory: URL) -> Bool {
+        !backupRemnants(in: directory).isEmpty
+    }
+
+    private func backupRemnants(in directory: URL) -> [URL] {
+        let entries = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return entries.filter { $0.lastPathComponent.contains(".fewer-replace-") }
+    }
 }

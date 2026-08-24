@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 只读最小权限：CI 不写任何仓库内容、不发布、不签名。
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    name: Build and Verify
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tooling (xcodegen, xcbeautify)
+        run: brew install xcodegen xcbeautify
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # 工程漂移检查：提交的 Fewer.xcodeproj 必须与 xcodegen 生成结果一致。
+      # 若失败，本地运行 `xcodegen generate` 并提交变更后再推送。
+      - name: Check project drift
+        run: git diff --exit-code -- Fewer.xcodeproj
+
+      - name: Run CI verification
+        run: ./script/ci_verify.sh
+
+      # FewerUITests 依赖签名 GUI 会话与系统权限（辅助功能/输入监控等），
+      # 无法在无签名 CI 中可靠运行，明确列为后续人工/签名验收，不纳入门禁。
+      - name: Note on UI Tests
+        run: echo "FewerUITests 需签名 GUI 会话与系统权限，不纳入无签名 CI 门禁；由 T012 集成验收在签名实机完成。"

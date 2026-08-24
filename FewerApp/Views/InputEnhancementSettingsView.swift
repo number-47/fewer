@@ -16,6 +16,7 @@ struct InputEnhancementSettingsView: View {
     @State private var tab: Tab = .scroll
     @State private var temporaryAllKeys = false
     @State private var isPositioningKeycast = false
+    var onOpenPermissions: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -37,6 +38,7 @@ struct InputEnhancementSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .disabled(model.isLoading)
         .alert("Fewer", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }
@@ -48,7 +50,10 @@ struct InputEnhancementSettingsView: View {
         .onDisappear {
             isPositioningKeycast = false
             model.setKeycastPositioning(false)
+            model.stopRefreshing()
+            model.flushPendingSave()
         }
+        .task { await model.startRefreshing() }
     }
 
     private var prototypeScroll: some View {
@@ -58,11 +63,11 @@ struct InputEnhancementSettingsView: View {
                 Divider()
                 FewerSettingsRow { settingToggle("反转方向", "自然滚动方向开关", binding(\.scroll.vertical.reversed)) }
                 Divider()
-                FewerSettingsRow { sliderRow("最小步长", "每次滚动最小像素位移", binding(\.scroll.vertical.minimumStep), 0...24, "%.0f") }
+                FewerSettingsRow { sliderRow("最小步长", "每次滚动最小像素位移", debouncedBinding(\.scroll.vertical.minimumStep), 0...24, "%.0f") }
                 Divider()
-                FewerSettingsRow { sliderRow("速度增益", "滚动加速度倍数", binding(\.scroll.vertical.speedGain), 0.25...8, "%.2f×") }
+                FewerSettingsRow { sliderRow("速度增益", "滚动加速度倍数", debouncedBinding(\.scroll.vertical.speedGain), 0.25...8, "%.2f×") }
                 Divider()
-                FewerSettingsRow { sliderRow("响应时长", "惯性减速持续时间", binding(\.scroll.vertical.response), 0.05...0.8, "%.2fs") }
+                FewerSettingsRow { sliderRow("响应时长", "惯性减速持续时间", debouncedBinding(\.scroll.vertical.response), 0.05...0.8, "%.2fs") }
             }
             prototypeNotice("水平轴与模拟触控板等高级选项保留在现有输入设置中。")
         }.padding(.bottom, 24)
@@ -157,14 +162,28 @@ struct InputEnhancementSettingsView: View {
     }
 
     private var prototypeDiagnostics: some View {
-        FewerSettingsCard {
-            FewerSettingsRow { diagnosticRow("辅助功能权限", model.helperStatus.isAccessibilityTrusted, model.helperStatus.isAccessibilityTrusted ? "已授权" : "未授权") }
-            Divider()
-            FewerSettingsRow { diagnosticRow("输入监控权限", model.helperStatus.isInputMonitoringTrusted, model.helperStatus.isInputMonitoringTrusted ? "已授权" : "未授权") }
-            Divider()
-            FewerSettingsRow { diagnosticRow("鼠标设备", model.helperStatus.detectedScrollDevice != nil, deviceTitle(model.helperStatus.detectedScrollDevice)) }
-            Divider()
-            FewerSettingsRow { diagnosticRow("触控板", model.helperStatus.detectedScrollDevice == .trackpad, model.helperStatus.detectedScrollDevice == .trackpad ? "已检测到" : "未检测到") }
+        VStack(spacing: 16) {
+            FewerSettingsCard {
+                FewerSettingsRow { diagnosticRow("辅助功能权限", model.helperStatus.isAccessibilityTrusted, model.helperStatus.isAccessibilityTrusted ? "已授权" : "未授权") }
+                Divider()
+                FewerSettingsRow { diagnosticRow("输入监控权限", model.helperStatus.isInputMonitoringTrusted, model.helperStatus.isInputMonitoringTrusted ? "已授权" : "未授权") }
+                Divider()
+                FewerSettingsRow { diagnosticRow("鼠标设备", model.helperStatus.detectedScrollDevice != nil, deviceTitle(model.helperStatus.detectedScrollDevice)) }
+                Divider()
+                FewerSettingsRow { diagnosticRow("触控板", model.helperStatus.detectedScrollDevice == .trackpad, model.helperStatus.detectedScrollDevice == .trackpad ? "已检测到" : "未检测到") }
+            }
+            if let onOpenPermissions {
+                FewerSettingsCard {
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("权限与扩展")
+                            Text("集中管理所有授权状态与操作入口").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("前往") { onOpenPermissions() }
+                    }
+                }
+            }
         }
         .padding(.bottom, 24)
     }
@@ -395,6 +414,13 @@ struct InputEnhancementSettingsView: View {
         )
     }
 
+    private func debouncedBinding<Value>(_ keyPath: WritableKeyPath<InputEnhancementSettings, Value>) -> Binding<Value> {
+        Binding(
+            get: { model.settings[keyPath: keyPath] },
+            set: { model.settings[keyPath: keyPath] = $0; model.scheduleSave() }
+        )
+    }
+
     private var gestureMasterBinding: Binding<Bool> {
         Binding(
             get: { model.settings.gestureRules.contains(where: \.isEnabled) },
@@ -460,19 +486,32 @@ struct InputEnhancementSettingsView: View {
 
     private func compactAxisSliders(_ index: Int, axis: Axis) -> some View {
         let step = axis == .vertical
-            ? applicationScrollBinding(index, \.vertical.minimumStep)
-            : applicationScrollBinding(index, \.horizontal.minimumStep)
+            ? debouncedApplicationScrollBinding(index, \.vertical.minimumStep)
+            : debouncedApplicationScrollBinding(index, \.horizontal.minimumStep)
         let gain = axis == .vertical
-            ? applicationScrollBinding(index, \.vertical.speedGain)
-            : applicationScrollBinding(index, \.horizontal.speedGain)
+            ? debouncedApplicationScrollBinding(index, \.vertical.speedGain)
+            : debouncedApplicationScrollBinding(index, \.horizontal.speedGain)
         let response = axis == .vertical
-            ? applicationScrollBinding(index, \.vertical.response)
-            : applicationScrollBinding(index, \.horizontal.response)
+            ? debouncedApplicationScrollBinding(index, \.vertical.response)
+            : debouncedApplicationScrollBinding(index, \.horizontal.response)
         return HStack {
             Text("步长").font(.caption); Slider(value: step, in: 0...24).frame(width: 80)
             Text("增益").font(.caption); Slider(value: gain, in: 0.25...8).frame(width: 80)
             Text("响应").font(.caption); Slider(value: response, in: 0.05...0.8).frame(width: 80)
         }
+    }
+
+    private func debouncedApplicationScrollBinding<Value>(
+        _ index: Int,
+        _ keyPath: WritableKeyPath<ScrollEnhancementSettings, Value>
+    ) -> Binding<Value> {
+        Binding(
+            get: { model.settings.applicationOverrides[index].settings[keyPath: keyPath] },
+            set: {
+                model.settings.applicationOverrides[index].settings[keyPath: keyPath] = $0
+                model.scheduleSave()
+            }
+        )
     }
 
     private func gestureEnabledBinding(_ index: Int) -> Binding<Bool> {
@@ -499,7 +538,7 @@ struct InputEnhancementSettingsView: View {
             set: {
                 let value = $0.trimmingCharacters(in: .whitespacesAndNewlines)
                 model.settings.gestureRules[index].bundleIdentifier = value.isEmpty ? nil : value
-                model.save()
+                model.scheduleSave()
             }
         )
     }

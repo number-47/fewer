@@ -7,26 +7,50 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
     private let logger = Logger(subsystem: "com.number47.fewer", category: "finder-menu")
     private var actionHandler: FinderActionHandler!
     private var menuAdapter: FinderMenuAdapter!
+    private let menuActionRegistry = FinderMenuActionRegistry()
     private let modulePreferencesStore = ModulePreferencesStore()
+    private let diagnosticStore = FinderMenuDiagnosticStore()
+    private var launchDiagnostic: FinderMenuDiagnostic
 
     override init() {
+        let now = Date()
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+        launchDiagnostic = FinderMenuDiagnostic(
+            lastExtensionLaunch: now,
+            buildVersion: version,
+            buildNumber: build,
+            processIdentifier: Int32(ProcessInfo.processInfo.processIdentifier)
+        )
         super.init()
         actionHandler = FinderActionHandler()
         menuAdapter = FinderMenuAdapter()
+        // directoryURLs 覆盖范围：
+        // - /Users：用户主目录、桌面、文档、下载、iCloud Drive（位于 ~/Library/Mobile Documents）
+        // - /Volumes：外接卷、挂载的磁盘映像、网络共享
+        // 侧栏项指向上述路径下的位置时扩展同样生效。
         FIFinderSyncController.default().directoryURLs = [
             URL(fileURLWithPath: "/Users", isDirectory: true),
             URL(fileURLWithPath: "/Volumes", isDirectory: true),
         ]
+        try? diagnosticStore.save(launchDiagnostic)
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
-        guard modulePreferencesStore.isEnabled(moduleID: "finder") else { return nil }
+        let now = Date()
+
+        guard modulePreferencesStore.isEnabled(moduleID: "finder") else {
+            recordMenuRequest(succeeded: false, entryCount: 0, reason: .moduleDisabled, at: now)
+            return nil
+        }
         guard let context = makeContext(for: menuKind) else {
             logger.error("Unable to resolve Finder menu context for kind \(menuKind.rawValue, privacy: .public)")
+            recordMenuRequest(succeeded: false, entryCount: 0, reason: .contextUnavailable, at: now)
             return nil
         }
         guard let services = actionHandler.services else {
             logger.error("Finder services are unavailable")
+            recordMenuRequest(succeeded: false, entryCount: 0, reason: .servicesUnavailable, at: now)
             return nil
         }
 
@@ -37,74 +61,60 @@ final class FinderSync: FIFinderSync, @unchecked Sendable {
             settings: settings,
             templates: templates
         )
-        actionHandler.context = context
+
+        guard let menu = menuAdapter.menu(
+            from: entries,
+            context: context,
+            target: self,
+            registry: menuActionRegistry
+        ) else {
+            recordMenuRequest(succeeded: false, entryCount: 0, reason: .emptyEntries, at: now)
+            return nil
+        }
+
+        recordMenuRequest(succeeded: true, entryCount: entries.count, reason: nil, at: now)
         logger.info("Built Finder menu with \(entries.count, privacy: .public) root entries")
-        return menuAdapter.menu(from: entries, target: self)
+        return menu
     }
 
-    @IBAction nonisolated func copyPathCommand(_ sender: AnyObject?) {
-        actionHandler.perform(.copyPath)
+    /// 将最近一次菜单请求结果写入诊断心跳，保留启动时间与构建身份不变。
+    private func recordMenuRequest(
+        succeeded: Bool,
+        entryCount: Int,
+        reason: FinderMenuReason?,
+        at date: Date
+    ) {
+        let updated = FinderMenuDiagnostic(
+            lastExtensionLaunch: launchDiagnostic.lastExtensionLaunch,
+            lastMenuRequest: date,
+            lastRequestSucceeded: succeeded,
+            lastEntryCount: entryCount,
+            lastReason: reason,
+            buildVersion: launchDiagnostic.buildVersion,
+            buildNumber: launchDiagnostic.buildNumber,
+            processIdentifier: launchDiagnostic.processIdentifier
+        )
+        launchDiagnostic = updated
+        try? diagnosticStore.save(updated)
     }
 
-    @IBAction nonisolated func copyAsCommand(_ sender: AnyObject?) {
-        guard let title = sender?.value(forKey: "title") as? String,
-              let format = FinderCopyFormat(menuTitle: title)
-        else { return }
-        actionHandler.perform(.copyAs(format))
-    }
-
-    @IBAction nonisolated func newFolderCommand(_ sender: AnyObject?) {
-        Task { @MainActor [weak self] in self?.actionHandler.perform(.newFolder) }
-    }
-
-    @IBAction nonisolated func cutCommand(_ sender: AnyObject?) {
-        Task { @MainActor [weak self] in
-            self?.actionHandler.perform(.cut)
-        }
-    }
-
-   @IBAction nonisolated func openInTerminalCommand(_ sender: AnyObject?) {
-       Task { @MainActor [weak self] in
-           self?.actionHandler.perform(.openInTerminal)
-       }
-   }
-
-    @IBAction nonisolated func openWithCommand(_ sender: AnyObject?) {
+    /// 统一菜单命令入口。
+    ///
+    /// Finder 在其 XPC 端点队列上调用 extension action。此处仅读取序列化的 `tag`（正整数 token），
+    /// 不触碰任何 `@MainActor` 隔离的状态，然后跳到 MainActor 通过注册表反查不可变快照执行命令。
+    /// 这消除了跨菜单上下文串扰：每个叶子项绑定的快照在构建时即固定，不受后续菜单构建影响。
+    @IBAction nonisolated func performCommand(_ sender: AnyObject?) {
+        // 在跳转前仅读取序列化的 tag。tag 是进程内唯一且永不复用的正整数 token。
         guard let tagNumber = sender?.value(forKey: "tag") as? NSNumber,
-              let bundleIdentifier = menuAdapter.openWithBundleIDs[tagNumber.intValue]
+              tagNumber.intValue > 0
         else { return }
-        Task { @MainActor [weak self] in
-            self?.actionHandler.perform(.openWith(bundleIdentifier: bundleIdentifier))
-        }
-    }
-
-    @IBAction nonisolated func refreshCommand(_ sender: AnyObject?) {
-        Task { @MainActor [weak self] in
-            self?.actionHandler.perform(.refresh)
-        }
-    }
-
-    @IBAction nonisolated func pasteCommand(_ sender: AnyObject?) {
+        let token = tagNumber.intValue
         Task { @MainActor [weak self] in
             guard let self,
-                  let context = actionHandler.context
+                  let snapshot = menuActionRegistry.snapshot(for: token)
             else { return }
-            actionHandler.perform(context.kind == .container ? .pasteHere : .pasteIntoFolder)
+            actionHandler.perform(command: snapshot.command, context: snapshot.context)
         }
-    }
-
-    @IBAction nonisolated func createFromTemplateCommand(_ sender: AnyObject?) {
-        // Finder invokes extension actions on its XPC endpoint queue. Read the serialized
-        // menu title before hopping to AppKit's main actor; retaining the proxy menu item
-        // across the hop is unsafe.
-        guard let title = sender?.value(forKey: "title") as? String else { return }
-        Task { @MainActor [weak self] in
-            self?.actionHandler.createTemplate(named: title)
-        }
-    }
-
-    @IBAction nonisolated func newFileCommand(_ sender: AnyObject?) {
-        // The parent item owns a submenu and is not directly actionable.
     }
 
     private func makeContext(for menuKind: FIMenuKind) -> FinderMenuContext? {

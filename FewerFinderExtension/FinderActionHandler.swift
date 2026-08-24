@@ -10,10 +10,13 @@ struct FinderServices: Sendable {
     let fileCoordinator: FileOperationCoordinator
 }
 
+/// Finder 菜单命令执行器。
+///
+/// 不再持有可变的 `context`。每次执行都接收显式的 `FinderMenuContext` 与 `MenuCommand`，
+/// 由调用方通过 token 注册表反查快照后传入，消除跨菜单上下文串扰。
 final class FinderActionHandler: NSObject, @unchecked Sendable {
     private let logger = Logger(subsystem: "com.number47.fewer", category: "finder-actions")
     let services: FinderServices?
-    var context: FinderMenuContext?
 
     override init() {
         do {
@@ -30,13 +33,11 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
         super.init()
     }
 
-    func perform(_ command: MenuCommand) {
+    /// 在 MainActor 上执行命令。调用方负责提供来自快照的 context 与 command。
+    @MainActor
+    func perform(command: MenuCommand, context: FinderMenuContext) {
         guard let services else {
             logger.error("perform aborted: services is nil")
-            return
-        }
-        guard let context else {
-            logger.error("perform aborted: context is nil for command \(String(describing: command), privacy: .public)")
             return
         }
 
@@ -60,11 +61,11 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
         case .pasteHere, .pasteIntoFolder:
             paste(to: context.targetURL, services: services)
         case .openInTerminal:
-            openInTerminal()
+            openInTerminal(context: context, services: services)
         case let .openWith(bundleIdentifier):
-            openWithApplication(bundleIdentifier: bundleIdentifier)
+            openWithApplication(bundleIdentifier: bundleIdentifier, context: context)
         case .refresh:
-            refreshDirectory()
+            refreshDirectory(context: context)
         case let .createFromTemplate(templateID):
             createFile(templateID: templateID, in: context.targetURL, services: services)
         case .newFile:
@@ -88,8 +89,8 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
 
     /// 重新加载当前 Finder 文件夹视图：空白处刷新当前文件夹，选中项时刷新其所在目录。
     /// 通过 NSWorkspace 通知 Finder 目标目录内容已变化，让外部新增/删除/修改的文件立即显示。
-    private func refreshDirectory() {
-        guard let context else { return }
+    @MainActor
+    private func refreshDirectory(context: FinderMenuContext) {
         let targetURL: URL
         if context.kind == .container {
             targetURL = context.targetURL
@@ -104,21 +105,11 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
         logger.info("Finder refresh requested for \(targetURL.path, privacy: .public)")
     }
 
-    func createTemplate(named displayName: String) {
-        guard let services,
-              let context,
-              let descriptor = (try? services.templateStore.templates())?.first(where: {
-                  $0.displayName == displayName
-              })
-        else { return }
-        createFile(templateID: descriptor.id, in: context.targetURL, services: services)
-    }
-
     /// 在终端中打开选中的文件夹；选中文件时打开其所在目录。
     /// 多个选中项时以第一个为准；容器（空白处）右键则打开当前文件夹。
     /// 使用设置中选择的终端应用，未安装时回退到 Terminal.app。
-    private func openInTerminal() {
-        guard let context, let services else { return }
+    @MainActor
+    private func openInTerminal(context: FinderMenuContext, services: FinderServices) {
         let url = context.selectedURLs.first ?? context.targetURL
         let directory = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
 
@@ -136,9 +127,9 @@ final class FinderActionHandler: NSObject, @unchecked Sendable {
         )
     }
 
-    private func openWithApplication(bundleIdentifier: String) {
-        guard let context,
-              !bundleIdentifier.isEmpty,
+    @MainActor
+    private func openWithApplication(bundleIdentifier: String, context: FinderMenuContext) {
+        guard !bundleIdentifier.isEmpty,
               let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
         else { return }
         NSWorkspace.shared.open(

@@ -67,8 +67,6 @@ struct MenuBarCalendarView: View {
 
     @StateObject private var scrollCoordinator = CalendarScrollCoordinator()
     @ObservedObject private var calendarState = CalendarViewState.shared
-    /// 网格的渲染偏移：滚动时跟随协调器像素偏移（无动画），手势结束时平滑回弹对齐。
-    @State private var gridOffset: CGFloat = 0
     @State private var isShowingMonthPicker = false
     @State private var jumpYear = Calendar.autoupdatingCurrent.component(.year, from: .now)
     @State private var jumpMonth = Calendar.autoupdatingCurrent.component(.month, from: .now)
@@ -100,22 +98,22 @@ struct MenuBarCalendarView: View {
                     }
                 }
 
-                LazyVGrid(columns: columns, spacing: 6) {
-                    ForEach(month.days) { day in
-                        dayCell(
-                            day,
-                            calendar: calendar,
-                            events: systemCalendar.events(on: day.date, calendar: calendar)
-                        )
+                GridOffsetView(scrollCoordinator: scrollCoordinator) {
+                    LazyVGrid(columns: columns, spacing: 6) {
+                        ForEach(month.days) { day in
+                            dayCell(
+                                day,
+                                calendar: calendar,
+                                events: systemCalendar.events(on: day.date, calendar: calendar)
+                            )
+                        }
                     }
+                    .background(
+                        WindowFrameReader { view in
+                            scrollCoordinator.gridView = view
+                        }
+                    )
                 }
-                .background(
-                    WindowFrameReader { view in
-                        scrollCoordinator.gridView = view
-                    }
-                )
-                .offset(y: gridOffset)
-                .clipped()
             }
 
             selectedDateSummary(in: month)
@@ -152,16 +150,6 @@ struct MenuBarCalendarView: View {
         }
         .onDisappear {
             scrollCoordinator.stop()
-        }
-        .onChange(of: scrollCoordinator.offsetY) { _, newOffset in
-            // 滚动中：网格跟随手指像素平移（不带动画，实时跟手）。
-            gridOffset = newOffset
-        }
-        .onChange(of: scrollCoordinator.snapRequested) {
-            // 滚动手势结束：网格平滑回弹到整行对齐，避免停在半行位置。
-            withAnimation(.easeOut(duration: 0.12)) {
-                gridOffset = 0
-            }
         }
         .onChange(of: calendarState.scrollAnchor) {
             loadSystemEvents(for: month)
@@ -464,17 +452,23 @@ struct MenuBarCalendarView: View {
 }
 
 /// 监听日历网格区域内的鼠标滚轮事件，按滚动量逐行（一周）滚动日历。
-/// 网格视图的纵向偏移实时跟随滚动像素（跟手顺滑），累计满一行像素后锚点切换一周，
-/// 行余数继续保留为偏移，保证行切换瞬间视觉连续、无跳变。
+///
+/// 性能要点：`offsetY`/`snapToken` 不再用 `@Published`，避免每次像素级滚动都使整个
+/// `MenuBarCalendarView` body 失效。改为通过 `onOffsetChange`/`onSnap` 回调把偏移变化
+/// 推送给 `GridOffsetView` 内部持有的 `GridOffsetStore`（`@StateObject`），让重绘范围
+/// 限定在网格容器这一棵子树。
 @MainActor
 final class CalendarScrollCoordinator: ObservableObject {
     /// 日期网格视图的弱引用：滚动事件到达时实时换算其在窗口坐标系中的区域，
     /// 避免缓存窗口 frame 在弹窗重新打开/布局变化时失效导致无法滚动。
     weak var gridView: NSView?
-    /// 网格视图当前的行方向像素偏移（跟随滚动余数），视图据此平移实现平滑滚动。
-    @Published var offsetY: CGFloat = 0
-    /// 滚动手势结束（含惯性结束）时自增，视图侧据此把网格平滑回弹到整行对齐。
-    @Published var snapRequested = 0
+    /// 网格视图当前的行方向像素偏移（跟随滚动余数）。仅供 hit-testing 读取，
+    /// 不通过 `@Published` 发布——变化经 `onOffsetChange` 回调推送给 `GridOffsetStore`。
+    private(set) var offsetY: CGFloat = 0
+    /// 偏移变化回调：把像素偏移推送给 `GridOffsetStore`，由其 `@Published` 驱动网格重绘。
+    var onOffsetChange: ((CGFloat) -> Void)?
+    /// 滚动手势结束回调：通知 `GridOffsetStore` 触发平滑回弹到整行对齐。
+    var onSnap: (() -> Void)?
     /// 每次滚动回调，正数向未来方向滚动、负数向过去方向滚动。
     var onRowStep: ((Int) -> Void)?
 
@@ -482,7 +476,7 @@ final class CalendarScrollCoordinator: ObservableObject {
     /// 累积的滚动量（像素），达到一行像素量后触发滚动，行余数保留保证顺滑。
     private var accumulatedDelta: CGFloat = 0
 
-    /// 一行（一周）的高度：日期单元格 minHeight 44 + LazyVGrid 纵向间距 8。
+    /// 一行（一周）的高度：日期单元格 minHeight 42 + LazyVGrid 纵向间距 6。
     private static let rowHeight: CGFloat = 48
     /// 滚动灵敏度：缩放触控板像素与鼠标滚轮格数对应的实际滚动量（越小越慢）。
     /// 默认 0.5：触控板滑动减半、鼠标滚轮每格滚半行（两格跨一周），跨行无缝性不受影响。
@@ -502,12 +496,12 @@ final class CalendarScrollCoordinator: ObservableObject {
             if event.phase == .began || event.phase == .mayBegin {
                 // 新手势开始：从整行对齐位置重新累积（打断上一手势的回弹动画）。
                 self.accumulatedDelta = 0
-                self.offsetY = 0
+                self.setOffset(0)
             }
             if event.phase == .ended || event.phase == .cancelled {
-                // 手势结束（含惯性结束）：清零累积量，视图侧平滑回弹到整行对齐。
+                // 手势结束（含惯性结束）：清零累积量，通知视图平滑回弹到整行对齐。
                 self.accumulatedDelta = 0
-                self.snapRequested += 1
+                self.onSnap?()
                 return nil
             }
 
@@ -518,15 +512,16 @@ final class CalendarScrollCoordinator: ObservableObject {
                 : event.scrollingDeltaY * Self.rowHeight * Self.scrollSensitivity
             self.accumulatedDelta += rawDelta
 
-            let rows = Int(self.accumulatedDelta / Self.rowHeight)
-            let remainder = self.accumulatedDelta - CGFloat(rows) * Self.rowHeight
-            self.accumulatedDelta = remainder
+            // 单次事件最多滚动一行（±1），避免快速滑动时锚点跳过多周导致网格内容大幅重建。
+            let totalRows = Int(self.accumulatedDelta / Self.rowHeight)
+            let stepRows = max(-1, min(1, totalRows))
+            self.accumulatedDelta -= CGFloat(stepRows) * Self.rowHeight
             // 视图偏移跟随行余数（符号与滚动方向一致：手指上推内容上移）：
             // 滚动未满一行时网格已随手指平移，满一行切换锚点后视觉无缝衔接。
-            self.offsetY = remainder
+            self.setOffset(self.accumulatedDelta)
             // 手指向下滑（scrollingDeltaY > 0）为向过去方向滚动。
-            if rows != 0 {
-                self.onRowStep?(-rows)
+            if stepRows != 0 {
+                self.onRowStep?(-stepRows)
             }
             return nil
         }
@@ -538,6 +533,52 @@ final class CalendarScrollCoordinator: ObservableObject {
         }
         monitor = nil
         accumulatedDelta = 0
+    }
+
+    /// 统一更新偏移并通知 `GridOffsetStore`，保证 hit-test 与渲染一致。
+    private func setOffset(_ value: CGFloat) {
+        offsetY = value
+        onOffsetChange?(value)
+    }
+}
+
+/// 隔离网格偏移渲染的 ObservableObject，由 `GridOffsetView` 以 `@StateObject` 持有。
+///
+/// `offset` 变化只会使 `GridOffsetView` 的 body 失效，不会波及 `MenuBarCalendarView`
+/// 父 body，从而把 SwiftUI 树重建范围限制在网格容器子树。
+@MainActor
+private final class GridOffsetStore: ObservableObject {
+    @Published var offset: CGFloat = 0
+    @Published var snapToken = 0
+}
+
+/// 承载日期网格并应用像素级偏移的容器视图。
+///
+/// 关键架构决策：`GridOffsetStore` 以 `@StateObject` 持有在此视图内部，而非父视图。
+/// 滚动时只有本视图 body 重新求值；`content` 作为同一 view 值传入，SwiftUI 跳过其
+/// 子树重建，从而避免 `LazyVGrid` 中 42 个日期单元格的 diff 开销。父 body 不失效。
+private struct GridOffsetView<Content: View>: View {
+    let scrollCoordinator: CalendarScrollCoordinator
+    @ViewBuilder var content: Content
+    @StateObject private var store = GridOffsetStore()
+
+    var body: some View {
+        content
+            .offset(y: store.offset)
+            .clipped()
+            .onAppear {
+                scrollCoordinator.onOffsetChange = { [weak store] offset in
+                    store?.offset = offset
+                }
+                scrollCoordinator.onSnap = { [weak store] in
+                    store?.snapToken &+= 1
+                }
+            }
+            .onChange(of: store.snapToken) { _, _ in
+                withAnimation(.easeOut(duration: 0.12)) {
+                    store.offset = 0
+                }
+            }
     }
 }
 

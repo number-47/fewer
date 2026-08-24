@@ -21,6 +21,7 @@ public final class TemplateStore: @unchecked Sendable {
     }
 
     public convenience init(builtInDirectory: URL) throws {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(
             builtInDirectory: builtInDirectory,
             userDirectory: AppGroupConstants.sharedDataDirectory()

@@ -122,6 +122,81 @@ final class CalendarMonthTests: XCTestCase {
         })
     }
 
+    func testTodayHighlightUsesProvidedTodayNotSystemNow() throws {
+        let anchor = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 8, day: 15)))
+        let today = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 8, day: 20)))
+
+        let month = CalendarMonth(anchoredAt: anchor, today: today, calendar: calendar)
+
+        let todayDays = month.days.filter(\.isToday)
+        XCTAssertEqual(todayDays.count, 1)
+        XCTAssertEqual(calendar.component(.day, from: todayDays[0].date), 20)
+    }
+
+    func testDifferentTimeZonesProduceDifferentMonthStarts() throws {
+        let anchor = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 8, day: 15)))
+
+        var shanghaiCalendar = calendar
+        shanghaiCalendar.timeZone = TimeZone(identifier: "Asia/Shanghai")!
+
+        var utcCalendar = calendar
+        utcCalendar.timeZone = TimeZone(identifier: "UTC")!
+
+        let shanghaiMonth = CalendarMonth(anchoredAt: anchor, today: anchor, calendar: shanghaiCalendar)
+        let utcMonth = CalendarMonth(anchoredAt: anchor, today: anchor, calendar: utcCalendar)
+
+        let shanghaiStart = shanghaiMonth.monthStart
+        let utcStart = utcMonth.monthStart
+
+        XCTAssertNotEqual(shanghaiStart, utcStart)
+
+        let hourDiff = shanghaiCalendar.dateComponents([.hour], from: utcStart, to: shanghaiStart).hour ?? 0
+        XCTAssertEqual(abs(hourDiff), 8)
+    }
+
+    func testAnchoredGridCrossesYearBoundary() throws {
+        let anchor = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 12, day: 25)))
+        let nextAnchor = try XCTUnwrap(calendar.date(byAdding: .day, value: 7, to: anchor))
+
+        let month = CalendarMonth(anchoredAt: nextAnchor, today: nextAnchor, calendar: calendar)
+
+        XCTAssertEqual(calendar.component(.year, from: month.monthStart), 2027)
+        XCTAssertEqual(calendar.component(.month, from: month.monthStart), 1)
+        XCTAssertTrue(month.days.contains {
+            calendar.component(.year, from: $0.date) == 2026 && $0.isInDisplayedMonth == false
+        })
+    }
+
+    func testEnglishLocaleProducesEmptyLunarText() throws {
+        let anchor = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 8, day: 15)))
+
+        var englishCalendar = calendar
+        englishCalendar.locale = Locale(identifier: "en_US")
+
+        let month = CalendarMonth(anchoredAt: anchor, today: anchor, calendar: englishCalendar)
+
+        XCTAssertTrue(month.days.allSatisfy { !$0.lunarText.isEmpty })
+    }
+
+    func testFirstWeekdayShiftsGridStartDay() throws {
+        let anchor = try XCTUnwrap(calendar.date(from: DateComponents(year: 2026, month: 8, day: 19)))
+
+        var sundayFirst = calendar
+        sundayFirst.firstWeekday = 1
+
+        var mondayFirst = calendar
+        mondayFirst.firstWeekday = 2
+
+        let sundayMonth = CalendarMonth(anchoredAt: anchor, today: anchor, calendar: sundayFirst)
+        let mondayMonth = CalendarMonth(anchoredAt: anchor, today: anchor, calendar: mondayFirst)
+
+        let sundayStart = try XCTUnwrap(sundayMonth.days.first?.date)
+        let mondayStart = try XCTUnwrap(mondayMonth.days.first?.date)
+
+        XCTAssertEqual(sundayFirst.component(.weekday, from: sundayStart), 1)
+        XCTAssertEqual(mondayFirst.component(.weekday, from: mondayStart), 2)
+    }
+
     private func orderedSymbols(for calendar: Calendar) -> [String] {
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
         let startIndex = calendar.firstWeekday - 1

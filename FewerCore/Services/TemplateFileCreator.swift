@@ -11,7 +11,8 @@ public struct TemplateFileCreator {
         from templateURL: URL,
         descriptor: TemplateDescriptor,
         in directory: URL,
-        policy: ConflictPolicy
+        policy: ConflictPolicy,
+        replaceFailureInjector: ReplaceFailureInjector = .none
     ) throws -> URL? {
         let defaultName = "新建 \(descriptor.displayName).\(descriptor.fileExtension)"
         var destination = directory.appendingPathComponent(defaultName)
@@ -27,8 +28,24 @@ public struct TemplateFileCreator {
             case .skip:
                 return nil
             case .replace:
-                var trashedURL: NSURL?
-                try fileManager.trashItem(at: destination, resultingItemURL: &trashedURL)
+                let outcome = RecoverableReplace.perform(
+                    source: templateURL,
+                    destination: destination,
+                    fileManager: fileManager,
+                    sourceCoordination: .reading,
+                    install: { fm, resolvedSource, resolvedDestination in
+                        try fm.copyItem(at: resolvedSource, to: resolvedDestination)
+                    },
+                    failureInjector: replaceFailureInjector
+                )
+                switch outcome {
+                case .success:
+                    return destination
+                case .installFailed:
+                    throw FileOperationError.systemError
+                case .notRecoverable:
+                    throw FileOperationError.replacementNotRecoverable
+                }
             }
         }
 

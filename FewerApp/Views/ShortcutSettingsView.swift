@@ -4,6 +4,7 @@ import FewerCore
 struct ShortcutSettingsView: View {
     @ObservedObject var model: SettingsViewModel
     @State private var helperStatus = PermissionService.shortcutHelperStatus
+    @State private var activateTask: Task<Void, Never>?
 
     private var authorizationStatusText: String {
         if helperStatus.isAccessibilityTrusted {
@@ -49,14 +50,20 @@ struct ShortcutSettingsView: View {
         .task {
             if model.settings.shortcutHelperEnabled {
                 PermissionService.launchShortcutHelper()
+                PermissionService.ensureShortcutHelperRunning()
             }
-            while !Task.isCancelled {
-                if model.settings.shortcutHelperEnabled {
-                    PermissionService.ensureShortcutHelperRunning()
-                }
+            helperStatus = PermissionService.shortcutHelperStatus
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            activateTask?.cancel()
+            activateTask = Task {
+                if model.settings.shortcutHelperEnabled { PermissionService.ensureShortcutHelperRunning() }
                 helperStatus = PermissionService.shortcutHelperStatus
-                try? await Task.sleep(for: .seconds(1))
             }
+        }
+        .onDisappear {
+            activateTask?.cancel()
+            activateTask = nil
         }
     }
 

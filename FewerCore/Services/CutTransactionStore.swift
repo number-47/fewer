@@ -9,6 +9,7 @@ public final class CutTransactionStore: @unchecked Sendable {
     private let decoder = JSONDecoder()
 
     public convenience init() throws {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(
             fileURL: AppGroupConstants.sharedDataDirectory()
                 .appendingPathComponent("cut-transaction.json")

@@ -7,6 +7,7 @@ public final class ShortcutHelperStatusStore: @unchecked Sendable {
     private let decoder = JSONDecoder()
 
     public convenience init() {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(
             fileURL: AppGroupConstants.sharedDataDirectory()
                 .appendingPathComponent("shortcut-helper-status.json")

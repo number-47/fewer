@@ -223,4 +223,38 @@ final class MenuBuilderTests: XCTestCase {
 
         XCTAssertEqual(entry?.children.map(\.command), [.openWith(bundleIdentifier: "com.example.swift")])
     }
+
+    // MARK: - Sidebar
+
+    func testSidebarShowsCopyPathAndOpenInTerminal() {
+        let context = FinderMenuContext(
+            kind: .sidebar,
+            selectedURLs: [target.appendingPathComponent("SideFolder", isDirectory: true)],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        let entries = MenuBuilder().entries(for: context, settings: .default, templates: [])
+        XCTAssertTrue(entries.contains(where: { $0.command == .copyPath }))
+        XCTAssertTrue(entries.contains(where: { $0.command == .openInTerminal }))
+    }
+
+    func testSidebarDoesNotShowMutatingEntries() {
+        let context = FinderMenuContext(
+            kind: .sidebar,
+            selectedURLs: [target.appendingPathComponent("SideFolder", isDirectory: true)],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: true
+        )
+
+        let entries = MenuBuilder().entries(for: context, settings: .default, templates: [TemplateDescriptor.builtInPlainText])
+
+        XCTAssertFalse(entries.contains(where: { $0.command == .newFolder }))
+        XCTAssertFalse(entries.contains(where: { $0.command == .newFile }))
+        XCTAssertFalse(entries.contains(where: { $0.command == .cut }))
+        XCTAssertFalse(entries.contains(where: { $0.command == .pasteHere }))
+        XCTAssertFalse(entries.contains(where: { $0.command == .pasteIntoFolder }))
+    }
 }

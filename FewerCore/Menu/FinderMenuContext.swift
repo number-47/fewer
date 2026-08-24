@@ -6,7 +6,7 @@ public enum FinderMenuKind: Equatable, Sendable {
     case sidebar
 }
 
-public struct FinderMenuContext: Sendable {
+public struct FinderMenuContext: Sendable, Equatable {
     public let kind: FinderMenuKind
     public let selectedURLs: [URL]
     public let targetURL: URL

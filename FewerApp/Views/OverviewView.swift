@@ -4,8 +4,10 @@ import SwiftUI
 /// 原型概览页的五项状态全部来自 Finder、截图与快捷键服务，不展示示例状态。
 struct OverviewView: View {
     @ObservedObject var model: SettingsViewModel
+    var onOpenPermissions: (() -> Void)?
     @State private var extensionStatus: ExtensionStatus = .unknown
     @State private var helperStatus = PermissionService.shortcutHelperStatus
+    @State private var activateTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView {
@@ -15,11 +17,23 @@ struct OverviewView: View {
                     Divider()
                     statusRow("辅助功能权限", "全局快捷键与鼠标手势所需", helperStatus.isAccessibilityTrusted ? "已授权" : "未授权", helperStatus.isAccessibilityTrusted)
                     Divider()
-                    statusRow("输入监控权限", "鼠标滚轮增强与手势识别所需", helperStatus.isEventTapActive ? "已授权" : "未授权", helperStatus.isEventTapActive)
+                    statusRow("输入监控权限", "鼠标滚轮增强与手势识别所需", helperStatus.isInputMonitoringTrusted ? "已授权" : "未授权", helperStatus.isInputMonitoringTrusted)
                     Divider()
                     statusRow("屏幕录制权限", "截图与滚动截图功能所需", ScreenshotCapture.hasPermission ? "已授权" : "未授权", ScreenshotCapture.hasPermission)
                     Divider()
                     statusRow("日历权限", "日历模块读取日程与提醒事项", SystemCalendarService.shared.authorizationState == .fullAccess ? "已授权" : "未授权", SystemCalendarService.shared.authorizationState == .fullAccess)
+                }
+                if let onOpenPermissions {
+                    FewerSettingsCard {
+                        FewerSettingsRow {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("权限与扩展")
+                                Text("前往集中管理所有授权状态与操作入口").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("前往") { onOpenPermissions() }
+                        }
+                    }
                 }
                 group {
                     statusRow("辅助进程状态", "FewerShortcutHelper — 快捷键、剪切粘贴、滚轮增强", helperStatus.isFresh() ? "运行中" : "未运行", helperStatus.isFresh())
@@ -43,14 +57,26 @@ struct OverviewView: View {
             .padding(.bottom, 24)
         }
         .task {
-            if model.settings.shortcutHelperEnabled { PermissionService.launchShortcutHelper() }
-            while !Task.isCancelled {
-                if model.settings.shortcutHelperEnabled { PermissionService.ensureShortcutHelperRunning() }
-                extensionStatus = ExtensionStatusService.finderExtensionStatus()
-                helperStatus = PermissionService.shortcutHelperStatus
-                try? await Task.sleep(for: .seconds(1))
+            if model.settings.shortcutHelperEnabled {
+                PermissionService.launchShortcutHelper()
+                PermissionService.ensureShortcutHelperRunning()
             }
+            await refreshStatuses()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            activateTask?.cancel()
+            activateTask = Task { await refreshStatuses() }
+        }
+        .onDisappear {
+            activateTask?.cancel()
+            activateTask = nil
+        }
+    }
+
+    private func refreshStatuses() async {
+        helperStatus = PermissionService.shortcutHelperStatus
+        let status = await ExtensionStatusService.cachedStatus()
+        if !Task.isCancelled { extensionStatus = status }
     }
 
     private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {

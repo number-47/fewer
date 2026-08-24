@@ -2,6 +2,7 @@ import Foundation
 
 enum SettingsSection: String, CaseIterable, Identifiable {
     case overview
+    case permissions
     case contextMenu
     case templates
     case shortcuts
@@ -16,6 +17,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .overview: "概览"
+        case .permissions: "权限与扩展"
         case .contextMenu: "右键菜单"
         case .templates: "文件模板"
         case .shortcuts: "快捷键"
@@ -30,6 +32,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .overview: "rectangle.3.group"
+        case .permissions: "checkmark.shield"
         case .contextMenu: "cursorarrow.click.2"
         case .templates: "doc.on.doc"
         case .shortcuts: "keyboard"

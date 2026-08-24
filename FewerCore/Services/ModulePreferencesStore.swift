@@ -5,6 +5,7 @@ public final class ModulePreferencesStore: @unchecked Sendable {
     private let lock = NSLock()
 
     public convenience init() {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(fileURL: AppGroupConstants.sharedDataDirectory().appendingPathComponent("module-preferences.json"))
     }
 

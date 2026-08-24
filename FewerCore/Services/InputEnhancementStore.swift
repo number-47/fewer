@@ -7,6 +7,7 @@ public final class InputEnhancementStore: @unchecked Sendable {
     private let decoder = JSONDecoder()
 
     public convenience init() {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(
             fileURL: AppGroupConstants.sharedDataDirectory()
                 .appendingPathComponent("input-enhancement-settings.json")

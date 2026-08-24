@@ -10,7 +10,8 @@ public actor FileOperationCoordinator {
     public func move(
         _ sourceURLs: [URL],
         to targetDirectory: URL,
-        policy: ConflictPolicy
+        policy: ConflictPolicy,
+        replaceFailureInjector: ReplaceFailureInjector = .none
     ) -> FileOperationBatchResult {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: targetDirectory.path, isDirectory: &isDirectory),
@@ -22,14 +23,15 @@ public actor FileOperationCoordinator {
         }
 
         return FileOperationBatchResult(items: sourceURLs.map { sourceURL in
-            moveOne(sourceURL, to: targetDirectory, policy: policy)
+            moveOne(sourceURL, to: targetDirectory, policy: policy, failureInjector: replaceFailureInjector)
         })
     }
 
     private func moveOne(
         _ sourceURL: URL,
         to targetDirectory: URL,
-        policy: ConflictPolicy
+        policy: ConflictPolicy,
+        failureInjector: ReplaceFailureInjector
     ) -> FileOperationItemResult {
         guard fileManager.fileExists(atPath: sourceURL.path) else {
             return FileOperationItemResult(sourceURL: sourceURL, destinationURL: nil, status: .failed, error: .sourceMissing)
@@ -64,16 +66,23 @@ public actor FileOperationCoordinator {
             case .skip:
                 return FileOperationItemResult(sourceURL: sourceURL, destinationURL: destination, status: .skipped)
             case .replace:
-                do {
-                    var trashedURL: NSURL?
-                    try fileManager.trashItem(at: destination, resultingItemURL: &trashedURL)
-                } catch {
-                    return FileOperationItemResult(
-                        sourceURL: sourceURL,
-                        destinationURL: destination,
-                        status: .failed,
-                        error: .replacementNotRecoverable
-                    )
+                let outcome = RecoverableReplace.perform(
+                    source: source,
+                    destination: destination,
+                    fileManager: fileManager,
+                    sourceCoordination: .moving,
+                    install: { fm, resolvedSource, resolvedDestination in
+                        try fm.moveItem(at: resolvedSource, to: resolvedDestination)
+                    },
+                    failureInjector: failureInjector
+                )
+                switch outcome {
+                case .success:
+                    return FileOperationItemResult(sourceURL: sourceURL, destinationURL: destination, status: .moved)
+                case .installFailed:
+                    return FileOperationItemResult(sourceURL: sourceURL, destinationURL: destination, status: .failed, error: .systemError)
+                case .notRecoverable:
+                    return FileOperationItemResult(sourceURL: sourceURL, destinationURL: destination, status: .failed, error: .replacementNotRecoverable)
                 }
             }
         }

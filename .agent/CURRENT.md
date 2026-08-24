@@ -5,47 +5,56 @@
 
 ## Objective
 
-完成五模块 Stats 风格菜单栏监控，并修复网络统计、按键展示位置、日历入口和鼠标手势右键回放。
+优先修复当前版本的右键、Finder 菜单、权限入口、日历和设置卡顿，并通过扩展稳定性审计发现其余问题；之后继续发布架构收口。
 
 ## Current Milestone
 
-菜单栏监控与输入交互修复。
+运行时稳定性 R0–R6。
 
 ## Active Tasks
 
 | Task | Title | Status | Priority | Depends On |
 |------|-------|--------|----------|------------|
-| T012 | 集成与发布验收 | IN_PROGRESS | P0 | T004-T011 |
+| T020 | R0 — 真实运行基线与扩展问题扫描 | DONE(用户跳过实机) | P0 | 无 |
+| T013 | PR1 — CI 基线与临时文件清理 | DONE | P0 | T020 |
+| T021 | R1 — 右键事件完整性与鼠标手势状态机 | DONE | P0 | T013, T020 |
+| T022 | R2 — 权限与扩展启用中心 | DONE | P0 | T013, T020 |
+| T023 | R3 — Finder 菜单可见性与生命周期修复 | DONE | P0 | T013, T020, T021, T022 |
+| T024 | R4 — 菜单栏日历滚动性能 | DONE | P1 | T013, T020 |
+| T025 | R5 — 设置窗口响应与后台状态刷新 | REVIEW | P1 | T013, T020, T022 |
+| T026 | R6 — 稳定性回归与第二轮问题收敛 | BACKLOG | P0 | T021, T022, T023, T024, T025 |
+| T014 | PR2 — App Group 共享存储与保守迁移 | DONE | P0 | T013 |
+| T015 | PR3 — Finder 动作快照隔离与 MainActor 边界 | DONE | P0 | T013, T023 |
+| T016 | PR4 — 可回滚 replace、文件协调与移除 `/` 例外 | DONE | P0 | T014, T015 |
+| T017 | PR5 — 经签名验证的双向 XPC 命令通道 | BLOCKED | P0 | T013 |
+| T018 | PR6 — SystemMetrics 后台采样与频率分层 | READY | P1 | T013 |
+| T019 | PR7 — 滚动截图后台合成与显式内存预算 | READY | P1 | T013 |
+| T012 | 集成与发布验收 | BACKLOG | P0 | T004-T010, T013-T026 |
 
 ## Review Queue
 
-| Task | Title | Status | Priority |
-|------|-------|--------|----------|
-| T001 | 修复输入增强“平滑滚动 + 反转方向”后鼠标滚轮失效 | REVIEW | P1 |
-| T002 | 五模块模型、偏好与 schema 4 迁移 | REVIEW | P0 |
-| T003 | 共享菜单栏组件与状态项引擎 | REVIEW | P0 |
-| T004 | CPU 模块 | REVIEW | P1 |
-| T005 | GPU 模块 | REVIEW | P1 |
-| T006 | 内存模块 | REVIEW | P1 |
-| T007 | 磁盘模块 | REVIEW | P1 |
-| T008 | 网络模块与默认路由统计 | REVIEW | P0 |
-| T009 | 按键展示位置 | REVIEW | P1 |
-| T010 | 独立菜单栏日历 | REVIEW | P1 |
-| T011 | 鼠标手势右键分界 | REVIEW | P1 |
+T013、T014、T021、T022、T024 已通过代码层验收：T013（CI 漂移检查、verify_templates.sh 通过、ci_verify.sh 语法 OK）；T014（FewerCore 267 tests/0 failures、Fewer build succeeded、8 项迁移单测全过、无 as any、未删旧数据/未改 Finder `/`）；T021（FewerCore 267 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、R1 回归测试全过、点击重放由 `activated` 状态判定）；T022（FewerCore 267 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、权限与扩展页已接入侧栏与 Overview/输入增强跳转、输入监控改用 `isInputMonitoringTrusted`、Event Tap 单独作为运行时诊断、状态刷新事件驱动且 pluginkit 在 `Task.detached` 后台执行、UI 测试 testPermissionsSettingsPageNavigation 已加）；T024（FewerCore 279 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、EventKit 查询与 reminder fetch 移至 EventKitWorker actor 后台边界、可见范围请求 150ms 合并、generation 守卫、有界 CalendarEventCache、网格像素偏移隔离到 GridOffsetStore 叶视图、行步进每事件限 ±1 并保留余数）；T023（FewerCore 289 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、`menu(for:)` 四分支原因码 moduleDisabled/contextUnavailable/servicesUnavailable/emptyEntries 已落地、FinderMenuDiagnostic 诊断心跳经共享 Store 持久化并在权限页 Finder 扩展行下方暴露、MenuBuilder 补齐 sidebar 的 copyPath/openInTerminal、directoryURLs 维持 /Users+/Volumes 未改）；T015（FewerCore 301 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、`FinderActionHandler.context`/`openWithBundleIDs`/标题反解/`representedObject` 全部移除、FinderMenuActionRegistry（Sendable+OSAllocatedUnfairLock）以唯一 token 绑定不可变快照、连续两菜单跨 context 隔离已测）；T016（FewerCore 309 tests/0 failures、Fewer BUILD SUCCEEDED、无 as any、`FileOperationCoordinator`/`TemplateFileCreator` 改为同名备份 rename 事务 + 注入式失败钩子覆盖 success/install-fail/rollback-fail/cleanup-fail/dir-replace、`NSFileCoordinator` 同时协调源与目标、Finder Extension `/` 例外按 T012 门禁暂不移除）；T025（FewerCore 309 tests、完整 Debug build、模板/产物/diff 门禁均通过，已修复快速重入与自身 DNC 回读两项持久化竞态，待签名实机性能和交互验收）。运行时实机验收（T001 其他应用滚轮、T005 Apple Silicon GPU 枚举、T009 多显示器、T021 Finder/Chrome/Safari 真实右键录制、T022 系统设置深链签名、T023 签名 Finder 菜单实机录屏、T024 Time Profiler 连续滚动录屏、T025 设置页性能与持久化、T017 签名 Mach service 探针、各模块真实采样与降级）由 T012 集成验收在签名实机完成。
 
 ## Blocked
 
-无。
+T017 受“签名 Mach service 往返探针”强制架构门禁阻塞：本环境无签名证书/WindowServer，无法提供 required 的双方身份校验与伪客户端拒绝证据；不得实现后以 DNC 回退。该探针与 DNC 移除推迟到 T012 签名实机验收。本阶段先推进可由 CI 验证的 T018、T019；签名实机验证统一由 T012 完成。T021/T022/T023/T024 已 DONE，T025 已 REVIEW。
 
 ## Recommended Next Task
 
-执行 T002；T001 保持 REVIEW，待真实鼠标滚轮实机确认。
+T015（PR3）、T016（PR4）已 DONE（T016：FewerCore 309 tests/0 failures、Fewer BUILD SUCCEEDED、recoverable-replace 事务与 NSFileCoordinator 协调已落地、无 as any；Finder `/` 例外按 T012 门禁暂不移除）。T017 已 BLOCKED，等待签名实机 Mach service 探针；T025 已进入 REVIEW（FewerCore 309 tests、完整 Debug build、模板/产物/diff 门禁均通过），仍待签名实机 Time Profiler 与设置交互验证。后续在审查后先同步 T018/T019 的任务元数据，再执行一个 READY 任务。
 
 ## Current Risks
 
 - T001 的“其他应用中真实滚轮滚动”仍需用户实机确认（需真实滚轮输入）。
 - IOReport、SMC、SMART 与 Wi-Fi 定位权限需要在签名实机上验证。
+- Finder XPC 回调不可靠序列化 `representedObject`；T015 必须只依赖已确认可读的 `tag`，并用唯一 token 绑定动作快照。
+- T016 删除 Finder `/` 临时例外前必须完成签名实机 create/cut/paste/replace/template 验证；失败时阻塞并重新设计权限边界。
+- T017 必须先证明当前 `SMAppService.loginItem` 打包下的 Mach service 注册、连接生命周期和双方身份校验成立。
+- T019 仍返回单个 `CGImage`，只能限制并移出整图分配，不能宣称分块后消除整图内存。
+- T011 的 4pt/16pt 阈值组合已被实机反馈否定；T021 已重做完整 down/drag/up/cancel/timeout 状态机（由 `activated` 状态判定点击重放），该风险已收敛。遗留：MouseGestureClickTolerance 等旧类型因被测试引用而保留，存在轻微死代码，后续可在 find-simplifications 评估。
+- T025 已将 Overview 的 `pluginkit` 和设置读写移出 MainActor；仍需签名实机的 Time Profiler、5 秒 Overview 进程采样和连续编辑持久化验证。
+- T023 的 Finder 菜单可见性依赖扩展启用状态与 `directoryURLs` 注册范围，需签名实机录屏确认；reason code 与诊断心跳必须不记录用户文件名/完整路径（隐私红线）。
 
 ## Last Updated
 
-2026-08-22
+2026-08-24

@@ -22,6 +22,7 @@ public final class SharedSettingsStore: @unchecked Sendable {
     private let lock = NSLock()
 
     public convenience init() throws {
+        SharedStoreBootstrap.migrateSharedStoresIfNeeded()
         self.init(
             fileURL: AppGroupConstants.sharedDataDirectory()
                 .appendingPathComponent("feature-settings.json")

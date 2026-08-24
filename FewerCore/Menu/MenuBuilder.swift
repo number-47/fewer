@@ -94,6 +94,12 @@ public struct MenuBuilder: Sendable {
                     isEnabled: context.isTargetWritable
                 )
 
+            case (.sidebar, .copyPath):
+                return MenuEntry(command: .copyPath, title: "复制路径")
+
+            case (.sidebar, .openInTerminal):
+                return MenuEntry(command: .openInTerminal, title: "在终端打开")
+
             case (.container, .refresh):
                 return MenuEntry(command: .refresh, title: "刷新")
 

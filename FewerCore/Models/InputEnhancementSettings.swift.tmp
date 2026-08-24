@@ -1,2 +1,0 @@
-# Just check current state of MouseGestureRule
-grep -n 'strokes\|directions' FewerCore/Models/InputEnhancementSettings.swift | head -30

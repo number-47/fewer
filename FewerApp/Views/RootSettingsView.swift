@@ -11,17 +11,20 @@ struct RootSettingsView: View {
             Divider()
             detail
         }
+        .disabled(model.isLoading)
         .frame(minWidth: 880, minHeight: 600)
         .background(Color.white)
         .tint(Color(red: 0, green: 113 / 255, blue: 227 / 255))
         .preferredColorScheme(.light)
+        .task { await model.load() }
+        .onDisappear { InputEnhancementViewModel.shared.flushPendingSave() }
     }
 
     private var sidebar: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach([
-                    SettingsSection.overview, .contextMenu, .templates, .shortcuts,
+                    SettingsSection.overview, .permissions, .contextMenu, .templates, .shortcuts,
                     .screenshot, .inputEnhancement, .modules, .general
                 ]) { sidebarItem($0) }
                 divider
@@ -63,7 +66,9 @@ struct RootSettingsView: View {
             Group {
                 switch selection {
                 case .overview:
-                    OverviewView(model: model)
+                    OverviewView(model: model, onOpenPermissions: { selection = .permissions })
+                case .permissions:
+                    PermissionsSettingsView()
                 case .contextMenu:
                     ContextMenuSettingsView(model: model)
                 case .templates:
@@ -73,7 +78,7 @@ struct RootSettingsView: View {
                 case .screenshot:
                     ScreenshotSettingsView()
                 case .inputEnhancement:
-                    InputEnhancementSettingsView()
+                    InputEnhancementSettingsView(onOpenPermissions: { selection = .permissions })
                 case .modules:
                     ModuleSettingsView()
                 case .general:
@@ -103,6 +108,7 @@ private extension SettingsSection {
     var subtitle: String {
         switch self {
         case .overview: "查看组件状态与权限，快速定位需要配置的项目。"
+        case .permissions: "集中管理辅助功能、输入监控、屏幕录制与 Finder 扩展授权。"
         case .contextMenu: "配置 Finder 右键菜单项的排序、开关与路径格式。"
         case .templates: "管理“新建文件”可用的模板，支持导入自定义模板。"
         case .shortcuts: "配置全局快捷键与剪切粘贴辅助功能。"
