@@ -72,6 +72,7 @@ struct MenuBarCalendarView: View {
     @State private var jumpMonth = Calendar.autoupdatingCurrent.component(.month, from: .now)
     @ObservedObject private var currentDate = CurrentDateProvider.shared
     @ObservedObject private var systemCalendar = SystemCalendarService.shared
+    @AppStorage(CalendarLanguage.storageKey) private var calendarLanguageValue = CalendarLanguage.chinese.rawValue
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -174,7 +175,7 @@ struct MenuBarCalendarView: View {
                 } label: {
                     HStack(spacing: 4) {
                        Text(month.monthStart.formatted(
-                            .dateTime.year().month(.wide)
+                            .dateTime.year().month(.wide).locale(calendarLanguage.locale)
                        ))
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                         Image(systemName: "chevron.down")
@@ -304,7 +305,7 @@ struct MenuBarCalendarView: View {
 
     private func accessibilityLabel(for day: CalendarDay, events: [CalendarEventItem]) -> String {
         let dateText = day.date.formatted(
-            .dateTime.weekday(.wide).year().month(.wide).day()
+            .dateTime.weekday(.wide).year().month(.wide).day().locale(calendarLanguage.locale)
         )
         let baseText = day.lunarText.isEmpty ? dateText : "\(dateText)，农历\(day.lunarText)"
         let eventTitles = events.prefix(3).map {
@@ -328,7 +329,7 @@ struct MenuBarCalendarView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(calendarState.selectedDate.formatted(
-                    .dateTime.weekday(.wide).year().month(.wide).day()
+                    .dateTime.weekday(.wide).year().month(.wide).day().locale(calendarLanguage.locale)
                 ))
                     .font(.system(size: 13, weight: .semibold))
 
@@ -414,9 +415,13 @@ struct MenuBarCalendarView: View {
 
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.locale = .current
+        calendar.locale = calendarLanguage.locale
         calendar.timeZone = .autoupdatingCurrent
         return calendar
+    }
+
+    private var calendarLanguage: CalendarLanguage {
+        CalendarLanguage(rawValue: calendarLanguageValue) ?? .chinese
     }
 }
 

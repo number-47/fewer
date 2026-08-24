@@ -62,6 +62,7 @@
 		63B1D982E15CEC2F3A0144EF /* CoreLocation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B490C440F5353AE794E4F567 /* CoreLocation.framework */; };
 		63D406BC5D4AAF210BFF9D9F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D748A2A7AA7B727ED681025A /* Assets.xcassets */; };
 		64580F7771F1CE0F527ADB42 /* InputActionExecutor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F91F1C5A0DD960438621471A /* InputActionExecutor.swift */; };
+		6508D1C3C33BA2BF757B1E94 /* CalendarLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */; };
 		6536B8877F98B388F48C1AF0 /* MenuModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9D9E5D45B52039A847259B /* MenuModels.swift */; };
 		65C9CE1FFA425348658927F5 /* ScreenshotCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB7C76B98FE31FB9257E5BF /* ScreenshotCore.swift */; };
 		671B1A9860428EC1A9410D2E /* MenuBarCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD1807550C64BF6502E2F7E7 /* MenuBarCalendarView.swift */; };
@@ -285,6 +286,7 @@
 		4EB47938DDA58799FBCE1E72 /* MarkupShapeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkupShapeTests.swift; sourceTree = "<group>"; };
 		52BDCE7A09C42B34E4EA696A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		53A7491B371B25E37B03F074 /* StatusBarMetricsOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarMetricsOptions.swift; sourceTree = "<group>"; };
+		53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarLanguage.swift; sourceTree = "<group>"; };
 		5555E76441DC981E08EB8844 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralSettingsView.swift; sourceTree = "<group>"; };
 		56DA24F4D226A37160911449 /* PermissionsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsSettingsView.swift; sourceTree = "<group>"; };
 		57ADD7A9253836626A46F7B4 /* Stats.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Stats.txt; sourceTree = "<group>"; };
@@ -705,6 +707,7 @@
 			isa = PBXGroup;
 			children = (
 				7645E579480968FF99EA3994 /* AppPresentationMode.swift */,
+				53C9A948D4E86CEEEB16017B /* CalendarLanguage.swift */,
 				37C08C924F1D71948D136989 /* InputEnhancementViewModel.swift */,
 				00597E6D68228B4D72B770F3 /* PermissionRow.swift */,
 				71A478AA0E53057EBBD40FEB /* SettingsSection.swift */,
@@ -1092,6 +1095,7 @@
 				F5191DB9C5ECC37D34E2D46A /* CPUFrequencyReader.swift in Sources */,
 				4F154DFD4FF0B8609DC846F6 /* CPUTemperatureReader.swift in Sources */,
 				3EA0C1690D1355B6B0D54111 /* CalendarAgendaView.swift in Sources */,
+				6508D1C3C33BA2BF757B1E94 /* CalendarLanguage.swift in Sources */,
 				1CE6AA89F4E574715D7ACB7F /* CalendarMonthPickerView.swift in Sources */,
 				6215339CB01FDD27B2E4960C /* CaptureOverlayView.swift in Sources */,
 				EAB8BC6D5DDAB41ECEBFB976 /* ContextMenuSettingsView.swift in Sources */,

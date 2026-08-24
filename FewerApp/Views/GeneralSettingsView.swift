@@ -4,6 +4,7 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @ObservedObject var model: SettingsViewModel
     @ObservedObject private var presentationController = AppPresentationController.shared
+    @AppStorage(CalendarLanguage.storageKey) private var calendarLanguageValue = CalendarLanguage.chinese.rawValue
 
     var body: some View {
         ScrollView {
@@ -18,6 +19,23 @@ struct GeneralSettingsView: View {
                             .tag(mode)
                     }
                         }.labelsHidden().pickerStyle(.segmented).frame(width: 180)
+                    }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("日历语言")
+                            Text("设置月份和星期的显示语言").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Picker("", selection: calendarLanguageBinding) {
+                            ForEach(CalendarLanguage.allCases) { language in
+                                Text(language.title).tag(language)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
+                        .accessibilityIdentifier("settings.calendarLanguage")
                     }
                     Divider()
                     FewerSettingsRow {
@@ -66,6 +84,13 @@ struct GeneralSettingsView: View {
             set: { mode in
                 presentationController.setMode(mode)
             }
+        )
+    }
+
+    private var calendarLanguageBinding: Binding<CalendarLanguage> {
+        Binding(
+            get: { CalendarLanguage(rawValue: calendarLanguageValue) ?? .chinese },
+            set: { calendarLanguageValue = $0.rawValue }
         )
     }
 }
