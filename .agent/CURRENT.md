@@ -5,11 +5,11 @@
 
 ## Objective
 
-优先修复当前版本的右键、Finder 菜单、权限入口、日历和设置卡顿，并通过扩展稳定性审计发现其余问题；之后继续发布架构收口。
+完成发布前收口：恢复 CI，完成已认证 XPC、最小 Finder 权限、跨进程状态一致性、截图内存限制、UI smoke 与签名发布验收。
 
 ## Current Milestone
 
-运行时稳定性 R0–R6。
+发布前收口 v5。
 
 ## Active Tasks
 
@@ -30,6 +30,16 @@
 | T018 | PR6 — SystemMetrics 后台采样与频率分层 | DONE | P1 | T013 |
 | T019 | PR7 — 滚动截图后台合成与显式内存预算 | DONE | P1 | T013 |
 | T012 | 集成与发布验收 | BACKLOG | P0 | T004-T010, T013-T026 |
+| T027 | CI Swift 6 修复 | DONE | P0 | 无 |
+| T028 | 签名 XPC 架构探针 | BLOCKED | P0 | T027 |
+| T029 | Finder `/` 例外移除与实机矩阵 | BLOCKED | P0 | T027, T016 |
+| T030 | App Group identifier 与跨进程 Store | DONE | P1 | T027 |
+| T031 | ModulePreferences 损坏恢复 | DONE | P1 | T030 |
+| T032 | 滚动截图 session 内存预算 | DONE | P1 | T027, T019 |
+| T033 | 普通 CI UI smoke | BLOCKED | P1 | T027 |
+| T034 | Popover 可访问性 | BACKLOG | P2 | T033 |
+| T035 | Helper 构建嵌入收口 | BACKLOG | P2 | T017 |
+| T036 | Input preference 主 App 单写迁移 | BACKLOG | P1 | T017, T030 |
 
 ## Review Queue
 
@@ -37,11 +47,11 @@ T013、T014、T021、T022、T024 已通过代码层验收：T013（CI 漂移检�
 
 ## Blocked
 
-T017 受“签名 Mach service 往返探针”强制架构门禁阻塞：本环境无签名证书/WindowServer，无法提供 required 的双方身份校验与伪客户端拒绝证据；不得实现后以 DNC 回退。该探针与 DNC 移除推迟到 T012 签名实机验收。本阶段先推进可由 CI 验证的 T018、T019；签名实机验证统一由 T012 完成。T021/T022/T023/T024 已 DONE，T025 已 REVIEW。
+T028：公开 `NSXPCConnection` 在当前 macOS SDK 不暴露 audit token；以 PID 反查签名不满足 audit-token 验收。需要用户决定是否允许改为低层 `xpc_connection_t` listener（保留 audit token）或调整安全验收，二者均不得静默降级。T029：启用的 extension 是 `/Applications/Fewer.app` 旧安装，覆盖用户安装前不能测试最新版本。T033：本机 XCTest UI host 缺少辅助功能授权。T017 在 T028 通过前保持 BLOCKED；不得以 DNC 回退。T016 的可回滚 replace 已完成，但 `/` entitlement 尚未移除，改由 T029 完成。T032 已完成 session resident-memory budget；其签名实机曲线留待 T012。
 
 ## Recommended Next Task
 
-T015（PR3）、T016（PR4）已 DONE（T016：FewerCore 309 tests/0 failures、Fewer BUILD SUCCEEDED、recoverable-replace 事务与 NSFileCoordinator 协调已落地、无 as any；Finder `/` 例外按 T012 门禁暂不移除）。T017 已 BLOCKED，等待签名实机 Mach service 探针；T025 已进入 REVIEW（FewerCore 309 tests、完整 Debug build、模板/产物/diff 门禁均通过），仍待签名实机 Time Profiler 与设置交互验证。后续在审查后先同步 T018/T019 的任务元数据，再执行一个 READY 任务。
+已完成：T027、T030、T031、T032。阻塞：T028（公开 `NSXPCConnection` 缺 audit token，需选择低层 XPC 或修改安全验收）、T029（最新 extension 未安装启用）、T033（XCTest UI host 缺 Accessibility）。T017、T034-T036、T012 受其依赖阻塞。
 
 ## Current Risks
 
@@ -57,4 +67,4 @@ T015（PR3）、T016（PR4）已 DONE（T016：FewerCore 309 tests/0 failures、
 
 ## Last Updated
 
-2026-08-24（T018 进入 REVIEW：SystemMetrics 采样移入 actor，16 个新测试通过，325 tests/0 failures，Fewer BUILD SUCCEEDED）
+2026-08-25（复验 `./script/verify.sh`：360 Core tests/0 failures、严格并发 Debug build、模板、三产物与 diff 检查通过；T028 发现 public `NSXPCConnection` 无 audit token，保持 BLOCKED。）

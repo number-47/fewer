@@ -20,25 +20,33 @@ public final class SharedSettingsStore: @unchecked Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let lock = NSLock()
+    private let access: SharedPreferenceAccess
 
-    public convenience init() throws {
+    public convenience init(access: SharedPreferenceAccess = .readOnly) throws {
         SharedStoreBootstrap.migrateSharedStoresIfNeeded()
-        self.init(
-            fileURL: AppGroupConstants.sharedDataDirectory()
-                .appendingPathComponent("feature-settings.json")
-        )
+        let defaults = try AppGroupConstants.sharedUserDefaults()
+        self.init(defaults: defaults, access: access)
+        if access == .mainAppWriter {
+            SharedStoreBootstrap.migratePreferenceIfNeeded(
+                in: defaults,
+                key: AppGroupConstants.featureSettingsKey,
+                legacyFileName: "feature-settings.json"
+            )
+        }
     }
 
-    public init(defaults: UserDefaults) {
+    public init(defaults: UserDefaults, access: SharedPreferenceAccess = .mainAppWriter) {
         self.storage = .defaults(defaults)
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
+        self.access = access
     }
 
-    public init(fileURL: URL) {
+    public init(fileURL: URL, access: SharedPreferenceAccess = .mainAppWriter) {
         self.storage = .file(fileURL)
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()
+        self.access = access
     }
 
     public func load() -> SettingsLoadResult {
@@ -68,6 +76,7 @@ public final class SharedSettingsStore: @unchecked Sendable {
     }
 
     public func save(_ settings: FeatureSettings) throws {
+        guard access == .mainAppWriter else { throw SharedPreferenceStoreError.readOnly }
         lock.lock()
         defer { lock.unlock() }
 
@@ -82,6 +91,19 @@ public final class SharedSettingsStore: @unchecked Sendable {
             )
             try data.write(to: fileURL, options: .atomic)
         }
+    }
+}
+
+public enum SharedPreferenceAccess: Sendable {
+    case readOnly
+    case mainAppWriter
+}
+
+public enum SharedPreferenceStoreError: LocalizedError, Equatable {
+    case readOnly
+
+    public var errorDescription: String? {
+        "Only the main Fewer app may write shared preferences."
     }
 }
 

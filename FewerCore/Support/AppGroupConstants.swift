@@ -6,12 +6,19 @@ public enum AppGroupConstants {
     private static let legacyGroupIdentifier = "group.com.number47.fewer"
     public static let groupIdentifier: String = {
         guard let configuredIdentifier = Bundle.main.object(forInfoDictionaryKey: "FewerAppGroupIdentifier") as? String else {
-            return legacyGroupIdentifier
+            os_log(.error, "Fewer: FewerAppGroupIdentifier is missing. A Team ID-prefixed App Group is required.")
+            return ""
         }
         let identifier = configuredIdentifier.trimmingCharacters(in: .whitespacesAndNewlines)
-        return identifier.isEmpty ? legacyGroupIdentifier : identifier
+        guard Self.isTeamPrefixedGroupIdentifier(identifier) else {
+            os_log(.error, "Fewer: FewerAppGroupIdentifier is not a Team ID-prefixed App Group: %{public}s", identifier)
+            return ""
+        }
+        return identifier
     }()
     public static let featureSettingsKey = "feature-settings-v1"
+    public static let inputEnhancementSettingsKey = "input-enhancement-settings-v1"
+    public static let modulePreferencesKey = "module-preferences-v1"
     public static let cutTransactionKey = "cut-transaction-v1"
     public static let requestShortcutHelperAccessibilityNotification = Notification.Name(
         "com.number47.fewer.request-shortcut-helper-accessibility"
@@ -38,18 +45,40 @@ public enum AppGroupConstants {
     /// Current shared storage root. File-backed Stores resolve here.
     ///
     /// Preferred location is the configured App Group container's `Shared` directory
-    /// so the app, Finder extension, and shortcut helper share one store. When the
-    /// container URL is unavailable (unsigned local builds without the entitlement)
-    /// it falls back to `~/Library/Application Support/Fewer/Shared` and logs a
-    /// diagnosable error in signed builds so a release can prove the container was used.
+    /// so the app, Finder extension, and shortcut helper share one store. Unsigned
+    /// Debug builds may fall back to `~/Library/Application Support/Fewer/Shared`;
+    /// Release builds log the missing container and fail fast.
     public static func sharedDataDirectory(fileManager: FileManager = .default) -> URL {
         let home = homeDirectory(for: fileManager)
         let containerURL = fileManager.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier)
         let (directory, usedContainer) = resolveSharedContainer(containerURL: containerURL, homeDirectory: home)
         if !usedContainer {
             logContainerFallback()
+            #if !DEBUG
+            fatalError("Fewer App Group container is required in Release builds.")
+            #endif
         }
         return directory
+    }
+
+    /// Returns the App Group defaults suite used for shared preferences. Release
+    /// builds must have both a valid Team ID-prefixed identifier and its container.
+    public static func sharedUserDefaults(fileManager: FileManager = .default) throws -> UserDefaults {
+        guard !groupIdentifier.isEmpty else {
+            throw AppGroupStoreError.invalidIdentifier
+        }
+
+        #if !DEBUG
+        guard fileManager.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) != nil else {
+            logContainerFallback()
+            throw AppGroupStoreError.containerUnavailable(identifier: groupIdentifier)
+        }
+        #endif
+
+        guard let defaults = UserDefaults(suiteName: groupIdentifier) else {
+            throw AppGroupStoreError.defaultsUnavailable(identifier: groupIdentifier)
+        }
+        return defaults
     }
 
     /// Previous shared storage location. Used only by the migrator to find
@@ -68,6 +97,16 @@ public enum AppGroupConstants {
     static func resolveLegacyAppGroupSharedDirectory(homeDirectory: URL) -> URL {
         homeDirectory
             .appendingPathComponent("Library/Group Containers/\(legacyGroupIdentifier)/Shared", isDirectory: true)
+    }
+
+    static func isTeamPrefixedGroupIdentifier(_ identifier: String) -> Bool {
+        let components = identifier.split(separator: ".", omittingEmptySubsequences: false)
+        guard components.count >= 4,
+              components[1] == "group",
+              !components[0].isEmpty,
+              components.dropFirst(2).allSatisfy({ !$0.isEmpty })
+        else { return false }
+        return !identifier.contains("$(")
     }
 
     /// Pure resolution of the shared data directory. Returns the resolved directory
@@ -99,12 +138,30 @@ public enum AppGroupConstants {
         // Unsigned local dev without the entitlement: the fallback is expected.
         os_log(.info, "Fewer: App Group container unavailable; using ~/Library/Application Support/Fewer/Shared (unsigned local dev).")
         #else
-        // A signed release should always have the container; surface this as an error.
+        // A signed release should always have the container; this error precedes
+        // the fail-fast in sharedDataDirectory().
         os_log(
             .error,
-            "Fewer: App Group container for %{public}s unavailable in a signed build; falling back to ~/Library/Application Support/Fewer/Shared. Verify the entitlement is present.",
+            "Fewer: App Group container for %{public}s unavailable in a signed build; terminating. Verify the entitlement is present.",
             groupIdentifier
         )
         #endif
+    }
+}
+
+public enum AppGroupStoreError: LocalizedError, Equatable {
+    case invalidIdentifier
+    case containerUnavailable(identifier: String)
+    case defaultsUnavailable(identifier: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidIdentifier:
+            return "Fewer App Group identifier is missing or invalid."
+        case let .containerUnavailable(identifier):
+            return "Fewer App Group container is unavailable: \(identifier)"
+        case let .defaultsUnavailable(identifier):
+            return "Fewer App Group UserDefaults suite is unavailable: \(identifier)"
+        }
     }
 }

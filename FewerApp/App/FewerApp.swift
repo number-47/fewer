@@ -9,9 +9,16 @@ enum FewerApp {
 
     static func main() {
         let application = NSApplication.shared
+        if AppLaunchMode.isUITesting {
+            application.setActivationPolicy(.regular)
+        }
         application.delegate = appDelegate
         application.run()
     }
+}
+
+private enum AppLaunchMode {
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 }
 
 @MainActor
@@ -1073,17 +1080,23 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        ModuleCommandObserver.shared.start()
+        if !AppLaunchMode.isUITesting {
+            ModuleCommandObserver.shared.start()
+            HotKeyManager.shared.install()
+        }
         installApplicationMenu()
-        HotKeyManager.shared.install()
         DispatchQueue.main.async {
-            AppPresentationController.shared.restoreStoredMode()
+            if !AppLaunchMode.isUITesting {
+                AppPresentationController.shared.restoreStoredMode()
+            }
             SettingsWindowController.shared.show()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        ModuleCommandObserver.shared.stop()
+        if !AppLaunchMode.isUITesting {
+            ModuleCommandObserver.shared.stop()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

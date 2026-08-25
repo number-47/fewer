@@ -146,4 +146,56 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         XCTAssertEqual(SharedSettingsStore(fileURL: fileURL).load().settings, settings)
     }
+
+    func testReadOnlyStoreRejectsWrites() {
+        let store = SharedSettingsStore(defaults: defaults, access: .readOnly)
+
+        XCTAssertThrowsError(try store.save(.default)) { error in
+            XCTAssertEqual(error as? SharedPreferenceStoreError, .readOnly)
+        }
+    }
+
+    func testPreferenceMigrationPreservesExistingAppGroupValue() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let legacyURL = directory.appendingPathComponent("feature-settings.json")
+        let legacyData = Data("legacy".utf8)
+        try legacyData.write(to: legacyURL)
+        let currentData = Data("current".utf8)
+        defaults.set(currentData, forKey: AppGroupConstants.featureSettingsKey)
+
+        SharedStoreBootstrap.migratePreferenceIfNeeded(
+            in: defaults,
+            key: AppGroupConstants.featureSettingsKey,
+            legacyFileName: legacyURL.lastPathComponent,
+            sharedRoot: directory.appendingPathComponent("Shared", isDirectory: true),
+            legacyFileURLs: [legacyURL]
+        )
+
+        XCTAssertEqual(defaults.data(forKey: AppGroupConstants.featureSettingsKey), currentData)
+        XCTAssertEqual(try Data(contentsOf: legacyURL), legacyData)
+    }
+
+    func testPreferenceMigrationCopiesLegacyDataOnlyWhenNewValueIsMissing() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let legacyURL = directory.appendingPathComponent("feature-settings.json")
+        let legacyData = Data("legacy".utf8)
+        try legacyData.write(to: legacyURL)
+
+        SharedStoreBootstrap.migratePreferenceIfNeeded(
+            in: defaults,
+            key: AppGroupConstants.featureSettingsKey,
+            legacyFileName: legacyURL.lastPathComponent,
+            sharedRoot: directory.appendingPathComponent("Shared", isDirectory: true),
+            legacyFileURLs: [legacyURL]
+        )
+
+        XCTAssertEqual(defaults.data(forKey: AppGroupConstants.featureSettingsKey), legacyData)
+        XCTAssertEqual(try Data(contentsOf: legacyURL), legacyData)
+    }
 }

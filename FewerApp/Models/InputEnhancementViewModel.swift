@@ -96,7 +96,7 @@ final class InputEnhancementViewModel: NSObject, ObservableObject {
             task = loadTask
         } else {
             task = Task.detached(priority: .utility) {
-                let store = InputEnhancementStore()
+                let store = InputEnhancementStore(access: .mainAppWriter)
                 return InputEnhancementLoadState(
                     store: store,
                     statusStore: ShortcutHelperStatusStore(),

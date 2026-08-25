@@ -62,14 +62,15 @@ struct ScreenshotSettingsView: View {
     }
 
     private func reconcileKeycastShortcutConflict() {
-        var inputSettings = InputEnhancementStore().load()
+        let inputStore = InputEnhancementStore(access: .mainAppWriter)
+        var inputSettings = inputStore.load()
         guard let shortcut = inputSettings.keycast.toggleShortcut else { return }
         let reserved = settings.shortcutsEnabled
             ? [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey].map(InputShortcut.init)
             : []
         guard !InputShortcutSafety.isAllowedGlobalToggle(shortcut, additionalReserved: reserved) else { return }
         inputSettings.keycast.toggleShortcut = nil
-        try? InputEnhancementStore().save(inputSettings)
+        try? inputStore.save(inputSettings)
         DistributedNotificationCenter.default().postNotificationName(
             AppGroupConstants.inputEnhancementSettingsDidChangeNotification,
             object: nil,

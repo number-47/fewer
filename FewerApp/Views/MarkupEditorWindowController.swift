@@ -2004,6 +2004,7 @@ private enum MarkupGeometry {
     }
 }
 
+@MainActor
 private enum MarkupRenderer {
     private static let ciContext = CIContext(options: [.cacheIntermediates: true])
 

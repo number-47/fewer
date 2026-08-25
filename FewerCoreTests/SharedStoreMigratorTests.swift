@@ -61,6 +61,12 @@ final class SharedStoreMigratorTests: XCTestCase {
         )
     }
 
+    func testTeamPrefixedGroupIdentifierRejectsLegacyAndBuildVariables() {
+        XCTAssertTrue(AppGroupConstants.isTeamPrefixedGroupIdentifier("ABCDE12345.group.com.number47.fewer"))
+        XCTAssertFalse(AppGroupConstants.isTeamPrefixedGroupIdentifier("group.com.number47.fewer"))
+        XCTAssertFalse(AppGroupConstants.isTeamPrefixedGroupIdentifier("$(DEVELOPMENT_TEAM).group.com.number47.fewer"))
+    }
+
     // MARK: - Migration behavior
 
     func testNoOldDataDoesNotCreateMarkerOrFiles() throws {

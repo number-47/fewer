@@ -1,7 +1,7 @@
 # Implementation Plan
 
-> 当前版本：v4
-> 最后更新：2026-08-24
+> 当前版本：v5
+> 最后更新：2026-08-25
 > Planner：Sol
 
 ## 目标
@@ -49,7 +49,30 @@
 
 推荐顺序：T020 → T013 → T021 →（T022、T024）→（T023、T025）→ T026。稳定性 P0 完成前，不进入会扩大输入/Finder 变更面的架构任务。
 
-## 发布架构收口计划（PR1–PR7）
+## 发布前收口计划（v5）
+
+已验证 `main` 的 CI 在完整 Fewer Debug build 阶段因 `MarkupRenderer` 的共享 `CIContext` 触发 Swift 6 concurrency error 而失败。T013 仅保留为历史 CI 基础设施任务；T016 仅代表可回滚 replace 已完成；T019 仅代表最终输出缓冲预算已完成。
+
+| 顺序 | Task | 标题 | 依赖 | 优先级 |
+|------|------|------|------|--------|
+| 1 | T027 | CI Swift 6 修复 | 无 | P0 |
+| 2 | T028 | 签名 XPC 架构探针 | T027 | P0 |
+| 3 | T017 | authenticated 双向 XPC | T028 | P0 |
+| 4 | T029 | Finder `/` 例外移除与实机矩阵 | T027, T016 | P0 |
+| 5 | T030 | App Group identifier 与跨进程 Store | T027 | P1 |
+| 6 | T031 | ModulePreferences 损坏恢复 | T030 | P1 |
+| 7 | T032 | 滚动截图 session 内存预算 | T027, T019 | P1 |
+| 8 | T033 | 普通 CI UI smoke | T027 | P1 |
+| 9 | T034 | Popover 可访问性 | T033 | P2 |
+| 10 | T035 | Helper 构建嵌入收口 | T017 | P2 |
+| 10a | T036 | Input preference 主 App 单写迁移 | T017, T030 | P1 |
+| 11 | T012 | 最终签名发布验收 | T017, T029-T035 | P0 |
+
+正式 App Group 固定为 `$(DEVELOPMENT_TEAM).group.com.number47.fewer`；legacy group 只用于一版迁移读取。特权命令只允许 signed XPC，DNC 仅用于非特权失效广播。若签名 probe 或 Finder 无 `/` 矩阵失败，任务必须 BLOCKED，不得降级回 DNC 或根路径例外。
+
+`InputEnhancementStore` 的 Helper 写入（紧急禁用、按键展示位置）必须等 T017 的 authenticated XPC 回调可用后迁入主 App 单写；T030 不得先将其改为只读并静默丢弃现有持久化。
+
+## 历史发布架构收口计划（PR1–PR7）
 
 原 PR1–PR5 经代码核对后拆为 7 个可独立回滚和验收的 PR。修订原因见 D003：原 PR4、PR5 混合多个无关架构改动，且 Finder XPC 菜单载荷和命名 XPC listener 的关键假设不成立。
 

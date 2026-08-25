@@ -515,6 +515,133 @@ public enum StitchKeyframePolicy {
     }
 }
 
+/// 滚动截图会话中长期保留图像的内存上限。
+///
+/// 该预算只约束关键帧、桥接帧和独立预览 backing；最终长图的输出预算仍由
+/// `StitchConfiguration.outputByteBudget` 单独负责。
+public struct RollingCaptureMemoryBudget: Sendable, Equatable {
+    public static let defaultByteLimit = 256 * 1024 * 1024
+
+    public struct Image: Hashable, Sendable {
+        /// 调用方在当前快照内分配的稳定 token；只用于返回可淘汰的关键帧。
+        public let token: Int
+        /// 同一个 CGImage backing 在多个保留位置出现时，只计一次。
+        public let backingIdentifier: UInt64
+        public let bytesPerRow: Int
+        public let height: Int
+        public let originY: Int
+        public let isRemovableKeyframe: Bool
+        public let participatesInSnapshotChain: Bool
+
+        public init(
+            token: Int,
+            backingIdentifier: UInt64,
+            bytesPerRow: Int,
+            height: Int,
+            originY: Int,
+            isRemovableKeyframe: Bool,
+            participatesInSnapshotChain: Bool = true
+        ) {
+            self.token = token
+            self.backingIdentifier = backingIdentifier
+            self.bytesPerRow = max(bytesPerRow, 0)
+            self.height = max(height, 0)
+            self.originY = originY
+            self.isRemovableKeyframe = isRemovableKeyframe
+            self.participatesInSnapshotChain = participatesInSnapshotChain
+        }
+
+        public var byteCount: Int {
+            let (bytes, overflow) = bytesPerRow.multipliedReportingOverflow(by: height)
+            return overflow ? Int.max : bytes
+        }
+    }
+
+    public enum Plan: Equatable, Sendable {
+        case withinBudget
+        case thin(keyframeTokens: [Int])
+        case limitExceeded
+    }
+
+    public let byteLimit: Int
+
+    public init(byteLimit: Int = Self.defaultByteLimit) {
+        self.byteLimit = max(byteLimit, 0)
+    }
+
+    /// 同一 backing 可能同时被 frame、pending 或预览快照引用；只按最大的已知
+    /// backing 大小计费，既不会重复统计，也不会因元数据差异低估。
+    public func residentBytes(for images: [Image]) -> Int {
+        var bytesByBacking: [UInt64: Int] = [:]
+        for image in images {
+            bytesByBacking[image.backingIdentifier] = max(
+                bytesByBacking[image.backingIdentifier, default: 0],
+                image.byteCount
+            )
+        }
+        return bytesByBacking.values.reduce(0) { partial, bytes in
+            let (total, overflow) = partial.addingReportingOverflow(bytes)
+            return overflow ? Int.max : total
+        }
+    }
+
+    /// 仅淘汰中间关键帧，且相邻幸存帧仍有足够重叠时才允许淘汰。两端帧、pending
+    /// 与预览均不可淘汰：它们分别定义已捕获内容边界或用户当前看到的内容。
+    public func plan(
+        for images: [Image],
+        maximumSnapshotGap: Int
+    ) -> Plan {
+        guard residentBytes(for: images) > byteLimit else { return .withinBudget }
+
+        var retained = images
+        var removedTokens: [Int] = []
+        let maximumGap = max(maximumSnapshotGap, 0)
+
+        while residentBytes(for: retained) > byteLimit {
+            let sortedIndices = retained.indices.filter {
+                retained[$0].participatesInSnapshotChain
+            }.sorted {
+                if retained[$0].originY == retained[$1].originY {
+                    return retained[$0].token < retained[$1].token
+                }
+                return retained[$0].originY < retained[$1].originY
+            }
+            guard sortedIndices.count >= 3 else { return .limitExceeded }
+
+            var bestIndex: Int?
+            var bestSavings = 0
+            for position in sortedIndices.indices where position > sortedIndices.startIndex && position < sortedIndices.index(before: sortedIndices.endIndex) {
+                let index = sortedIndices[position]
+                let image = retained[index]
+                guard image.isRemovableKeyframe else { continue }
+
+                let previous = retained[sortedIndices[sortedIndices.index(before: position)]]
+                let next = retained[sortedIndices[sortedIndices.index(after: position)]]
+                let gap = Self.snapshotGap(from: previous.originY, to: next.originY)
+                guard gap <= maximumGap else { continue }
+
+                var candidate = retained
+                candidate.remove(at: index)
+                let savings = residentBytes(for: retained) - residentBytes(for: candidate)
+                guard savings > bestSavings else { continue }
+                bestSavings = savings
+                bestIndex = index
+            }
+
+            guard let bestIndex else { return .limitExceeded }
+            removedTokens.append(retained[bestIndex].token)
+            retained.remove(at: bestIndex)
+        }
+
+        return removedTokens.isEmpty ? .withinBudget : .thin(keyframeTokens: removedTokens)
+    }
+
+    private static func snapshotGap(from lowerOriginY: Int, to upperOriginY: Int) -> Int {
+        let (gap, overflow) = upperOriginY.subtractingReportingOverflow(lowerOriginY)
+        return overflow ? Int.max : max(gap, 0)
+    }
+}
+
 /// 以首帧为原点追踪当前视口和已覆盖的文档范围。
 public struct StitchCoverage: Equatable, Sendable {
     public private(set) var currentOriginY = 0

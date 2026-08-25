@@ -9,6 +9,9 @@ struct ModuleSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                if let message = host.modulePreferencesRecoveryMessage {
+                    recoveryCard(message)
+                }
                 statusBarOrderCard
                 ForEach(monitorIDs, id: \.self) { monitorID in
                     monitorCard(monitorID)
@@ -21,6 +24,29 @@ struct ModuleSettingsView: View {
             }
             .padding(.bottom, 24)
         }
+    }
+
+    private func recoveryCard(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("模块偏好需要恢复")
+                    .fontWeight(.semibold)
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("修改任一模块设置即可保存新配置，或恢复默认设置。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button("恢复默认") {
+                host.restoreDefaultModulePreferences()
+            }
+        }
+        .padding(16)
+        .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private var statusBarOrderCard: some View {

@@ -40,6 +40,20 @@ final class InputEnhancementStoreTests: XCTestCase {
         XCTAssertEqual(InputEnhancementStore(fileURL: fileURL).load(), .default)
     }
 
+    func testUserDefaultsRoundTripAcrossInstancesAndReadOnlyStoreCannotWrite() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var settings = InputEnhancementSettings.default
+        settings.scroll.isEnabled = true
+
+        try InputEnhancementStore(defaults: defaults).save(settings)
+        XCTAssertTrue(InputEnhancementStore(defaults: defaults, access: .readOnly).load().scroll.isEnabled)
+        XCTAssertThrowsError(try InputEnhancementStore(defaults: defaults, access: .readOnly).save(settings)) {
+            XCTAssertEqual($0 as? SharedPreferenceStoreError, .readOnly)
+        }
+    }
+
     func testMigratesSchemaOneWithoutGestureExclusions() throws {
         let data = Data(#"{"schemaVersion":1,"scroll":{"isEnabled":false,"vertical":{"smoothEnabled":true,"reversed":false},"horizontal":{"smoothEnabled":true,"reversed":false},"minimumStep":3,"speedGain":1,"response":0.18,"simulatesTrackpad":false},"applicationOverrides":[],"gestureRules":[],"keycast":{"isEnabled":false,"mode":"shortcutsOnly","showsMouseClicks":false,"opacity":0.88,"fontSize":24,"displayDuration":1.8,"maximumVisibleEvents":5,"excludedBundleIdentifiers":[]},"emergencyDisabled":false}"#.utf8)
         let settings = try JSONDecoder().decode(InputEnhancementSettings.self, from: data)

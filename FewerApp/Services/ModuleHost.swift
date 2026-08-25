@@ -81,11 +81,13 @@ final class ModuleHost: ObservableObject {
     static let shared = ModuleHost()
 
     @Published private(set) var preferences: ModulePreferences
+    @Published private(set) var modulePreferencesRecoveryMessage: String?
     let modules = ModuleRegistry.modules
-    private let store = ModulePreferencesStore()
+    private let store = ModulePreferencesStore(access: .mainAppWriter)
 
     private init() {
         preferences = store.load(descriptors: modules.map(\.descriptor))
+        modulePreferencesRecoveryMessage = store.recoveryMessage
     }
 
     func modules(on surface: ModuleSurface) -> [any FewerModule] {
@@ -126,6 +128,12 @@ final class ModuleHost: ObservableObject {
         if moduleID == "screenshot" { HotKeyManager.shared.install() }
     }
 
+    func restoreDefaultModulePreferences() {
+        preferences = ModulePreferences(enabledModuleIDs: Set(modules.map(\.descriptor.id)))
+        preferences.reconcile(with: modules.map(\.descriptor))
+        save()
+    }
+
     var commands: [ModuleCommand] {
         modules
             .filter { preferences.enabledModuleIDs.contains($0.descriptor.id) }
@@ -164,7 +172,8 @@ final class ModuleHost: ObservableObject {
         case ("screenshot", "window"): ScreenshotService.shared.begin(.window)
         case ("screenshot", "fullscreen"): ScreenshotService.shared.begin(.fullscreen)
         case ("input", "toggle-scroll"), ("input", "toggle-keycast"), ("input", "toggle-gesture"):
-            var settings = InputEnhancementStore().load()
+            let inputStore = InputEnhancementStore(access: .mainAppWriter)
+            var settings = inputStore.load()
             if commandID == "toggle-scroll" { settings.scroll.isEnabled.toggle() }
             else if commandID == "toggle-keycast" { settings.keycast.isEnabled.toggle() }
             else {
@@ -177,7 +186,7 @@ final class ModuleHost: ObservableObject {
                     }
                 }
             }
-            try? InputEnhancementStore().save(settings)
+            try? inputStore.save(settings)
             DistributedNotificationCenter.default().postNotificationName(
                 AppGroupConstants.inputEnhancementSettingsDidChangeNotification,
                 object: nil,
@@ -268,7 +277,12 @@ final class ModuleHost: ObservableObject {
     }
 
     private func save() {
-        try? store.save(preferences)
+        do {
+            try store.save(preferences)
+            modulePreferencesRecoveryMessage = nil
+        } catch {
+            return
+        }
         DistributedNotificationCenter.default().postNotificationName(
             AppGroupConstants.modulePreferencesDidChangeNotification,
             object: nil,

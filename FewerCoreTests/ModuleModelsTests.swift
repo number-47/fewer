@@ -184,6 +184,141 @@ final class ModuleModelsTests: XCTestCase {
         XCTAssertTrue(store.isEnabled(moduleID: "screenshot"))
     }
 
+    func testModuleStoreMissingPreferencesUsesFreshDefaults() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = directory.appendingPathComponent("module-preferences.json")
+        let recoveryDirectory = directory.appendingPathComponent("Recovery", isDirectory: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+
+        let store = ModulePreferencesStore(
+            fileURL: fileURL,
+            recoveryDirectory: recoveryDirectory,
+            backupTimestamp: { "20260825103000" }
+        )
+        let preferences = store.load(descriptors: dashboardDescriptors())
+
+        XCTAssertEqual(preferences.enabledModuleIDs, Set(dashboardDescriptors().map(\.id)))
+        XCTAssertNil(store.recoveryMessage)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
+    }
+
+    func testModuleStoreCorruptUserDefaultsBacksUpAndStaysDisabledAfterRestart() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let recoveryDirectory = directory.appendingPathComponent("Recovery", isDirectory: true)
+        let corrupt = Data("not-json".utf8)
+        defaults.set(corrupt, forKey: AppGroupConstants.modulePreferencesKey)
+
+        let store = ModulePreferencesStore(
+            defaults: defaults,
+            recoveryDirectory: recoveryDirectory,
+            backupTimestamp: { "20260825103000" }
+        )
+        let recovered = store.load(descriptors: dashboardDescriptors())
+
+        XCTAssertTrue(recovered.enabledModuleIDs.isEmpty)
+        XCTAssertNotNil(store.recoveryMessage)
+        XCTAssertFalse(store.isEnabled(moduleID: "finder"))
+        XCTAssertNil(defaults.data(forKey: AppGroupConstants.modulePreferencesKey))
+        XCTAssertEqual(
+            try Data(contentsOf: recoveryDirectory.appendingPathComponent("module-preferences.corrupt-20260825103000.json")),
+            corrupt
+        )
+
+        let restarted = ModulePreferencesStore(
+            defaults: defaults,
+            recoveryDirectory: recoveryDirectory,
+            backupTimestamp: { "20260825103000" }
+        )
+        XCTAssertTrue(restarted.load(descriptors: dashboardDescriptors()).enabledModuleIDs.isEmpty)
+        XCTAssertNotNil(restarted.recoveryMessage)
+        XCTAssertFalse(restarted.isEnabled(moduleID: "finder"))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: recoveryDirectory.path)
+            .filter { $0.hasPrefix("module-preferences.corrupt-") }.count, 1)
+    }
+
+    func testModuleStoreCorruptFilePreservesExistingBackupWithUniqueName() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let fileURL = directory.appendingPathComponent("module-preferences.json")
+        let recoveryDirectory = directory.appendingPathComponent("Recovery", isDirectory: true)
+        let existingBackup = recoveryDirectory.appendingPathComponent("module-preferences.corrupt-20260825103000.json")
+        let corrupt = Data("not-json".utf8)
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: recoveryDirectory, withIntermediateDirectories: true)
+        try Data("keep-me".utf8).write(to: existingBackup)
+        try corrupt.write(to: fileURL)
+
+        let store = ModulePreferencesStore(
+            fileURL: fileURL,
+            recoveryDirectory: recoveryDirectory,
+            backupTimestamp: { "20260825103000" }
+        )
+        XCTAssertTrue(store.load(descriptors: dashboardDescriptors()).enabledModuleIDs.isEmpty)
+
+        XCTAssertEqual(try Data(contentsOf: existingBackup), Data("keep-me".utf8))
+        XCTAssertEqual(
+            try Data(contentsOf: recoveryDirectory.appendingPathComponent("module-preferences.corrupt-20260825103000-1.json")),
+            corrupt
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertFalse(store.isEnabled(moduleID: "finder"))
+    }
+
+    func testModuleStoreExplicitSaveClearsCorruptionRecovery() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+            try? FileManager.default.removeItem(at: directory)
+        }
+        defaults.set(Data("not-json".utf8), forKey: AppGroupConstants.modulePreferencesKey)
+        let store = ModulePreferencesStore(
+            defaults: defaults,
+            recoveryDirectory: directory.appendingPathComponent("Recovery", isDirectory: true),
+            backupTimestamp: { "20260825103000" }
+        )
+
+        _ = store.load(descriptors: dashboardDescriptors())
+        try store.save(ModulePreferences(enabledModuleIDs: ["screenshot"]))
+
+        XCTAssertNil(store.recoveryMessage)
+        XCTAssertTrue(store.isEnabled(moduleID: "screenshot"))
+        XCTAssertFalse(store.isEnabled(moduleID: "finder"))
+        let restarted = ModulePreferencesStore(
+            defaults: defaults,
+            recoveryDirectory: directory.appendingPathComponent("Recovery", isDirectory: true),
+            backupTimestamp: { "20260825103000" }
+        )
+        XCTAssertEqual(restarted.load(descriptors: dashboardDescriptors()).enabledModuleIDs, ["screenshot"])
+        XCTAssertNil(restarted.recoveryMessage)
+    }
+
+    func testUserDefaultsStoreIsSharedAndReadOnlyLoadDoesNotPersistReconciliation() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let descriptors = dashboardDescriptors()
+        let writer = ModulePreferencesStore(defaults: defaults)
+        try writer.save(ModulePreferences(enabledModuleIDs: ["screenshot"]))
+
+        let reader = ModulePreferencesStore(defaults: defaults, access: .readOnly)
+        XCTAssertFalse(reader.isEnabled(moduleID: "finder"))
+        XCTAssertEqual(reader.load(descriptors: descriptors).enabledModuleIDs, ["screenshot"])
+        XCTAssertThrowsError(try reader.save(ModulePreferences(enabledModuleIDs: ["finder"]))) {
+            XCTAssertEqual($0 as? SharedPreferenceStoreError, .readOnly)
+        }
+    }
+
     private func dashboardDescriptors() -> [ModuleDescriptor] {
         [
             descriptor("cpu", 0), descriptor("gpu", 10), descriptor("memory", 20), descriptor("disk", 30),

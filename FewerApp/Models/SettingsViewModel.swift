@@ -32,7 +32,7 @@ final class SettingsViewModel: ObservableObject {
         let resourceDirectory = Bundle.main.resourceURL ?? Bundle.main.bundleURL
         let loaded = await Task.detached(priority: .utility) { () -> Result<SettingsLoadState, SettingsViewModelError> in
             do {
-                let settingsStore = try SharedSettingsStore()
+                let settingsStore = try SharedSettingsStore(access: .mainAppWriter)
                 let templateStore = try TemplateStore(builtInDirectory: resourceDirectory)
                 return .success(SettingsLoadState(
                     settingsStore: settingsStore,

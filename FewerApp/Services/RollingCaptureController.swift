@@ -8,6 +8,7 @@ enum RollingCaptureFailure: Equatable {
     case captureFailed(String)
     case dimensionChanged
     case outputLimitExceeded
+    case residentMemoryLimitExceeded
 
     var message: String {
         switch self {
@@ -15,6 +16,7 @@ enum RollingCaptureFailure: Equatable {
         case .captureFailed(let message): message
         case .dimensionChanged: "选区尺寸或页面缩放发生变化，无法可靠拼接。"
         case .outputLimitExceeded: "长图已达到 64M 像素、32000 像素高度或 120 帧限制。"
+        case .residentMemoryLimitExceeded: "滚动截图已达到 256 MiB 会话图像内存限制，已停止以保留已截内容。"
         }
     }
 }
@@ -34,6 +36,7 @@ final class RollingCaptureController: ObservableObject {
         minimumOverlapRatio: 0.1,
         minimumMatchOverlapRatio: 0.25
     )
+    private let residentMemoryBudget = RollingCaptureMemoryBudget()
     private var task: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewNeedsRefresh = false
@@ -206,6 +209,10 @@ final class RollingCaptureController: ObservableObject {
                 pause(for: .captureFailed("滚动首帧不可用。"))
                 return
             }
+            guard canRetainFirstFrame(first.image) else {
+                pause(for: .residentMemoryLimitExceeded)
+                return
+            }
             installFirstFrame(first.image, prepared: firstPrepared)
             transition(.firstFrameCaptured)
             statusText = manualRecordingStatus
@@ -350,7 +357,10 @@ final class RollingCaptureController: ObservableObject {
             // 滚动停顿：当前画面是同一位置的完整渲染版本，用其刷新桥接帧，
             // 让长图尾部使用已渲染清晰的画面（网页图片渐进加载时尤为明显）。
             currentPreparedFrame = prepared
-            refreshPendingFrame(with: image)
+            if !refreshPendingFrame(with: image) {
+                pause(for: .residentMemoryLimitExceeded)
+                return .failed
+            }
             return .duplicate
         case .failure(.dimensionChanged):
             pause(for: .dimensionChanged)
@@ -400,18 +410,30 @@ final class RollingCaptureController: ObservableObject {
             pause(for: .outputLimitExceeded)
             return .failed
         }
-        if contribution != .covered,
-           !retainKeyframe(
-               image,
-               contribution: contribution,
-               originY: nextCoverage.currentOriginY,
-               match: match
-           ) {
-            if state == .capturing {
-                statusText = "滚动过快，当前画面与已截内容断开；放慢或回滚后自动恢复"
+        if contribution != .covered {
+            switch retainKeyframe(
+                image,
+                contribution: contribution,
+                originY: nextCoverage.currentOriginY,
+                match: match
+            ) {
+            case .retained:
+                break
+            case .chainBroken:
+                if state == .capturing {
+                    statusText = "滚动过快，当前画面与已截内容断开；放慢或回滚后自动恢复"
+                }
+                Self.logger.info("held frame that breaks keyframe chain origin=\(nextCoverage.currentOriginY)")
+                return .unreliable
+            case .memoryLimitExceeded:
+                pause(for: .residentMemoryLimitExceeded)
+                return .failed
             }
-            Self.logger.info("held frame that breaks keyframe chain origin=\(nextCoverage.currentOriginY)")
-            return .unreliable
+        }
+        if contribution == .covered,
+           !refreshPendingFrame(with: image) {
+            pause(for: .residentMemoryLimitExceeded)
+            return .failed
         }
         coverage = nextCoverage
         currentPreparedFrame = prepared
@@ -420,7 +442,6 @@ final class RollingCaptureController: ObservableObject {
         outputHeight = nextHeight
         updateStationaryBands(with: match)
         if contribution == .covered {
-            refreshPendingFrame(with: image)
             requestPreviewUpdate(direction: match.direction)
             if state == .capturing {
                 statusText = "已回到截取过的区域，可继续向任一端滚动"
@@ -481,14 +502,31 @@ final class RollingCaptureController: ObservableObject {
 
     /// 滚动停顿或回访已截区域时，用完全渲染的当前画面刷新同一位置的桥接帧，
     /// 让长图尾部使用清晰版本（滚动中的帧可能还未完全渲染）。
-    private func refreshPendingFrame(with image: CGImage) {
+    private func refreshPendingFrame(with image: CGImage) -> Bool {
         let origin = coverage.currentOriginY
-        if pendingBottomFrame?.originY == origin {
-            pendingBottomFrame = (image, origin)
+        var candidateFrames = frames
+        var candidatePlacements = placements
+        var candidateTopFrame = pendingTopFrame
+        var candidateBottomFrame = pendingBottomFrame
+        if candidateBottomFrame?.originY == origin {
+            candidateBottomFrame = (image, origin)
         }
-        if pendingTopFrame?.originY == origin {
-            pendingTopFrame = (image, origin)
+        if candidateTopFrame?.originY == origin {
+            candidateTopFrame = (image, origin)
         }
+        let frameHeight = frames.first?.height ?? image.height
+        guard enforceResidentMemoryBudget(
+            frames: &candidateFrames,
+            placements: &candidatePlacements,
+            pendingTopFrame: candidateTopFrame,
+            pendingBottomFrame: candidateBottomFrame,
+            maximumSnapshotGap: frameHeight - confirmedTop - confirmedBottom - configuration.minimumShift
+        ) else { return false }
+        frames = candidateFrames
+        placements = candidatePlacements
+        pendingTopFrame = candidateTopFrame
+        pendingBottomFrame = candidateBottomFrame
+        return true
     }
 
     /// 低置信度帧的安全处理。
@@ -541,17 +579,29 @@ final class RollingCaptureController: ObservableObject {
         // 周期性内容歧义：先验引导的猜测置信度达标，可以安全推进位置追踪。
         var nextCoverage = coverage
         let contribution = nextCoverage.advance(by: guess)
-        if contribution != .covered,
-           !retainKeyframe(
-               image,
-               contribution: contribution,
-               originY: nextCoverage.currentOriginY,
-               match: guess
-           ) {
-            if state == .capturing {
-                statusText = "滚动过快，当前画面与已截内容断开；放慢或回滚后自动恢复"
+        if contribution != .covered {
+            switch retainKeyframe(
+                image,
+                contribution: contribution,
+                originY: nextCoverage.currentOriginY,
+                match: guess
+            ) {
+            case .retained:
+                break
+            case .chainBroken:
+                if state == .capturing {
+                    statusText = "滚动过快，当前画面与已截内容断开；放慢或回滚后自动恢复"
+                }
+                return .unreliable
+            case .memoryLimitExceeded:
+                pause(for: .residentMemoryLimitExceeded)
+                return .failed
             }
-            return .unreliable
+        }
+        if contribution == .covered,
+           !refreshPendingFrame(with: image) {
+            pause(for: .residentMemoryLimitExceeded)
+            return .failed
         }
         coverage = nextCoverage
         currentPreparedFrame = prepared
@@ -651,6 +701,22 @@ final class RollingCaptureController: ObservableObject {
             }.value
             guard !Task.isCancelled, !didEnd else { break }
             if generation == previewGeneration, let image {
+                var candidateFrames = frames
+                var candidatePlacements = placements
+                let frameHeight = frames.first?.height ?? image.height
+                guard enforceResidentMemoryBudget(
+                    frames: &candidateFrames,
+                    placements: &candidatePlacements,
+                    pendingTopFrame: pendingTopFrame,
+                    pendingBottomFrame: pendingBottomFrame,
+                    maximumSnapshotGap: frameHeight - confirmedTop - confirmedBottom - configuration.minimumShift,
+                    preview: image
+                ) else {
+                    pause(for: .residentMemoryLimitExceeded)
+                    break
+                }
+                frames = candidateFrames
+                placements = candidatePlacements
                 previewImage = image
             }
             if previewNeedsRefresh {
@@ -699,7 +765,19 @@ final class RollingCaptureController: ObservableObject {
             maximumHeight: 176,
             direction: direction
         ) else { return nil }
-        return image.cropping(to: cropRect)
+        guard let cropped = image.cropping(to: cropRect),
+              let context = CGContext(
+                  data: nil,
+                  width: cropped.width,
+                  height: cropped.height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: 0,
+                  space: CGColorSpaceCreateDeviceRGB(),
+                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              )
+        else { return nil }
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: cropped.width, height: cropped.height))
+        return context.makeImage()
     }
 
     nonisolated private static func downscaled(_ image: CGImage, scale: CGFloat) -> CGImage? {
@@ -723,12 +801,18 @@ final class RollingCaptureController: ObservableObject {
     /// 与快照链失去重叠的帧不参与合成，避免长图上出现空白带；空白带判断
     /// 以“最后一个将进入快照的帧”（含桥接帧）为参照，而不是最近已存储帧，
     /// 否则快速滚动时一次大位移会让后续所有帧被永久丢弃。
+    private enum KeyframeRetention {
+        case retained
+        case chainBroken
+        case memoryLimitExceeded
+    }
+
     private func retainKeyframe(
         _ image: CGImage,
         contribution: StitchCoverageContribution,
         originY: Int,
         match: StitchMatch
-    ) -> Bool {
+    ) -> KeyframeRetention {
         let spacing = max(image.height / 2, configuration.minimumShift)
         // 固定顶/底栏确认后会从合成时的每帧可用高度中扣除；链检查必须用同样的
         // 有效高度，否则极端间距下收尾合成会因帧间无重叠而失败。
@@ -738,65 +822,175 @@ final class RollingCaptureController: ObservableObject {
                 - max(confirmedBottom, match.stationaryBottomHeight),
             configuration.minimumShift
         )
+        var candidateFrames = frames
+        var candidatePlacements = placements
+        var candidateTopFrame = pendingTopFrame
+        var candidateBottomFrame = pendingBottomFrame
         switch contribution {
         case .prepend:
-            let minimumStoredOrigin = placements.map(\.originY).min() ?? 0
-            let lastSnapshotOrigin = pendingTopFrame?.originY ?? minimumStoredOrigin
+            let minimumStoredOrigin = candidatePlacements.map(\.originY).min() ?? 0
+            let lastSnapshotOrigin = candidateTopFrame?.originY ?? minimumStoredOrigin
             guard !StitchKeyframePolicy.breaksSnapshotChain(
                 gap: lastSnapshotOrigin - originY,
                 frameHeight: effectiveHeight,
                 minimumShift: configuration.minimumShift
-            ) else { return false }
+            ) else { return .chainBroken }
             switch StitchKeyframePolicy.decide(
                 gap: minimumStoredOrigin - originY,
                 spacing: spacing
             ) {
             case .bridge:
-                pendingTopFrame = (image, originY)
+                candidateTopFrame = (image, originY)
             case .retain:
                 if StitchKeyframePolicy.breaksSnapshotChain(
                     gap: minimumStoredOrigin - originY,
                     frameHeight: effectiveHeight,
                     minimumShift: configuration.minimumShift
-                ), let pendingTopFrame {
-                    frames.append(pendingTopFrame.image)
-                    placements.append(StitchFramePlacement(originY: pendingTopFrame.originY))
+                ), let candidateTopFrame {
+                    candidateFrames.append(candidateTopFrame.image)
+                    candidatePlacements.append(StitchFramePlacement(originY: candidateTopFrame.originY))
                 }
-                frames.append(image)
-                placements.append(StitchFramePlacement(originY: originY))
-                pendingTopFrame = nil
+                candidateFrames.append(image)
+                candidatePlacements.append(StitchFramePlacement(originY: originY))
+                candidateTopFrame = nil
             }
         case .append:
-            let maximumStoredOrigin = placements.map(\.originY).max() ?? 0
-            let lastSnapshotOrigin = pendingBottomFrame?.originY ?? maximumStoredOrigin
+            let maximumStoredOrigin = candidatePlacements.map(\.originY).max() ?? 0
+            let lastSnapshotOrigin = candidateBottomFrame?.originY ?? maximumStoredOrigin
             guard !StitchKeyframePolicy.breaksSnapshotChain(
                 gap: originY - lastSnapshotOrigin,
                 frameHeight: effectiveHeight,
                 minimumShift: configuration.minimumShift
-            ) else { return false }
+            ) else { return .chainBroken }
             switch StitchKeyframePolicy.decide(
                 gap: originY - maximumStoredOrigin,
                 spacing: spacing
             ) {
             case .bridge:
-                pendingBottomFrame = (image, originY)
+                candidateBottomFrame = (image, originY)
             case .retain:
                 if StitchKeyframePolicy.breaksSnapshotChain(
                     gap: originY - maximumStoredOrigin,
                     frameHeight: effectiveHeight,
                     minimumShift: configuration.minimumShift
-                ), let pendingBottomFrame {
-                    frames.append(pendingBottomFrame.image)
-                    placements.append(StitchFramePlacement(originY: pendingBottomFrame.originY))
+                ), let candidateBottomFrame {
+                    candidateFrames.append(candidateBottomFrame.image)
+                    candidatePlacements.append(StitchFramePlacement(originY: candidateBottomFrame.originY))
                 }
-                frames.append(image)
-                placements.append(StitchFramePlacement(originY: originY))
-                pendingBottomFrame = nil
+                candidateFrames.append(image)
+                candidatePlacements.append(StitchFramePlacement(originY: originY))
+                candidateBottomFrame = nil
             }
         case .covered:
             break
         }
+        guard enforceResidentMemoryBudget(
+            frames: &candidateFrames,
+            placements: &candidatePlacements,
+            pendingTopFrame: candidateTopFrame,
+            pendingBottomFrame: candidateBottomFrame,
+            maximumSnapshotGap: effectiveHeight - configuration.minimumShift
+        ) else { return .memoryLimitExceeded }
+        frames = candidateFrames
+        placements = candidatePlacements
+        pendingTopFrame = candidateTopFrame
+        pendingBottomFrame = candidateBottomFrame
+        return .retained
+    }
+
+    private func canRetainFirstFrame(_ image: CGImage) -> Bool {
+        let entry = residentMemoryImage(
+            image,
+            token: 0,
+            originY: 0,
+            isRemovableKeyframe: false
+        )
+        guard case .withinBudget = residentMemoryBudget.plan(
+            for: [entry],
+            maximumSnapshotGap: max(image.height - configuration.minimumShift, 0)
+        ) else { return false }
         return true
+    }
+
+    private func enforceResidentMemoryBudget(
+        frames: inout [CGImage],
+        placements: inout [StitchFramePlacement],
+        pendingTopFrame: (image: CGImage, originY: Int)?,
+        pendingBottomFrame: (image: CGImage, originY: Int)?,
+        maximumSnapshotGap: Int,
+        preview: CGImage? = nil
+    ) -> Bool {
+        let preview = preview ?? previewImage
+        var entries = zip(frames, placements).enumerated().map { index, pair in
+            residentMemoryImage(
+                pair.0,
+                token: index,
+                originY: pair.1.originY,
+                isRemovableKeyframe: true
+            )
+        }
+        let storedOrigins = Set(placements.map(\.originY))
+        if let pendingTopFrame {
+            entries.append(residentMemoryImage(
+                pendingTopFrame.image,
+                token: -1,
+                originY: pendingTopFrame.originY,
+                isRemovableKeyframe: false,
+                participatesInSnapshotChain: !storedOrigins.contains(pendingTopFrame.originY)
+            ))
+        }
+        if let pendingBottomFrame {
+            entries.append(residentMemoryImage(
+                pendingBottomFrame.image,
+                token: -2,
+                originY: pendingBottomFrame.originY,
+                isRemovableKeyframe: false,
+                participatesInSnapshotChain: !storedOrigins.contains(pendingBottomFrame.originY)
+            ))
+        }
+        if let preview {
+            entries.append(residentMemoryImage(
+                preview,
+                token: -3,
+                originY: 0,
+                isRemovableKeyframe: false,
+                participatesInSnapshotChain: false
+            ))
+        }
+
+        switch residentMemoryBudget.plan(
+            for: entries,
+            maximumSnapshotGap: max(maximumSnapshotGap, 0)
+        ) {
+        case .withinBudget:
+            return true
+        case .limitExceeded:
+            return false
+        case .thin(let keyframeTokens):
+            let removed = Set(keyframeTokens)
+            let retained = zip(frames, placements).enumerated().filter { !removed.contains($0.offset) }
+            frames = retained.map { $0.element.0 }
+            placements = retained.map { $0.element.1 }
+            return true
+        }
+    }
+
+    private func residentMemoryImage(
+        _ image: CGImage,
+        token: Int,
+        originY: Int,
+        isRemovableKeyframe: Bool,
+        participatesInSnapshotChain: Bool = true
+    ) -> RollingCaptureMemoryBudget.Image {
+        RollingCaptureMemoryBudget.Image(
+            token: token,
+            backingIdentifier: UInt64(bitPattern: Int64(ObjectIdentifier(image).hashValue)),
+            bytesPerRow: image.bytesPerRow,
+            height: image.height,
+            originY: originY,
+            isRemovableKeyframe: isRemovableKeyframe,
+            participatesInSnapshotChain: participatesInSnapshotChain
+        )
     }
 
     private func compositionSnapshot() -> (frames: [CGImage], placements: [StitchFramePlacement]) {
