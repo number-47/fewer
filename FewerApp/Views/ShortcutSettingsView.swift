@@ -5,6 +5,8 @@ struct ShortcutSettingsView: View {
     @ObservedObject var model: SettingsViewModel
     @State private var helperStatus = PermissionService.shortcutHelperStatus
     @State private var activateTask: Task<Void, Never>?
+    @State private var screenshotSettings = ScreenshotSettings.default
+    private let screenshotStore = ScreenshotSettingsStore()
 
     private var authorizationStatusText: String {
         if helperStatus.isAccessibilityTrusted {
@@ -23,15 +25,15 @@ struct ShortcutSettingsView: View {
                     Divider()
                     FewerSettingsRow { status("⌘V 粘贴支持", "Finder 中使用 ⌘V 粘贴文件", authorizationStatusText, helperStatus.isFresh()) }
                 }
-                FewerSettingsCard {
-                    FewerSettingsRow { Text("截图快捷键").fontWeight(.semibold) }
-                    Divider()
-                    FewerSettingsRow { Text("区域截图"); Spacer(); Text("⌘⌥A").monospaced().foregroundStyle(.secondary) }
-                    Divider()
-                    FewerSettingsRow { Text("窗口截图"); Spacer(); Text("⌘⌥W").monospaced().foregroundStyle(.secondary) }
-                    Divider()
-                    FewerSettingsRow { Text("全屏截图"); Spacer(); Text("⌘⌥F").monospaced().foregroundStyle(.secondary) }
-                }
+               FewerSettingsCard {
+                   FewerSettingsRow { Text("截图快捷键").fontWeight(.semibold) }
+                   Divider()
+                    FewerSettingsRow { HotKeyRecorder(title: "区域截图", spec: $screenshotSettings.regionHotKey) }
+                   Divider()
+                    FewerSettingsRow { HotKeyRecorder(title: "窗口截图", spec: $screenshotSettings.windowHotKey) }
+                   Divider()
+                    FewerSettingsRow { HotKeyRecorder(title: "全屏截图", spec: $screenshotSettings.fullscreenHotKey) }
+               }
                 FewerSettingsCard {
                     FewerSettingsRow {
                         VStack(alignment: .leading, spacing: 2) { Text("快捷键助手"); Text("辅助进程，负责监听与执行全局快捷键").font(.caption).foregroundStyle(.secondary) }
@@ -48,11 +50,20 @@ struct ShortcutSettingsView: View {
             }.padding(.bottom, 24)
         }
         .task {
+            screenshotSettings = screenshotStore.load()
             if model.settings.shortcutHelperEnabled {
                 PermissionService.launchShortcutHelper()
                 PermissionService.ensureShortcutHelperRunning()
             }
             helperStatus = PermissionService.shortcutHelperStatus
+        }
+        .onChange(of: screenshotSettings) { _, _ in
+            screenshotStore.save(screenshotSettings)
+            if screenshotSettings.shortcutsEnabled {
+                HotKeyManager.shared.install()
+            } else {
+                HotKeyManager.shared.unregisterAll()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             activateTask?.cancel()

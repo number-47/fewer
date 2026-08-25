@@ -198,7 +198,17 @@ struct InputEnhancementSettingsView: View {
     private func sliderRow(_ title: String, _ detail: String, _ value: Binding<Double>, _ range: ClosedRange<Double>, _ format: String) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) { Text(title); Text(detail).font(.caption).foregroundStyle(.secondary) }
-            Spacer(); Slider(value: value, in: range).frame(width: 120); Text(String(format: format, value.wrappedValue)).font(.caption.monospacedDigit()).frame(width: 44, alignment: .trailing)
+            Spacer()
+            Slider(value: value, in: range).frame(width: 100)
+            TextField("", value: value, format: .number)
+                .frame(width: 50)
+                .multilineTextAlignment(.trailing)
+                .textFieldStyle(.roundedBorder)
+                .onChange(of: value.wrappedValue) { _, new in
+                    if new < range.lowerBound || new > range.upperBound {
+                        value.wrappedValue = min(max(new, range.lowerBound), range.upperBound)
+                    }
+                }
         }
     }
 

@@ -123,7 +123,7 @@ struct ScreenshotSettingsView: View {
 }
 
 /// 快捷键录制行：点击后等待下一次按键组合，Esc 取消。
-private struct HotKeyRecorder: View {
+struct HotKeyRecorder: View {
     let title: String
     @Binding var spec: HotKeySpec
 
