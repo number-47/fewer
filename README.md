@@ -140,3 +140,7 @@ project.yml             XcodeGen 工程配置源
 提交改动前请先运行 `./script/verify.sh`。提交信息采用简洁的 [Conventional Commits](https://www.conventionalcommits.org/) 格式，例如 `feat: ...`、`fix: ...`、`docs: ...` 和 `test: ...`。
 
 涉及界面、Finder 菜单、系统权限或签名行为的变更，请在 Pull Request 中说明真实运行环境和验证结果；构建成功不能替代对应的交互验证。
+
+## License
+
+本项目基于 [MIT License](LICENSE) 开源。
