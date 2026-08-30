@@ -18,6 +18,14 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
     private var inputEventCoordinator: InputEventCoordinator?
     private var heartbeatTimer: Timer?
     private let statusStore = ShortcutHelperStatusStore()
+    private var lastSavedStatus: ShortcutHelperStatus?
+    private var hasObservedHostApplication = false
+    private let hostApplicationURL = Bundle.main.bundleURL
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .standardizedFileURL
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         inputEventCoordinator = InputEventCoordinator()
@@ -63,6 +71,7 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func refreshStatus() {
+        if stopIfHostApplicationExited() { return }
         let isTrusted = AXIsProcessTrusted()
         inputEventCoordinator?.refreshCachedState()
         let runtimeStatus = inputEventCoordinator?.status() ?? InputEventRuntimeStatus()
@@ -79,11 +88,37 @@ final class ShortcutHelperDelegate: NSObject, NSApplicationDelegate {
             processIdentifier: ProcessInfo.processInfo.processIdentifier,
             updatedAt: Date()
         )
-        try? statusStore.save(status)
+        if shouldPersistStatus(status) {
+            try? statusStore.save(status)
+            lastSavedStatus = status
+        }
         if isTrusted {
             inputEventCoordinator?.start()
         } else {
             inputEventCoordinator?.stop()
         }
+    }
+
+    private func stopIfHostApplicationExited() -> Bool {
+        let isRunning = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.number47.fewer"
+        ).contains {
+            $0.bundleURL?.standardizedFileURL == hostApplicationURL
+        }
+        if isRunning {
+            hasObservedHostApplication = true
+            return false
+        }
+        guard hasObservedHostApplication else { return false }
+        Task { @MainActor in
+            NSApp.terminate(nil)
+        }
+        return true
+    }
+
+    private func shouldPersistStatus(_ new: ShortcutHelperStatus) -> Bool {
+        guard let last = lastSavedStatus else { return true }
+        if !new.hasSameContent(as: last) { return true }
+        return Date().timeIntervalSince(last.updatedAt) >= 4
     }
 }

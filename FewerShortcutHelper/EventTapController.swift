@@ -47,12 +47,15 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
     private var mainDisplayHeight: CGFloat = 0
     private var pendingGestureHUDUpdate: (point: CGPoint, directions: [MouseGestureDirection])?
     private var gestureHUDUpdateToken: UUID?
+    private var scrollDirectionTracker = ScrollDirectionTracker()
 
     private let bridge = PasteboardCutBridge()
     private let finderSettingsStore = try? SharedSettingsStore()
     private let inputSettingsStore = InputEnhancementStore()
     @MainActor private lazy var scrollEngine: SmoothScrollEngine = {
-        let engine = SmoothScrollEngine()
+        let engine = SmoothScrollEngine { [weak self] generation in
+            self?.isScrollGenerationCurrent(generation) ?? false
+        }
         engine.activityChanged = { [weak self] active in
             self?.updateRuntimeStatus { $0.isScrollEngineActive = active }
         }
@@ -314,12 +317,13 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
         let shouldBypass = inputSuppressed
         stateLock.unlock()
         guard !shouldBypass, bundleIdentifier != "com.number47.fewer" else {
+            invalidateScrollDirection()
             Task { @MainActor [weak self] in self?.scrollEngine.cancel() }
             return false
         }
         if lastScrollBundleIdentifier != bundleIdentifier {
             lastScrollBundleIdentifier = bundleIdentifier
-            Task { @MainActor [weak self] in self?.scrollEngine.cancel() }
+            invalidateScrollDirection()
         }
         let snapshot = ScrollEventSnapshot(
             isContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
@@ -337,13 +341,18 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
             || result.horizontalDelta != snapshot.horizontalDelta
         guard changed else { return false }
         let displayID = displayID(at: event.location)
+        let generation = recordScrollDirection(
+            vertical: result.verticalDelta,
+            horizontal: result.horizontalDelta
+        )
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.scrollEngine.enqueue(
                 vertical: result.verticalDelta,
                 horizontal: result.horizontalDelta,
                 settings: resolved,
-                displayID: displayID
+                displayID: displayID,
+                generation: generation
             )
             self.updateRuntimeStatus { $0.isScrollEngineActive = self.scrollEngine.isActive }
         }
@@ -621,6 +630,7 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
         stateLock.lock()
         temporaryAllKeys = false
         stateLock.unlock()
+        invalidateScrollDirection()
         Task { @MainActor [weak self] in
             self?.scrollEngine.cancel()
             self?.gestureHUD.hide()
@@ -771,6 +781,24 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
         stateLock.lock()
         update(&runtimeStatus)
         stateLock.unlock()
+    }
+
+    private func recordScrollDirection(vertical: Double, horizontal: Double) -> UInt64 {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return scrollDirectionTracker.record(vertical: vertical, horizontal: horizontal)
+    }
+
+    private func invalidateScrollDirection() {
+        stateLock.lock()
+        scrollDirectionTracker.invalidate()
+        stateLock.unlock()
+    }
+
+    private func isScrollGenerationCurrent(_ generation: UInt64) -> Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return scrollDirectionTracker.isCurrent(generation)
     }
 
     @objc private func applicationContextDidChange() {

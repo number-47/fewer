@@ -113,6 +113,35 @@ final class InputProcessingTests: XCTestCase {
         XCTAssertEqual(simulate(frameRate: 60), simulate(frameRate: 120), accuracy: 0.000_001)
     }
 
+    func testScrollDirectionGenerationInvalidatesPreviousDirectionImmediately() {
+        var tracker = ScrollDirectionTracker()
+        let downwardGeneration = tracker.record(vertical: 8, horizontal: 0)
+
+        XCTAssertTrue(tracker.isCurrent(downwardGeneration))
+        XCTAssertEqual(tracker.record(vertical: 4, horizontal: 0), downwardGeneration)
+
+        let upwardGeneration = tracker.record(vertical: -3, horizontal: 0)
+
+        XCTAssertFalse(tracker.isCurrent(downwardGeneration))
+        XCTAssertTrue(tracker.isCurrent(upwardGeneration))
+    }
+
+    func testScrollDirectionGenerationTracksAxesAndExplicitInvalidation() {
+        var tracker = ScrollDirectionTracker()
+        let initialGeneration = tracker.record(vertical: 6, horizontal: 2)
+
+        XCTAssertEqual(tracker.record(vertical: 0, horizontal: 1), initialGeneration)
+
+        let reversedHorizontalGeneration = tracker.record(vertical: 0, horizontal: -1)
+
+        XCTAssertFalse(tracker.isCurrent(initialGeneration))
+        XCTAssertTrue(tracker.isCurrent(reversedHorizontalGeneration))
+
+        tracker.invalidate()
+
+        XCTAssertFalse(tracker.isCurrent(reversedHorizontalGeneration))
+    }
+
     func testSyntheticScrollUsesDiscreteLineEventsWithoutTrackpadSimulation() {
         let spec = SyntheticScrollEventSpecFactory.make(
             vertical: -3,

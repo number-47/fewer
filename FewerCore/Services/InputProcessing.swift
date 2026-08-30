@@ -112,6 +112,43 @@ public enum ScrollDecayModel {
     }
 }
 
+public struct ScrollDirectionTracker: Sendable {
+    private var verticalSign: FloatingPointSign?
+    private var horizontalSign: FloatingPointSign?
+    private var generation: UInt64 = 0
+
+    public init() {}
+
+    @discardableResult
+    public mutating func record(vertical: Double, horizontal: Double) -> UInt64 {
+        var changedDirection = false
+        if vertical != 0 {
+            let sign = vertical.sign
+            changedDirection = verticalSign.map { $0 != sign } ?? false
+            verticalSign = sign
+        }
+        if horizontal != 0 {
+            let sign = horizontal.sign
+            changedDirection = changedDirection || (horizontalSign.map { $0 != sign } ?? false)
+            horizontalSign = sign
+        }
+        if changedDirection {
+            generation &+= 1
+        }
+        return generation
+    }
+
+    public mutating func invalidate() {
+        generation &+= 1
+        verticalSign = nil
+        horizontalSign = nil
+    }
+
+    public func isCurrent(_ generation: UInt64) -> Bool {
+        self.generation == generation
+    }
+}
+
 public enum SyntheticScrollUnits: Equatable, Sendable {
     case line
     case pixel

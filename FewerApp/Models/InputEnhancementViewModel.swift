@@ -242,14 +242,16 @@ final class InputEnhancementViewModel: NSObject, ObservableObject {
         guard isRefreshing else { return }
         let generation = refreshGeneration
         guard let store else { return }
-        Task { [weak self] in
-            let loadedSettings = await Task.detached(priority: .utility) { store.load() }.value
-            guard let self,
-                  self.isRefreshing,
-                  self.refreshGeneration == generation,
-                  !Task.isCancelled
-            else { return }
-            self.settings = loadedSettings
+        DispatchQueue.main.async { [weak self] in
+            Task { [weak self] in
+                let loadedSettings = await Task.detached(priority: .utility) { store.load() }.value
+                guard let self,
+                      self.isRefreshing,
+                      self.refreshGeneration == generation,
+                      !Task.isCancelled
+                else { return }
+                self.settings = loadedSettings
+            }
         }
     }
 }

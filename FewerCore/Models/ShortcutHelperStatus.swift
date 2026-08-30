@@ -78,4 +78,18 @@ public struct ShortcutHelperStatus: Codable, Equatable, Sendable {
     public func isFresh(at date: Date = Date(), timeout: TimeInterval = 5) -> Bool {
         processIdentifier > 0 && date.timeIntervalSince(updatedAt) <= timeout
     }
+
+    /// Compare all meaningful fields except `updatedAt`.
+    public func hasSameContent(as other: ShortcutHelperStatus) -> Bool {
+        isAccessibilityTrusted == other.isAccessibilityTrusted &&
+        isInputMonitoringTrusted == other.isInputMonitoringTrusted &&
+        isEventTapActive == other.isEventTapActive &&
+        isScrollEngineActive == other.isScrollEngineActive &&
+        isGestureEngineActive == other.isGestureEngineActive &&
+        isKeycastActive == other.isKeycastActive &&
+        detectedScrollDevice == other.detectedScrollDevice &&
+        emergencyDisabled == other.emergencyDisabled &&
+        lastError == other.lastError &&
+        processIdentifier == other.processIdentifier
+    }
 }

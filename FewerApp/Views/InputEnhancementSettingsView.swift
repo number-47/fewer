@@ -320,30 +320,25 @@ struct InputEnhancementSettingsView: View {
                 add: { chooseExcludedApplication(forKeycast: false) },
                 remove: { model.settings.gestureExcludedBundleIdentifiers.remove($0); model.save() }
             )
-            ForEach(Array(model.settings.gestureRules.enumerated()), id: \.element.id) { index, rule in
+            ForEach(model.settings.gestureRules) { rule in
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 12) {
-                        Toggle("", isOn: gestureEnabledBinding(index)).labelsHidden()
-                        Picker("触发键", selection: gestureButtonBinding(index)) {
+                        Toggle("", isOn: gestureEnabledBinding(rule.id)).labelsHidden()
+                        Picker("触发键", selection: gestureButtonBinding(rule.id)) {
                             Text("右键").tag(Int64(1))
                             Text("中键").tag(Int64(2))
                             Text("侧键 1").tag(Int64(3))
                             Text("侧键 2").tag(Int64(4))
                         }.frame(width: 110)
-                      GestureRuleRecorder(
-                            directions: Binding(
-                                get: { model.settings.gestureRules[index].directions },
-                                set: { model.settings.gestureRules[index].directions = $0; model.save() }
-                            )
-                        )
+                        GestureRuleRecorder(directions: gestureDirectionsBinding(rule.id))
                         Spacer()
                         Button(role: .destructive) {
-                            model.settings.gestureRules.remove(at: index)
+                            model.settings.gestureRules.removeAll { $0.id == rule.id }
                             model.save()
                         } label: { Image(systemName: "trash") }
                     }
                     HStack(spacing: 12) {
-                        Picker("动作", selection: gestureActionBinding(index)) {
+                        Picker("动作", selection: gestureActionBinding(rule.id)) {
                             Text("后退").tag(InputAction.mouseBack)
                             Text("前进").tag(InputAction.mouseForward)
                             Text("Mission Control").tag(InputAction.missionControl)
@@ -358,7 +353,7 @@ struct InputEnhancementSettingsView: View {
                         Text("最小化窗口").tag(InputAction.minimizeWindow)
                         Text("最大化窗口").tag(InputAction.zoomWindow)
                         }.frame(minWidth: 150)
-                        TextField("Bundle ID（留空为全局）", text: gestureBundleBinding(index))
+                        TextField("Bundle ID（留空为全局）", text: gestureBundleBinding(rule.id))
                             .frame(maxWidth: 240)
                         Spacer()
                     }
@@ -524,28 +519,51 @@ struct InputEnhancementSettingsView: View {
         )
     }
 
-    private func gestureEnabledBinding(_ index: Int) -> Binding<Bool> {
-        Binding(get: { model.settings.gestureRules[index].isEnabled }, set: {
-            model.settings.gestureRules[index].isEnabled = $0; model.save()
+    private func gestureEnabledBinding(_ id: UUID) -> Binding<Bool> {
+        Binding(get: {
+            model.settings.gestureRules.first(where: { $0.id == id })?.isEnabled ?? false
+        }, set: {
+            guard let index = model.settings.gestureRules.firstIndex(where: { $0.id == id }) else { return }
+            model.settings.gestureRules[index].isEnabled = $0
+            model.save()
         })
     }
 
-    private func gestureButtonBinding(_ index: Int) -> Binding<Int64> {
-        Binding(get: { model.settings.gestureRules[index].triggerButton }, set: {
-            model.settings.gestureRules[index].triggerButton = $0; model.save()
+    private func gestureButtonBinding(_ id: UUID) -> Binding<Int64> {
+        Binding(get: {
+            model.settings.gestureRules.first(where: { $0.id == id })?.triggerButton ?? 1
+        }, set: {
+            guard let index = model.settings.gestureRules.firstIndex(where: { $0.id == id }) else { return }
+            model.settings.gestureRules[index].triggerButton = $0
+            model.save()
         })
     }
 
-    private func gestureActionBinding(_ index: Int) -> Binding<InputAction> {
-        Binding(get: { model.settings.gestureRules[index].action }, set: {
-            model.settings.gestureRules[index].action = $0; model.save()
+    private func gestureDirectionsBinding(_ id: UUID) -> Binding<[MouseGestureDirection]> {
+        Binding(get: {
+            model.settings.gestureRules.first(where: { $0.id == id })?.directions ?? []
+        }, set: {
+            guard let index = model.settings.gestureRules.firstIndex(where: { $0.id == id }) else { return }
+            model.settings.gestureRules[index].directions = $0
+            model.save()
         })
     }
 
-    private func gestureBundleBinding(_ index: Int) -> Binding<String> {
+    private func gestureActionBinding(_ id: UUID) -> Binding<InputAction> {
+        Binding(get: {
+            model.settings.gestureRules.first(where: { $0.id == id })?.action ?? .mouseBack
+        }, set: {
+            guard let index = model.settings.gestureRules.firstIndex(where: { $0.id == id }) else { return }
+            model.settings.gestureRules[index].action = $0
+            model.save()
+        })
+    }
+
+    private func gestureBundleBinding(_ id: UUID) -> Binding<String> {
         Binding(
-            get: { model.settings.gestureRules[index].bundleIdentifier ?? "" },
+            get: { model.settings.gestureRules.first(where: { $0.id == id })?.bundleIdentifier ?? "" },
             set: {
+                guard let index = model.settings.gestureRules.firstIndex(where: { $0.id == id }) else { return }
                 let value = $0.trimmingCharacters(in: .whitespacesAndNewlines)
                 model.settings.gestureRules[index].bundleIdentifier = value.isEmpty ? nil : value
                 model.scheduleSave()

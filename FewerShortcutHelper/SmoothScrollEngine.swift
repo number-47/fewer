@@ -5,6 +5,7 @@ import QuartzCore
 @MainActor
 final class SmoothScrollEngine: NSObject {
     var activityChanged: ((Bool) -> Void)?
+    private let isGenerationCurrent: (UInt64) -> Bool
     private var displayLink: CADisplayLink?
     private var verticalRemaining = 0.0
     private var horizontalRemaining = 0.0
@@ -14,15 +15,23 @@ final class SmoothScrollEngine: NSObject {
     private var simulatesTrackpad = false
     private var phaseStarted = false
     private var momentumStarted = false
+    private var activeGeneration: UInt64?
     private(set) var isActive = false
+
+    init(isGenerationCurrent: @escaping (UInt64) -> Bool) {
+        self.isGenerationCurrent = isGenerationCurrent
+        super.init()
+    }
 
     func enqueue(
         vertical: Double,
         horizontal: Double,
         settings: ScrollEnhancementSettings,
-        displayID: CGDirectDisplayID?
+        displayID: CGDirectDisplayID?,
+        generation: UInt64
     ) {
-        if settings.simulatesTrackpad, isActive {
+        guard isGenerationCurrent(generation) else { return }
+        if activeGeneration != generation || (settings.simulatesTrackpad && isActive) {
             cancel()
         }
         verticalResponse = settings.vertical.response
@@ -46,6 +55,7 @@ final class SmoothScrollEngine: NSObject {
             post(vertical: 0, horizontal: horizontal, phase: nil)
         }
         guard abs(verticalRemaining) >= 0.5 || abs(horizontalRemaining) >= 0.5 else { return }
+        activeGeneration = generation
         let screen: NSScreen?
         if let displayID {
             screen = NSScreen.screens.first {
@@ -74,6 +84,7 @@ final class SmoothScrollEngine: NSObject {
         lastTimestamp = nil
         phaseStarted = false
         momentumStarted = false
+        activeGeneration = nil
         isActive = false
         if wasActive { activityChanged?(false) }
     }
@@ -88,6 +99,10 @@ final class SmoothScrollEngine: NSObject {
     }
 
     @objc private func step(_ link: CADisplayLink) {
+        guard let activeGeneration, isGenerationCurrent(activeGeneration) else {
+            cancel()
+            return
+        }
         let timestamp = link.timestamp
         let deltaTime = min(max(timestamp - (lastTimestamp ?? timestamp - link.duration), 1.0 / 240.0), 0.05)
         lastTimestamp = timestamp

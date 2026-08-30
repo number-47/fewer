@@ -30,10 +30,13 @@ public final class ShortcutHelperStatusStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        try FileManager.default.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
+        let directory = fileURL.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            try FileManager.default.createDirectory(
+                at: directory,
+                withIntermediateDirectories: true
+            )
+        }
         let data = try encoder.encode(status)
         try data.write(to: fileURL, options: .atomic)
     }
