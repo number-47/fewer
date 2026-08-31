@@ -24,6 +24,7 @@ echo "[1/6] 校验 Codex 配置"
 /usr/bin/python3 -m json.tool .codex/hooks.json >/dev/null
 /usr/bin/python3 "$VERIFY_STOP_GATE" --validate-config
 PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 "$VERIFY_HOOK_TESTS"
+PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 script/verify_agent_state.py
 test "$(sed -n '2p' .agents/skills/ship-code/SKILL.md)" = "name: ship-code"
 grep -q '^  default_prompt: ".*\$ship-code' .agents/skills/ship-code/agents/openai.yaml
 

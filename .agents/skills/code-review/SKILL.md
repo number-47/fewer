@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Use when reviewing a Fewer pull request — orient the reviewer to this repository's standards (AGENTS.md conventions, project.yml module boundaries, Swift 6 strict concurrency, testing and security rules) and the review-specific checks code alone cannot show.
+description: Use when reviewing a Fewer pull request — orient the review to this repository's standards (AGENTS.md conventions, project.yml module boundaries, Swift 6 strict concurrency, testing and security rules) and the review-specific checks code alone cannot show.
 ---
 
 # 审查 Fewer PR

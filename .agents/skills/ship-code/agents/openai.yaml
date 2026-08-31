@@ -1,4 +1,4 @@
 interface:
   display_name: "Ship Code"
-  short_description: "按 Fewer 项目门禁完成实现、验证、独立审查与交付"
-  default_prompt: "使用 $ship-code 完成此 Fewer 代码改动，包括测试、完整验证与独立审查。"
+  short_description: "按范围完成 Fewer 实现、最小充分验证、主对话验收与风险报告"
+  default_prompt: "使用 $ship-code 完成此 Fewer 代码改动，运行最小充分验证并接受主对话验收。"

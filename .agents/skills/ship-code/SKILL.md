@@ -1,6 +1,6 @@
 ---
 name: ship-code
-description: Use for tasks that create, edit, delete, or rename Fewer repository code, tests, build scripts, project.yml, or tracked configuration. Run the complete implementation, verification, independent review, and reporting workflow. Do not use for read-only explanation, diagnosis, planning, review, or status checks.
+description: Use for tasks that create, edit, delete, or rename Fewer repository code, tests, build scripts, project.yml, or tracked configuration. Run the implementation, minimum sufficient verification, main-conversation acceptance, and reporting workflow. Do not use for read-only explanation, diagnosis, planning, review, or status checks.
 ---
 
 # Ship Code
@@ -24,20 +24,19 @@ description: Use for tasks that create, edit, delete, or rename Fewer repository
 ## 3. 逐步验证
 
 - 在迭代过程中运行与改动直接相关的最小测试。
-- 实现完成后运行唯一完整门禁：
+- 完成时运行任务明确要求的最小充分验证；只修复由本任务造成的失败，对预先存在或无法归因的失败保留证据。
+- 仅在跨模块改动、`project.yml`/target/scheme、验证基础设施、发布任务、无法归因的改动，或用户明确要求时，运行完整门禁：
 
   ```bash
   ./script/verify.sh
   ```
 
-- 只修复由本任务造成的失败；对预先存在或无法归因的失败保留证据并明确报告。
+`pre-push-checks` 是推送或标记可审查时的详细验证矩阵；不要在这里复制另一套门禁。审查后若有代码变化，只重新运行受影响的验证；完整门禁只在其适用范围发生变化时重跑。
 
-## 4. 独立审查
+## 4. 主对话验收
 
-- 委派项目自定义 `reviewer` agent，提供用户需求、成功标准、任务文件清单和本任务 diff 范围。
-- 若自定义 agent 尚未加载，改用一个明确只读的独立 subagent 执行同样审查，并报告该回退。
+- 主对话检查任务 diff、验收标准、验证证据、范围控制与剩余风险。
 - 修复全部 P0、P1，以及确实影响本任务的 P2；忽略纯风格偏好和范围外建议。
-- 审查后发生任何代码变化时，再次运行 `./script/verify.sh`。
 
 ## 5. 交付检查
 

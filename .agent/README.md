@@ -1,101 +1,58 @@
-# Agent 协作系统
+# Agent 协作状态
 
-本目录是多 Agent 协作系统的操作中心。仓库文件是唯一事实源。
+`.agent/` 是项目协作的持久事实源。当前热状态只在 `PROJECT.md`；技术决策在 `decisions/`；任务在 `tasks/`。
 
-## 文件说明
+## 目录
 
-| 文件 | 用途 |
-|------|------|
-| `CURRENT.md` | 当前状态快照（目标、活动/审查任务、阻塞、下一步），保持很小 |
-| `PLAN.md` | 当前实施计划，包含任务列表与依赖关系 |
-| `tasks/active/` | 可执行任务（`Txxx.md`） |
-| `tasks/review/` | 待审查任务 |
-| `tasks/archive/` | 已完成/取消任务的归档 |
-| `decisions/` | 单项技术决策（`Dxxx-<slug>.md` + `INDEX.md`） |
+| 路径 | 用途 |
+|---|---|
+| `PROJECT.md` | 当前目标、约束、直接阻塞、下一动作和最近核对日期 |
+| `tasks/active/` | 未终结任务：`PENDING`、`IN_PROGRESS`、`BLOCKED` |
+| `tasks/archive/YYYY-MM/` | 终结任务：`DONE`、`CANCELLED`，保留历史证据 |
+| `decisions/` | 可复用的技术决策 |
 
-## 工作流
+## 任务格式
 
-自动编排主入口：
+活动任务使用以下最小结构。任务文件是状态、依赖、验收和证据的唯一来源。
 
+```markdown
+# Txxx: 标题
+
+## Metadata
+- Priority: P0 | P1 | P2
+- Status: PENDING | IN_PROGRESS | BLOCKED
+- Dependencies: 无 | Txxx, Tyyy
+
+## Goal
+可验证的单一结果。
+
+## Scope
+允许修改的范围和必要的排除项。
+
+## Acceptance Criteria
+- 可逐项判定的结果。
+
+## Validation
+- 最小充分的验证命令或人工验证矩阵。
+
+## Evidence
+仅在实施、阻塞或验收时追加。`BLOCKED` 必须说明证据和解除条件。
 ```
-project-run（Orchestrator）→ Planner → Executor → Reviewer → 循环 → Milestone DONE
-```
 
-人工 fallback：
-
-```
-project-plan / project-next / project-execute / project-review / project-replan
-```
-
-1. **Planner**（推荐 Sol XHigh）创建计划与任务，不写生产代码。
-2. **Executor**（Terra 常规 / Luna 简单）执行单个任务，完成后置为 REVIEW。
-3. **Reviewer**（Sol High）独立验收，只有 Reviewer 能置 DONE。
-4. **project-compact** 归档已完成任务与历史，保持热数据小。
+`PENDING` 不需要额外激活迁移：所有依赖均为归档 `DONE` 时即可选择执行。实施开始后置为 `IN_PROGRESS`；主对话验收通过后写入证据、置为 `DONE` 并立即移入当月归档。需修复时保持 `IN_PROGRESS`；取消任务记录原因后归档。`BLOCKED` 只表示任务自身的直接阻塞，不用于表达未完成依赖。
 
 ## 使用方式
 
-在 Codex 中：
+唯一入口是 `$project-workflow`：
 
-```
-# 自动完成整个需求（Orchestrator 循环，中间无需人工“继续”）
-$project-run <需求描述>
-
-# 制定计划
-$project-plan <需求描述>
-
-# 执行下一个 READY 任务
-$project-next
-
-# 执行指定任务
-$project-execute T001
-
-# 审查任务
-$project-review T001
-
-# 重新规划
-$project-replan T003 blocked by API limit
-
-# 归档与收敛
-$project-compact
+```text
+$project-workflow plan <目标>
+$project-workflow replan [Txxx] <原因>
+$project-workflow run [目标]
+$project-workflow next
+$project-workflow task Txxx
+$project-workflow review Txxx
+$project-workflow compact
 ```
 
-## 状态值
-
-- `BACKLOG` — 任务已创建，尚未就绪
-- `READY` — 依赖已满足，可以执行
-- `IN_PROGRESS` — 正在执行
-- `REVIEW` — 执行完成，等待审查
-- `BLOCKED` — 被阻塞，需 Planner 介入
-- `DONE` — 审查通过且验收标准全部满足
-- `CANCELLED` — 已取消
-
-## 任务文件模板
-
-创建新任务时使用以下模板：
-
-```markdown
-# Txxx: <标题>
-
-## Goal
-<这个任务要达成什么>
-
-## Context
-<为什么需要这个任务>
-
-## Files likely affected
-- `path/to/file.swift`
-
-## Dependencies
-- Txxx (必须先完成)
-
-## Implementation steps
-1. ...
-2. ...
-
-## Acceptance criteria
-- [ ] <可验证的条件 1>
-- [ ] <可验证的条件 2>
-
-## Recommended executor model
-<推荐模型，如 Sol / Terra / Luna>
-```
+`next` 与 `task` 完成一个任务的实施、验收和状态迁移后停止；`run` 在每次归档后重新读取任务并继续。归档只收敛 `PROJECT.md` 和终态位置，不删除历史证据。
