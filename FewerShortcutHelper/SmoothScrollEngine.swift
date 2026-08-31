@@ -106,12 +106,12 @@ final class SmoothScrollEngine: NSObject {
         let timestamp = link.timestamp
         let deltaTime = min(max(timestamp - (lastTimestamp ?? timestamp - link.duration), 1.0 / 240.0), 0.05)
         lastTimestamp = timestamp
-        let vertical = consumableAmount(
+        let vertical = ScrollDecayModel.consumableAmount(
             from: &verticalRemaining,
             deltaTime: deltaTime,
             response: verticalResponse
         )
-        let horizontal = consumableAmount(
+        let horizontal = ScrollDecayModel.consumableAmount(
             from: &horizontalRemaining,
             deltaTime: deltaTime,
             response: horizontalResponse
@@ -137,30 +137,6 @@ final class SmoothScrollEngine: NSObject {
         if abs(verticalRemaining) < 0.5, abs(horizontalRemaining) < 0.5 {
             cancel()
         }
-    }
-
-    private func consumableAmount(
-        from remaining: inout Double,
-        deltaTime: Double,
-        response: Double
-    ) -> Double {
-        let proposed = ScrollDecayModel.displacement(
-            remaining: remaining,
-            deltaTime: deltaTime,
-            response: response
-        )
-        guard abs(proposed) >= 0.5 else {
-            guard abs(remaining) >= 0.5 else {
-                remaining = 0
-                return 0
-            }
-            let amount = remaining.sign == .minus ? -1.0 : 1.0
-            remaining -= amount
-            return amount
-        }
-        let amount = proposed.rounded()
-        remaining -= amount
-        return amount
     }
 
     private func post(

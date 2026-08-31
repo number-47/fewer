@@ -84,6 +84,37 @@ public enum ScrollEventProcessor {
 }
 
 public enum ScrollDeltaReader {
+    /// Returns a discrete line delta for physical mouse events.
+    /// When the line field is unavailable, only preserve the sign because the
+    /// fixed-point and point fields may contain pixel magnitudes.
+    public static func lineDelta(fixedPtDelta: Double, pointDelta: Int, lineDelta: Int) -> Double {
+        if lineDelta != 0 { return Double(lineDelta) }
+        if fixedPtDelta != 0 { return fixedPtDelta.sign == .minus ? -1 : 1 }
+        return Double(pointDelta.signum())
+    }
+
+    public static func delta(
+        fixedPtDelta: Double,
+        pointDelta: Int,
+        lineDelta: Int,
+        units: SyntheticScrollUnits
+    ) -> Double {
+        switch units {
+        case .line:
+            Self.lineDelta(
+                fixedPtDelta: fixedPtDelta,
+                pointDelta: pointDelta,
+                lineDelta: lineDelta
+            )
+        case .pixel:
+            Self.pixelDelta(
+                fixedPtDelta: fixedPtDelta,
+                pointDelta: pointDelta,
+                lineDelta: lineDelta
+            )
+        }
+    }
+
     /// Returns a scroll delta in pixels from the three Quartz scroll fields.
     ///
     /// `scrollWheelEventPointDeltaAxis*` is unambiguously pixel-based, so it is
@@ -109,6 +140,31 @@ public enum ScrollDecayModel {
         guard remaining != 0, deltaTime > 0 else { return 0 }
         let clampedResponse = min(max(response, 0.05), 0.8)
         return remaining * (1 - exp(-deltaTime / clampedResponse))
+    }
+
+    public static func consumableAmount(
+        from remaining: inout Double,
+        deltaTime: Double,
+        response: Double
+    ) -> Double {
+        guard abs(remaining) >= 0.5 else {
+            remaining = 0
+            return 0
+        }
+        let proposed = displacement(
+            remaining: remaining,
+            deltaTime: deltaTime,
+            response: response
+        )
+        let amount = abs(proposed) >= 0.5
+            ? proposed.rounded()
+            : (remaining.sign == .minus ? -1.0 : 1.0)
+        if abs(amount) >= abs(remaining) {
+            remaining = 0
+        } else {
+            remaining -= amount
+        }
+        return amount
     }
 }
 

@@ -325,14 +325,15 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
             lastScrollBundleIdentifier = bundleIdentifier
             invalidateScrollDirection()
         }
+        let resolved = settings.resolvedScrollSettings(for: bundleIdentifier)
+        let units: SyntheticScrollUnits = resolved?.simulatesTrackpad == true ? .pixel : .line
         let snapshot = ScrollEventSnapshot(
             isContinuous: event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0,
             scrollPhase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
             momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase),
-            verticalDelta: scrollDelta(event, axis: 1),
-            horizontalDelta: scrollDelta(event, axis: 2)
+            verticalDelta: scrollDelta(event, axis: 1, units: units),
+            horizontalDelta: scrollDelta(event, axis: 2, units: units)
         )
-        let resolved = settings.resolvedScrollSettings(for: bundleIdentifier)
         let result = ScrollEventProcessor.process(snapshot, settings: resolved)
         updateRuntimeStatus { $0.detectedScrollDevice = result.device }
         guard let resolved, result.device == ScrollInputDevice.mouse else { return false }
@@ -359,14 +360,22 @@ final class InputEventCoordinator: NSObject, @unchecked Sendable {
         return true
     }
 
-    private func scrollDelta(_ event: CGEvent, axis: Int) -> Double {
+    private func scrollDelta(
+        _ event: CGEvent,
+        axis: Int,
+        units: SyntheticScrollUnits
+    ) -> Double {
         let fixedField: CGEventField = axis == 1 ? .scrollWheelEventFixedPtDeltaAxis1 : .scrollWheelEventFixedPtDeltaAxis2
         let pointField: CGEventField = axis == 1 ? .scrollWheelEventPointDeltaAxis1 : .scrollWheelEventPointDeltaAxis2
         let lineField: CGEventField = axis == 1 ? .scrollWheelEventDeltaAxis1 : .scrollWheelEventDeltaAxis2
-        return ScrollDeltaReader.pixelDelta(
-            fixedPtDelta: event.getDoubleValueField(fixedField),
-            pointDelta: Int(event.getIntegerValueField(pointField)),
-            lineDelta: Int(event.getIntegerValueField(lineField))
+        let fixedPtDelta = event.getDoubleValueField(fixedField)
+        let pointDelta = Int(event.getIntegerValueField(pointField))
+        let lineDelta = Int(event.getIntegerValueField(lineField))
+        return ScrollDeltaReader.delta(
+            fixedPtDelta: fixedPtDelta,
+            pointDelta: pointDelta,
+            lineDelta: lineDelta,
+            units: units
         )
     }
 

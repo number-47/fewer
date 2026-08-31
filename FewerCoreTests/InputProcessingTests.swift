@@ -85,6 +85,24 @@ final class InputProcessingTests: XCTestCase {
         XCTAssertEqual(result.horizontalDelta, 15)
     }
 
+    func testScrollDeltaReaderPrefersDiscreteLineDeltaForMouseEvents() {
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: 1, pointDelta: 40, lineDelta: 1), 1)
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: -1, pointDelta: -40, lineDelta: -1), -1)
+        XCTAssertEqual(
+            ScrollDeltaReader.delta(fixedPtDelta: 1, pointDelta: 40, lineDelta: 1, units: .line),
+            1
+        )
+        XCTAssertEqual(
+            ScrollDeltaReader.delta(fixedPtDelta: 1, pointDelta: 40, lineDelta: 1, units: .pixel),
+            40
+        )
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: 40, pointDelta: 0, lineDelta: 0), 1)
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: -40, pointDelta: 0, lineDelta: 0), -1)
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: 0, pointDelta: 40, lineDelta: 0), 1)
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: 0, pointDelta: -40, lineDelta: 0), -1)
+        XCTAssertEqual(ScrollDeltaReader.lineDelta(fixedPtDelta: 0, pointDelta: 0, lineDelta: 0), 0)
+    }
+
     func testScrollDeltaReaderPrefersUnambiguousPixelPointDelta() {
         // The point (pixel) delta is preferred even when a fixed-pt value is present,
         // because the fixed-pt field can be line-based (1.0 per notch) on some mice.
@@ -111,6 +129,60 @@ final class InputProcessingTests: XCTestCase {
         }
 
         XCTAssertEqual(simulate(frameRate: 60), simulate(frameRate: 120), accuracy: 0.000_001)
+    }
+
+    func testScrollDecayConsumesHalfLineTailWithoutReversingDirection() {
+        var settings = ScrollEnhancementSettings(isEnabled: true)
+        settings.vertical.minimumStep = 1
+        settings.vertical.speedGain = 0.25
+        let event = ScrollEventSnapshot(
+            isContinuous: false,
+            scrollPhase: 0,
+            momentumPhase: 0,
+            verticalDelta: 1,
+            horizontalDelta: 0
+        )
+        let perEvent = ScrollEventProcessor.process(event, settings: settings).verticalDelta
+        XCTAssertEqual(perEvent, 0.25)
+
+        var positiveRemaining = perEvent + perEvent
+        XCTAssertEqual(
+            ScrollDecayModel.consumableAmount(
+                from: &positiveRemaining,
+                deltaTime: 1 / 60,
+                response: 0.18
+            ),
+            1
+        )
+        XCTAssertEqual(positiveRemaining, 0)
+
+        var negativeRemaining = -0.5
+        XCTAssertEqual(
+            ScrollDecayModel.consumableAmount(
+                from: &negativeRemaining,
+                deltaTime: 1 / 60,
+                response: 0.18
+            ),
+            -1
+        )
+        XCTAssertEqual(negativeRemaining, 0)
+    }
+
+    func testScrollDecayDoesNotReverseDirectionForTailLargerThanOneLine() {
+        var remaining = 1.6
+        var amounts: [Double] = []
+        while remaining != 0 {
+            amounts.append(
+                ScrollDecayModel.consumableAmount(
+                    from: &remaining,
+                    deltaTime: 1 / 60,
+                    response: 0.18
+                )
+            )
+        }
+
+        XCTAssertEqual(amounts, [1, 1])
+        XCTAssertTrue(amounts.allSatisfy { $0 > 0 })
     }
 
     func testScrollDirectionGenerationInvalidatesPreviousDirectionImmediately() {
