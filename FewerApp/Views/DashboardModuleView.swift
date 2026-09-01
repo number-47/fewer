@@ -169,19 +169,43 @@ final class MonitorStatusItemView: NSView {
 struct MonitorModulePopoverView: View {
     let moduleID: SystemMonitorModuleID
     let openSettings: () -> Void
-    var openActivityMonitor: (() -> Void)? = nil
+    let openSystemMonitor: () -> Void
 
     var body: some View {
         MenuBarPopoverChrome(
             title: moduleID.title,
             systemImage: moduleID.systemImage,
-            openSettings: openSettings,
-            openActivityMonitor: openActivityMonitor
+            openSettings: openSettings
         ) {
-            ScrollView {
+            VStack(spacing: 0) {
                 MonitorModuleContent(moduleID: moduleID)
+
+                Divider()
+
+                Button(action: openSystemMonitor) {
+                    Label(footerTitle, systemImage: footerSystemImage)
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .accessibilityIdentifier("monitor.footer.\(moduleID.rawValue)")
             }
         }
+        .frame(width: 280)
+    }
+
+    private var footerTitle: String {
+        switch moduleID {
+        case .disk: "打开磁盘工具"
+        case .network: "打开网络监视器"
+        case .cpu, .gpu, .memory: "打开活动监视器"
+        }
+    }
+
+    private var footerSystemImage: String {
+        moduleID == .disk ? "externaldrive" : "chart.bar.xaxis"
     }
 }
 
@@ -190,10 +214,9 @@ struct MonitorModuleContent: View {
     let moduleID: SystemMonitorModuleID
     @ObservedObject private var metrics = SystemMetricsService.shared
     @StateObject private var wifiDetails = NetworkWiFiDetailsService()
-    @State private var showsWiFiDetails = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             switch moduleID {
             case .cpu: CPUDetailsView(
                 snapshot: metrics.current.cpu,
@@ -209,35 +232,21 @@ struct MonitorModuleContent: View {
                 history: metrics.history.compactMap(\.disk)
             )
             case .network:
-                row("下载", rate(metrics.current.networkInBytesPerSecond))
-                row("上传", rate(metrics.current.networkOutBytesPerSecond))
-                row("状态", metrics.defaultNetworkInterface == nil ? "未连接" : "已连接")
-                row("默认接口", metrics.defaultNetworkInterface ?? "不可用")
-                row("IPv4", metrics.localIPv4Address ?? "不可用")
-                row("IPv6", metrics.localIPv6Address ?? "不可用")
-                row("累计下载", ByteCountFormatter.string(fromByteCount: Int64(metrics.current.networkInBytes), countStyle: .file))
-                row("累计上传", ByteCountFormatter.string(fromByteCount: Int64(metrics.current.networkOutBytes), countStyle: .file))
-                DisclosureGroup("Wi-Fi 详情", isExpanded: Binding(
-                    get: { showsWiFiDetails },
-                    set: { isExpanded in
-                        showsWiFiDetails = isExpanded
-                        if isExpanded {
-                            wifiDetails.requestDetails(defaultInterfaceName: metrics.defaultNetworkInterface)
-                        }
-                    }
-                )) {
-                    row("SSID", wifiDetails.ssid)
-                    row("BSSID", wifiDetails.bssid)
-                    row("信号", wifiDetails.signal)
-                    if wifiDetails.status != "可用" { row("状态", wifiDetails.status) }
-                }
-            }
-            if moduleID == .network {
-                Text("详细采样将在对应监控模块启用后显示。")
-                    .font(.caption).foregroundStyle(.secondary)
+                NetworkDetailsView(
+                    downloadRate: metrics.current.networkInBytesPerSecond,
+                    uploadRate: metrics.current.networkOutBytesPerSecond,
+                    downloadHistory: metrics.history.map(\.networkInBytesPerSecond),
+                    uploadHistory: metrics.history.map(\.networkOutBytesPerSecond),
+                    interface: metrics.defaultNetworkInterface,
+                    ipv4: metrics.localIPv4Address,
+                    ipv6: metrics.localIPv6Address,
+                    totalDownloaded: metrics.current.networkInBytes,
+                    totalUploaded: metrics.current.networkOutBytes,
+                    wifiDetails: wifiDetails
+                )
             }
         }
-        .padding(14)
+        .padding(16)
         .onAppear { metrics.setModuleVisible(moduleID, isVisible: true) }
         .onDisappear { metrics.setModuleVisible(moduleID, isVisible: false) }
     }
@@ -246,9 +255,132 @@ struct MonitorModuleContent: View {
         guard let deviceID = metrics.current.gpu?.selectedDevice?.id else { return [] }
         return metrics.history.compactMap { $0.gpu?.device(id: deviceID)?.utilization }
     }
-    private func row(_ name: String, _ value: String) -> some View { HStack { Text(name).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() } }
-    private func percentage(_ value: Double) -> String { "\(Int((value * 100).rounded()))%" }
-    private func rate(_ value: Double) -> String { ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file) + "/s" }
+}
+
+private enum MonitorPopoverStyle {
+    static func color(for moduleID: SystemMonitorModuleID) -> Color {
+        switch moduleID {
+        case .cpu: Color(nsColor: .systemBlue)
+        case .gpu: Color(nsColor: .systemPurple)
+        case .memory: Color(nsColor: .systemGreen)
+        case .disk: Color(nsColor: .systemOrange)
+        case .network: Color(nsColor: .systemTeal)
+        }
+    }
+}
+
+private struct MonitorCard<Content: View>: View {
+    let title: String?
+    let color: Color
+    @ViewBuilder let content: Content
+
+    init(_ title: String? = nil, color: Color, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.color = color
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            content
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(color.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(.separator.opacity(0.5))
+        }
+    }
+}
+
+private struct MonitorMetricRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title).foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(value).monospacedDigit().lineLimit(1)
+        }
+        .font(.system(size: 12))
+    }
+}
+
+private struct MonitorTrendGraph: View {
+    let values: [Double]
+    let color: Color
+    var upperBound: Double? = nil
+
+    var body: some View {
+        GeometryReader { geometry in
+            let visible = Array(values.suffix(60))
+            if visible.count > 1 {
+                let maximum = max(upperBound ?? (visible.max() ?? 1), 0.000_001)
+                Path { path in
+                    for (index, value) in visible.enumerated() {
+                        let x = geometry.size.width * CGFloat(index) / CGFloat(visible.count - 1)
+                        let y = geometry.size.height * (1 - CGFloat(min(max(value / maximum, 0), 1)))
+                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+                    }
+                }
+                .stroke(color, lineWidth: 1.5)
+            } else {
+                Text("暂无历史")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(height: 52)
+        .padding(8)
+        .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+private struct MonitorDualTrendGraph: View {
+    let firstValues: [Double]
+    let secondValues: [Double]
+    let firstColor: Color
+    let secondColor: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let first = Array(firstValues.suffix(60))
+            let second = Array(secondValues.suffix(60))
+            let maximum = max(first.max() ?? 0, second.max() ?? 0, 0.000_001)
+            if max(first.count, second.count) > 1 {
+                trendPath(values: first, in: geometry.size, maximum: maximum)
+                    .stroke(firstColor, lineWidth: 1.5)
+                trendPath(values: second, in: geometry.size, maximum: maximum)
+                    .stroke(secondColor, lineWidth: 1.5)
+            } else {
+                Text("暂无历史")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(height: 52)
+        .padding(8)
+        .background(firstColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func trendPath(values: [Double], in size: CGSize, maximum: Double) -> Path {
+        Path { path in
+            guard values.count > 1 else { return }
+            for (index, value) in values.enumerated() {
+                let x = size.width * CGFloat(index) / CGFloat(values.count - 1)
+                let y = size.height * (1 - CGFloat(min(max(value / maximum, 0), 1)))
+                if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+            }
+        }
+    }
 }
 
 
@@ -259,26 +391,39 @@ private struct DiskDetailsView: View {
     var body: some View {
         Group {
             if let snapshot {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(snapshot.volumeName).font(.title3).lineLimit(1)
-                        Spacer()
-                        Text(percentage(snapshot.usageRatio)).font(.title3).monospacedDigit()
+                let color = MonitorPopoverStyle.color(for: .disk)
+                VStack(alignment: .leading, spacing: 12) {
+                    MonitorCard(color: color) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(snapshot.volumeName).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                            Spacer()
+                            Text(percentage(snapshot.usageRatio)).font(.title2).monospacedDigit()
+                        }
+                        Text("\(bytes(snapshot.usedBytes)) / \(bytes(snapshot.totalBytes))")
+                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        MonitorTrendGraph(values: history.map(\.usageRatio), color: color, upperBound: 1)
+                        MonitorMetricRow(title: "可用", value: bytes(snapshot.availableBytes))
                     }
-                    Text("\(bytes(snapshot.usedBytes)) / \(bytes(snapshot.totalBytes))")
-                        .font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                    DiskHistoryGraph(values: history.map(\.usageRatio))
-                    detail("可用", bytes(snapshot.availableBytes))
-                    detail("文件系统", snapshot.fileSystem ?? "不可用")
-                    detail("连接", snapshot.connectionType ?? "不可用")
-                    detail("设备", snapshot.deviceName ?? "不可用")
-                    detail("读取", rate(snapshot.readBytesPerSecond))
-                    detail("写入", rate(snapshot.writeBytesPerSecond))
-                    detail("累计读取", bytes(snapshot.readBytes))
-                    detail("累计写入", bytes(snapshot.writeBytes))
-                    Divider()
-                    Text("SMART").font(.caption).foregroundStyle(.secondary)
-                    smartDetails(snapshot.smart)
+                    MonitorCard("读写速度", color: color) {
+                        MonitorMetricRow(title: "读取", value: rate(snapshot.readBytesPerSecond))
+                        MonitorMetricRow(title: "写入", value: rate(snapshot.writeBytesPerSecond))
+                        MonitorDualTrendGraph(
+                            firstValues: history.compactMap(\.readBytesPerSecond),
+                            secondValues: history.compactMap(\.writeBytesPerSecond),
+                            firstColor: Color(nsColor: .systemBlue),
+                            secondColor: Color(nsColor: .systemOrange)
+                        )
+                    }
+                    MonitorCard("磁盘信息", color: color) {
+                        MonitorMetricRow(title: "文件系统", value: snapshot.fileSystem ?? "不可用")
+                        MonitorMetricRow(title: "连接", value: snapshot.connectionType ?? "不可用")
+                        MonitorMetricRow(title: "设备", value: snapshot.deviceName ?? "不可用")
+                        MonitorMetricRow(title: "累计读取", value: bytes(snapshot.readBytes))
+                        MonitorMetricRow(title: "累计写入", value: bytes(snapshot.writeBytes))
+                    }
+                    MonitorCard("SMART 状态", color: color) {
+                        smartDetails(snapshot.smart)
+                    }
                 }
             } else {
                 ContentUnavailableView("磁盘数据不可用", systemImage: "internaldrive", description: Text("系统没有返回可读取的启动卷信息。"))
@@ -290,18 +435,14 @@ private struct DiskDetailsView: View {
     @ViewBuilder
     private func smartDetails(_ smart: DiskSMARTSnapshot?) -> some View {
         if let smart {
-            detail("健康度", smart.health ?? "不可用")
-            detail("温度", smart.temperatureCelsius.map { String(format: "%.0f℃", $0) } ?? "不可用")
-            detail("寿命", smart.lifeRemainingPercent.map { String(format: "%.0f%%", $0) } ?? "不可用")
-            detail("警告", smart.warning ?? "不可用")
-            detail("通电时间", smart.powerOnHours.map { "\($0) 小时" } ?? "不可用")
+            MonitorMetricRow(title: "健康度", value: smart.health ?? "不可用")
+            MonitorMetricRow(title: "温度", value: smart.temperatureCelsius.map { String(format: "%.0f℃", $0) } ?? "不可用")
+            MonitorMetricRow(title: "寿命", value: smart.lifeRemainingPercent.map { String(format: "%.0f%%", $0) } ?? "不可用")
+            MonitorMetricRow(title: "警告", value: smart.warning ?? "不可用")
+            MonitorMetricRow(title: "通电时间", value: smart.powerOnHours.map { "\($0) 小时" } ?? "不可用")
         } else {
-            detail("状态", "不可用")
+            MonitorMetricRow(title: "状态", value: "不可用")
         }
-    }
-
-    private func detail(_ title: String, _ value: String) -> some View {
-        HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit().lineLimit(1) }
     }
 
     private func bytes(_ value: UInt64?) -> String {
@@ -319,30 +460,6 @@ private struct DiskDetailsView: View {
     }
 }
 
-private struct DiskHistoryGraph: View {
-    let values: [Double]
-
-    var body: some View {
-        GeometryReader { geometry in
-            if values.count > 1 {
-                let visible = Array(values.suffix(40))
-                Path { path in
-                    for (index, value) in visible.enumerated() {
-                        let x = geometry.size.width * CGFloat(index) / CGFloat(visible.count - 1)
-                        let y = geometry.size.height * (1 - CGFloat(min(max(value, 0), 1)))
-                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
-                    }
-                }
-                .stroke(Color.accentColor, lineWidth: 1.5)
-            } else {
-                Text("暂无历史").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(height: 48)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
-    }
-}
-
 private struct MemoryDetailsView: View {
     let snapshot: MemorySnapshot?
     let history: [Double]
@@ -350,32 +467,35 @@ private struct MemoryDetailsView: View {
     var body: some View {
         Group {
             if let snapshot {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("已用").foregroundStyle(.secondary)
-                        Spacer()
+                let color = MonitorPopoverStyle.color(for: .memory)
+                VStack(alignment: .leading, spacing: 12) {
+                    MonitorCard(color: color) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("内存使用").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(percentage(snapshot.usageRatio)).font(.title2).monospacedDigit()
+                        }
                         Text("\(bytes(snapshot.usedBytes)) / \(bytes(snapshot.totalBytes))")
-                            .font(.title3).monospacedDigit()
+                            .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        MonitorTrendGraph(values: history, color: color, upperBound: 1)
                     }
-                    MemoryHistoryGraph(values: history)
-                    detail("使用率", percentage(snapshot.usageRatio))
-                    detail("App", bytes(snapshot.appBytes))
-                    detail("活跃", bytes(snapshot.activeBytes))
-                    detail("Wired", bytes(snapshot.wiredBytes))
-                    detail("Compressed", bytes(snapshot.compressedBytes))
-                    detail("可用", bytes(snapshot.freeBytes))
-                    detail("Swap", swap(snapshot.swap))
-                    detail("压力", snapshot.pressure?.level.rawValue ?? "不可用")
+                    MonitorCard("内存构成", color: color) {
+                        MonitorMetricRow(title: "App", value: bytes(snapshot.appBytes))
+                        MonitorMetricRow(title: "活跃", value: bytes(snapshot.activeBytes))
+                        MonitorMetricRow(title: "Wired", value: bytes(snapshot.wiredBytes))
+                        MonitorMetricRow(title: "Compressed", value: bytes(snapshot.compressedBytes))
+                        MonitorMetricRow(title: "可用", value: bytes(snapshot.freeBytes))
+                    }
+                    MonitorCard("内存压力", color: color) {
+                        MonitorMetricRow(title: "状态", value: snapshot.pressure?.level.rawValue ?? "不可用")
+                        MonitorMetricRow(title: "Swap", value: swap(snapshot.swap))
+                    }
                 }
             } else {
                 ContentUnavailableView("内存数据不可用", systemImage: "memorychip", description: Text("系统没有返回可读取的 Mach VM 内存统计。"))
                     .frame(maxWidth: .infinity, minHeight: 260)
             }
         }
-    }
-
-    private func detail(_ title: String, _ value: String) -> some View {
-        HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }
     }
 
     private func bytes(_ value: UInt64) -> String {
@@ -388,31 +508,8 @@ private struct MemoryDetailsView: View {
 
     private func swap(_ value: MemorySwapSnapshot?) -> String {
         guard let value else { return "不可用" }
+        guard value.totalBytes > 0 || value.usedBytes > 0 || value.freeBytes > 0 else { return "未使用" }
         return "\(bytes(value.usedBytes)) / \(bytes(value.totalBytes))"
-    }
-}
-
-private struct MemoryHistoryGraph: View {
-    let values: [Double]
-
-    var body: some View {
-        GeometryReader { geometry in
-            if values.count > 1 {
-                let visible = Array(values.suffix(40))
-                Path { path in
-                    for (index, value) in visible.enumerated() {
-                        let x = geometry.size.width * CGFloat(index) / CGFloat(visible.count - 1)
-                        let y = geometry.size.height * (1 - CGFloat(min(max(value, 0), 1)))
-                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
-                    }
-                }
-                .stroke(Color.accentColor, lineWidth: 1.5)
-            } else {
-                Text("暂无历史").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(height: 48)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -423,25 +520,30 @@ private struct GPUDetailsView: View {
     var body: some View {
         Group {
             if let snapshot, let gpu = snapshot.selectedDevice {
-                VStack(alignment: .leading, spacing: 11) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("总使用率").foregroundStyle(.secondary)
-                        Spacer()
-                        Text(percentage(gpu.utilization)).font(.title2).monospacedDigit()
+                let color = MonitorPopoverStyle.color(for: .gpu)
+                VStack(alignment: .leading, spacing: 12) {
+                    MonitorCard(color: color) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("利用率").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(percentage(gpu.utilization)).font(.title2).monospacedDigit()
+                        }
+                        MonitorTrendGraph(values: history, color: color, upperBound: 1)
+                        HStack(spacing: 12) {
+                            usage("Render", gpu.renderUtilization)
+                            usage("Tiler", gpu.tilerUtilization)
+                            usage("ANE", gpu.aneUtilization)
+                        }
                     }
-                    GPUHistoryGraph(values: history)
-                    HStack(spacing: 12) {
-                        usage("Render", gpu.renderUtilization)
-                        usage("Tiler", gpu.tilerUtilization)
-                        usage("ANE", gpu.aneUtilization)
-                    }
-                    detail("设备", snapshot.selectedAutomatically ? "自动 · \(gpu.model)" : "已选 · \(gpu.model)")
-                    detail("类型", gpu.type.rawValue)
-                    detail("核心", gpu.coreCount.map(String.init) ?? "不可用")
-                    detail("FPS", gpu.framesPerSecond.map { String(format: "%.0f", $0) } ?? "不可用")
-                    detail("状态", gpu.isActive ? "可用" : "已关闭")
-                    if snapshot.devices.count > 1 {
-                        detail("已发现 GPU", "\(snapshot.devices.count)")
+                    MonitorCard("GPU 信息", color: color) {
+                        MonitorMetricRow(title: "设备", value: snapshot.selectedAutomatically ? "自动 · \(gpu.model)" : "已选 · \(gpu.model)")
+                        MonitorMetricRow(title: "类型", value: gpu.type.rawValue)
+                        MonitorMetricRow(title: "核心", value: gpu.coreCount.map(String.init) ?? "不可用")
+                        MonitorMetricRow(title: "FPS", value: gpu.framesPerSecond.map { String(format: "%.0f", $0) } ?? "不可用")
+                        MonitorMetricRow(title: "状态", value: gpu.isActive ? "可用" : "已关闭")
+                        if snapshot.devices.count > 1 {
+                            MonitorMetricRow(title: "已发现 GPU", value: "\(snapshot.devices.count)")
+                        }
                     }
                 }
             } else {
@@ -458,36 +560,8 @@ private struct GPUDetailsView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func detail(_ title: String, _ value: String) -> some View {
-        HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }
-    }
-
     private func percentage(_ value: Double?) -> String {
         value.map { "\(Int(($0 * 100).rounded()))%" } ?? "不可用"
-    }
-}
-
-private struct GPUHistoryGraph: View {
-    let values: [Double]
-
-    var body: some View {
-        GeometryReader { geometry in
-            if values.count > 1 {
-                let visible = Array(values.suffix(40))
-                Path { path in
-                    for (index, value) in visible.enumerated() {
-                        let x = geometry.size.width * CGFloat(index) / CGFloat(visible.count - 1)
-                        let y = geometry.size.height * (1 - CGFloat(min(max(value, 0), 1)))
-                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
-                    }
-                }
-                .stroke(Color.accentColor, lineWidth: 1.5)
-            } else {
-                Text("暂无历史").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .frame(height: 48)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
     }
 }
 
@@ -498,28 +572,31 @@ private struct CPUDetailsView: View {
     var body: some View {
         Group {
             if let snapshot {
-                VStack(alignment: .leading, spacing: 11) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("总使用率").foregroundStyle(.secondary)
-                        Spacer()
-                        Text(percentage(snapshot.total)).font(.title2).monospacedDigit()
+                let color = MonitorPopoverStyle.color(for: .cpu)
+                VStack(alignment: .leading, spacing: 12) {
+                    MonitorCard(color: color) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("利用率").foregroundStyle(.secondary)
+                            Spacer()
+                            Text(percentage(snapshot.total)).font(.title2).monospacedDigit()
+                        }
+                        MonitorTrendGraph(values: history, color: color, upperBound: 1)
+                        HStack(spacing: 12) {
+                            usage("用户", snapshot.user)
+                            usage("系统", snapshot.system)
+                            usage("空闲", snapshot.idle)
+                        }
                     }
-                    CPUHistoryGraph(values: history)
-                    HStack(spacing: 12) {
-                        usage("用户", snapshot.user)
-                        usage("系统", snapshot.system)
-                        usage("空闲", snapshot.idle)
+                    MonitorCard("基本信息", color: color) {
+                        MonitorMetricRow(title: "平均负载", value: loadAverage(snapshot.loadAverage))
+                        MonitorMetricRow(title: "运行时间", value: snapshot.uptime.map(uptime) ?? "不可用")
+                        MonitorMetricRow(title: "频率", value: snapshot.frequencyHz.map(frequency) ?? "不可用")
+                        MonitorMetricRow(title: "温度", value: snapshot.temperatureCelsius.map { String(format: "%.0f℃", $0) } ?? "不可用")
+                        clusterDetails(snapshot.clusters)
                     }
-                    detail("负载", loadAverage(snapshot.loadAverage))
-                    detail("运行时间", snapshot.uptime.map(uptime) ?? "不可用")
-                    if let frequencyHz = snapshot.frequencyHz {
-                        detail("频率", frequency(frequencyHz))
+                    MonitorCard("核心利用率", color: color) {
+                        coreDetails(snapshot.cores)
                     }
-                    if let temperatureCelsius = snapshot.temperatureCelsius {
-                        detail("温度", String(format: "%.0f℃", temperatureCelsius))
-                    }
-                    coreDetails(snapshot.cores)
-                    clusterDetails(snapshot.clusters)
                 }
             } else {
                 ContentUnavailableView("CPU 数据不可用", systemImage: "cpu", description: Text("首次采样或系统暂时无法读取 CPU 计数。"))
@@ -535,22 +612,15 @@ private struct CPUDetailsView: View {
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func detail(_ title: String, _ value: String) -> some View {
-        HStack { Text(title).foregroundStyle(.secondary); Spacer(); Text(value).monospacedDigit() }
-    }
-
     @ViewBuilder
     private func coreDetails(_ cores: [CPUCoreSnapshot]) -> some View {
         if cores.isEmpty {
-            detail("核心", "不可用")
+            MonitorMetricRow(title: "核心", value: "不可用")
         } else {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("核心").foregroundStyle(.secondary)
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: min(cores.count, 4)), spacing: 4) {
-                    ForEach(cores) { core in
-                        Text("\(core.id + 1) · \(percentage(core.total))")
-                            .font(.caption2).monospacedDigit()
-                    }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: min(cores.count, 3)), spacing: 4) {
+                ForEach(cores) { core in
+                    Text("\(core.id + 1) · \(percentage(core.total))")
+                        .font(.caption2).monospacedDigit()
                 }
             }
         }
@@ -559,10 +629,10 @@ private struct CPUDetailsView: View {
     @ViewBuilder
     private func clusterDetails(_ clusters: [CPUClusterSnapshot]) -> some View {
         if clusters.isEmpty {
-            detail("性能集群", "不可用")
+            MonitorMetricRow(title: "核心集群", value: "不可用")
         } else {
             ForEach(clusters) { cluster in
-                detail(cluster.name, "\(cluster.physicalCoreCount) 物理 / \(cluster.logicalCoreCount) 逻辑核心")
+                MonitorMetricRow(title: cluster.name, value: "\(cluster.physicalCoreCount) 物理 / \(cluster.logicalCoreCount) 逻辑")
             }
         }
     }
@@ -581,27 +651,71 @@ private struct CPUDetailsView: View {
     private func frequency(_ value: UInt64) -> String { String(format: "%.2f GHz", Double(value) / 1_000_000_000) }
 }
 
-private struct CPUHistoryGraph: View {
-    let values: [Double]
+private struct NetworkDetailsView: View {
+    let downloadRate: Double
+    let uploadRate: Double
+    let downloadHistory: [Double]
+    let uploadHistory: [Double]
+    let interface: String?
+    let ipv4: String?
+    let ipv6: String?
+    let totalDownloaded: UInt64
+    let totalUploaded: UInt64
+    @ObservedObject var wifiDetails: NetworkWiFiDetailsService
+
+    private let color = MonitorPopoverStyle.color(for: .network)
 
     var body: some View {
-        GeometryReader { geometry in
-            if values.count > 1 {
-                Path { path in
-                    let visible = Array(values.suffix(40))
-                    for (index, value) in visible.enumerated() {
-                        let x = geometry.size.width * CGFloat(index) / CGFloat(visible.count - 1)
-                        let y = geometry.size.height * (1 - CGFloat(min(max(value, 0), 1)))
-                        if index == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                NetworkRateCard(title: "下载", value: rate(downloadRate), values: downloadHistory, color: Color(nsColor: .systemBlue))
+                NetworkRateCard(title: "上传", value: rate(uploadRate), values: uploadHistory, color: Color(nsColor: .systemPurple))
+            }
+            MonitorCard("网络信息", color: color) {
+                MonitorMetricRow(title: "状态", value: interface == nil ? "未连接" : "已连接")
+                MonitorMetricRow(title: "默认接口", value: interface ?? "不可用")
+                MonitorMetricRow(title: "IPv4", value: ipv4 ?? "不可用")
+                MonitorMetricRow(title: "IPv6", value: ipv6 ?? "不可用")
+                MonitorMetricRow(title: "累计下载", value: bytes(totalDownloaded))
+                MonitorMetricRow(title: "累计上传", value: bytes(totalUploaded))
+            }
+            MonitorCard("Wi-Fi", color: color) {
+                MonitorMetricRow(title: "SSID", value: wifiDetails.ssid)
+                MonitorMetricRow(title: "BSSID", value: wifiDetails.bssid)
+                MonitorMetricRow(title: "信号", value: wifiDetails.signal)
+                if wifiDetails.status != "可用" {
+                    MonitorMetricRow(title: "状态", value: wifiDetails.status)
                 }
-                .stroke(Color.accentColor, lineWidth: 1.5)
-            } else {
-                Text("暂无历史").font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                Button("读取 Wi-Fi 详情") {
+                    wifiDetails.requestDetails(defaultInterfaceName: interface)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .buttonStyle(.borderless)
             }
         }
-        .frame(height: 48)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func rate(_ value: Double) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file) + "/s"
+    }
+
+    private func bytes(_ value: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(clamping: value), countStyle: .file)
+    }
+}
+
+private struct NetworkRateCard: View {
+    let title: String
+    let value: String
+    let values: [Double]
+    let color: Color
+
+    var body: some View {
+        MonitorCard(color: color) {
+            Text(title).font(.system(size: 12, weight: .semibold)).foregroundStyle(color)
+            Text(value).font(.title3).monospacedDigit()
+            MonitorTrendGraph(values: values, color: color)
+        }
     }
 }
 

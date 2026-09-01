@@ -2,39 +2,75 @@ import FewerCore
 import SwiftUI
 
 struct CalendarAgendaView: View {
+    enum Presentation {
+        case standalone
+        case embedded
+    }
+
     let events: [CalendarEventItem]
     let authorizationState: SystemCalendarAuthorizationState
     let reminderAuthorizationState: SystemCalendarAuthorizationState
     let isLoading: Bool
     let isRequestingAccess: Bool
     let errorMessage: String?
-    var expandsToFill: Bool = false
+    var presentation: Presentation = .embedded
+    var title: String = "日程与节假日"
+    var openEvent: ((CalendarEventItem) -> Void)?
     let requestAccess: () -> Void
     let openSettings: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("日程与节假日")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.mini)
-                }
+        Group {
+            switch presentation {
+            case .standalone:
+                standaloneContent
+            case .embedded:
+                embeddedContent
             }
+        }
+    }
 
+    private var embeddedContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            agendaHeader(title: title, large: false)
             content
         }
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 96,
-            maxHeight: expandsToFill ? .infinity : 112,
-            alignment: .topLeading
-        )
+        .frame(maxWidth: .infinity, minHeight: 96, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var standaloneContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            agendaHeader(title: title, large: true)
+            content
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 144, maxHeight: 280, alignment: .topLeading)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private func agendaHeader(title: String, large: Bool) -> some View {
+        HStack {
+            Text(title)
+                .font(large ? .system(size: 18, weight: .semibold) : .caption.weight(.semibold))
+                .foregroundStyle(large ? .primary : .secondary)
+
+            Spacer()
+
+            if large {
+                Text("\(events.count) 项")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if isLoading {
+                ProgressView()
+                    .controlSize(large ? .small : .mini)
+            }
+        }
     }
 
     @ViewBuilder
@@ -115,7 +151,7 @@ struct CalendarAgendaView: View {
             Image(systemName: "calendar.badge.minus")
                 .foregroundStyle(.secondary)
             Text("当天没有日程或节假日")
-                .font(.caption)
+                .font(presentation == .standalone ? .system(size: 14) : .caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
@@ -139,7 +175,62 @@ struct CalendarAgendaView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
+    @ViewBuilder
     private func eventRow(_ event: CalendarEventItem) -> some View {
+        if presentation == .standalone {
+            Button(action: { openEvent?(event) }) {
+                eventRowContent(event, standalone: true)
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            eventRowContent(event, standalone: false)
+        }
+    }
+
+    @ViewBuilder
+    private func eventRowContent(_ event: CalendarEventItem, standalone: Bool) -> some View {
+        if standalone {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(color(for: event))
+                    .frame(width: 12, height: 12)
+
+                Text(event.title.isEmpty ? "无标题日程" : event.title)
+                    .font(.system(size: 15, weight: .medium))
+                    .lineLimit(1)
+
+                Text(timeRangeText(for: event))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Text(event.calendarTitle)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Text(eventTypeText(for: event))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        } else {
+            embeddedEventRowContent(event)
+        }
+    }
+
+    private func embeddedEventRowContent(_ event: CalendarEventItem) -> some View {
         HStack(alignment: .top, spacing: 7) {
             Circle()
                 .fill(color(for: event))
@@ -154,7 +245,7 @@ struct CalendarAgendaView: View {
                     .lineLimit(1)
 
                 HStack(spacing: 5) {
-                    Text(timeText(for: event))
+                    Text(embeddedTimeText(for: event))
                     Text(event.calendarTitle)
                         .lineLimit(1)
 
@@ -185,13 +276,26 @@ struct CalendarAgendaView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func timeText(for event: CalendarEventItem) -> String {
+    private func timeRangeText(for event: CalendarEventItem) -> String {
         if event.isAllDay {
             return "全天"
         }
-        return event.startDate.formatted(
-            .dateTime.hour().minute()
-        )
+        let style = Date.FormatStyle(date: .omitted, time: .shortened)
+        return "\(event.startDate.formatted(style)) – \(event.endDate.formatted(style))"
+    }
+
+    private func embeddedTimeText(for event: CalendarEventItem) -> String {
+        if event.isAllDay {
+            return "全天"
+        }
+        return event.startDate.formatted(.dateTime.hour().minute())
+    }
+
+    private func eventTypeText(for event: CalendarEventItem) -> String {
+        if event.kind == .reminder {
+            return event.isCompleted ? "提醒·已完成" : "提醒"
+        }
+        return event.isSubscription ? "订阅日历" : "日程"
     }
 
     private func color(for event: CalendarEventItem) -> Color {

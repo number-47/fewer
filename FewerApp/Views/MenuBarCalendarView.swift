@@ -59,9 +59,10 @@ struct MenuBarCalendarView: View {
         case embedded
     }
 
-    static let preferredSize = NSSize(width: 400, height: 632)
+    static let preferredSize = NSSize(width: 710, height: 910)
     var presentation: Presentation = .standalone
-    var availableWidth: CGFloat = preferredSize.width
+    var availableWidth: CGFloat = 400
+    var openSettings: (() -> Void)?
     /// 月份选择器（二级弹窗）窗口标识，用于失焦关闭时识别焦点是否仍在日历弹窗体系内。
     static let monthPickerWindowIdentifier = NSUserInterfaceItemIdentifier("fewer-month-picker")
 
@@ -77,16 +78,38 @@ struct MenuBarCalendarView: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
     var body: some View {
-        calendarContent(today: currentDate.date)
-            .frame(width: availableWidth)
+        Group {
+            switch presentation {
+            case .standalone:
+                standaloneContent(today: currentDate.date)
+            case .embedded:
+                embeddedContent(today: currentDate.date)
+            }
+        }
+        .frame(width: presentation == .standalone ? Self.preferredSize.width : availableWidth)
+        .onAppear(perform: start)
+        .onDisappear {
+            scrollCoordinator.stop()
+        }
+        .onChange(of: calendarState.scrollAnchor) {
+            loadSystemEvents(for: displayedMonth)
+        }
+        .onChange(of: systemCalendar.changeRevision) {
+            loadSystemEvents(for: displayedMonth)
+        }
+        .onChange(of: systemCalendar.authorizationState) {
+            loadSystemEvents(for: displayedMonth)
+        }
+        .onChange(of: systemCalendar.reminderAuthorizationState) {
+            loadSystemEvents(for: displayedMonth)
+        }
     }
 
-    private func calendarContent(today: Date) -> some View {
+    private func embeddedContent(today: Date) -> some View {
         let month = CalendarMonth(anchoredAt: calendarState.scrollAnchor, today: today, calendar: calendar)
-
         return VStack(spacing: 10) {
             VStack(spacing: 10) {
-                header(for: month)
+                embeddedHeader(for: month)
 
                 // 星期标题行
                 HStack(spacing: 4) {
@@ -116,57 +139,152 @@ struct MenuBarCalendarView: View {
                 }
             }
 
-            selectedDateSummary(in: month)
-
-            CalendarAgendaView(
-                events: systemCalendar.events(on: calendarState.selectedDate, calendar: calendar),
-                authorizationState: systemCalendar.authorizationState,
-                reminderAuthorizationState: systemCalendar.reminderAuthorizationState,
-                isLoading: systemCalendar.isLoading,
-                isRequestingAccess: systemCalendar.isRequestingAccess,
-               errorMessage: systemCalendar.errorMessage,
-                expandsToFill: presentation == .embedded,
-                requestAccess: {
-                    Task {
-                        await systemCalendar.requestFullAccess()
-                        loadSystemEvents(for: month)
-                    }
-                },
-                openSettings: {
-                    systemCalendar.openPrivacySettings()
-                }
-            )
-
+            compactSelectedDateSummary(in: month)
+            agendaView(for: month, presentation: .embedded)
         }
         .padding(.horizontal, 14)
         .padding(.top, presentation == .embedded ? 6 : 14)
         .padding(.bottom, presentation == .embedded ? 4 : 14)
-        .frame(maxHeight: presentation == .embedded ? .infinity : nil, alignment: .top)
-        .onAppear {
-            scrollCoordinator.onRowStep = { rows in
-                scrollByRows(rows)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func standaloneContent(today: Date) -> some View {
+        let month = CalendarMonth(anchoredAt: calendarState.scrollAnchor, today: today, calendar: calendar)
+        return VStack(spacing: 0) {
+            standaloneTitleBar
+            Divider()
+            ScrollView {
+                VStack(spacing: 14) {
+                    standaloneMonthCard(for: month)
+                    agendaView(for: month, presentation: .standalone)
+                }
+                .padding(18)
             }
-            scrollCoordinator.start()
-            loadSystemEvents(for: month)
         }
-        .onDisappear {
-            scrollCoordinator.stop()
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(.regularMaterial)
+    }
+
+    private var standaloneTitleBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 48, height: 48)
+                .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("日历")
+                    .font(.system(size: 24, weight: .bold))
+                Text("单独菜单栏模块 · 可开发版（精修）")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            standaloneActionButton(
+                title: "刷新",
+                systemImage: "arrow.clockwise",
+                identifier: "calendar.popover.refresh",
+                action: { reloadSystemEvents(for: displayedMonth) }
+            )
+            standaloneActionButton(
+                title: "设置",
+                systemImage: "gearshape",
+                identifier: "calendar.popover.settings",
+                action: { openSettings?() }
+            )
         }
-        .onChange(of: calendarState.scrollAnchor) {
-            loadSystemEvents(for: month)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+    }
+
+    private func standaloneActionButton(
+        title: String,
+        systemImage: String,
+        identifier: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .frame(width: 64, height: 58)
         }
-        .onChange(of: systemCalendar.changeRevision) {
-            loadSystemEvents(for: month)
+        .buttonStyle(.plain)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         }
-        .onChange(of: systemCalendar.authorizationState) {
-            loadSystemEvents(for: month)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(title)
+    }
+
+    private func standaloneMonthCard(for month: CalendarMonth) -> some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Button {
+                    prepareMonthJump(from: month.monthStart)
+                    isShowingMonthPicker = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(month.monthStart.formatted(.dateTime.year().month(.wide).locale(calendarLanguage.locale)))
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .buttonStyle(.plain)
+                .help("选择年份和月份")
+                .popover(isPresented: $isShowingMonthPicker, arrowEdge: .top) {
+                    monthPicker
+                }
+
+                HStack {
+                    monthButton(systemImage: "chevron.left", title: "上个月", offset: -1, standalone: true)
+                    Spacer()
+                    monthButton(systemImage: "chevron.right", title: "下个月", offset: 1, standalone: true)
+                }
+            }
+
+            HStack(spacing: 4) {
+                ForEach(month.weekdaySymbols, id: \.self) { symbol in
+                    Text(symbol)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            GridOffsetView(scrollCoordinator: scrollCoordinator) {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    ForEach(standaloneDays(in: month)) { day in
+                        standaloneDayCell(
+                            day,
+                            calendar: calendar,
+                            events: systemCalendar.events(on: day.date, calendar: calendar)
+                        )
+                    }
+                }
+                .background(WindowFrameReader { scrollCoordinator.gridView = $0 })
+            }
+
+            standaloneSelectedDateSummary(in: month)
         }
-        .onChange(of: systemCalendar.reminderAuthorizationState) {
-            loadSystemEvents(for: month)
+        .padding(18)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         }
     }
 
-    private func header(for month: CalendarMonth) -> some View {
+    private func embeddedHeader(for month: CalendarMonth) -> some View {
         VStack(spacing: 8) {
             HStack(spacing: 6) {
                 Button {
@@ -231,18 +349,43 @@ struct MenuBarCalendarView: View {
         }
     }
 
-    private func monthButton(systemImage: String, title: String, offset: Int) -> some View {
+    private func monthButton(
+        systemImage: String,
+        title: String,
+        offset: Int,
+        standalone: Bool = false
+    ) -> some View {
         Button {
             stepMonth(by: offset)
         } label: {
             Image(systemName: systemImage)
-                .font(.system(size: 11, weight: .medium))
-                .frame(width: 22, height: 22)
+                .font(.system(size: standalone ? 18 : 11, weight: .medium))
+                .frame(width: standalone ? 38 : 22, height: standalone ? 38 : 22)
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
+        .background {
+            if standalone {
+                Circle().fill(Color.primary.opacity(0.05))
+            }
+        }
         .help(title)
         .accessibilityLabel(title)
+    }
+
+    private var monthPicker: some View {
+        CalendarMonthPickerView(
+            year: $jumpYear,
+            month: $jumpMonth,
+            calendar: calendar,
+            cancel: { isShowingMonthPicker = false },
+            confirm: jumpToSelectedMonth
+        )
+        .background(
+            WindowAccessor { window in
+                window?.identifier = Self.monthPickerWindowIdentifier
+            }
+        )
     }
 
     private func dayCell(
@@ -303,6 +446,70 @@ struct MenuBarCalendarView: View {
         .accessibilityLabel(accessibilityLabel(for: day, events: events))
     }
 
+    private func standaloneDayCell(
+        _ day: CalendarDay,
+        calendar: Calendar,
+        events: [CalendarEventItem]
+    ) -> some View {
+        let isSelected = calendar.isDate(day.date, inSameDayAs: calendarState.selectedDate)
+        let holidayTitle = CalendarEventItem.holidayTitle(in: events)
+
+        return Button {
+            calendarState.selectedDate = day.date
+            if !day.isInDisplayedMonth {
+                calendarState.scrollAnchor = day.date
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Text(day.number, format: .number.grouping(.never))
+                    .font(.system(size: 19, weight: day.isToday || isSelected ? .bold : .medium, design: .rounded))
+                    .monospacedDigit()
+
+                Text(holidayTitle ?? day.lunarText)
+                    .font(.system(size: 11, weight: holidayTitle == nil ? .regular : .semibold))
+                    .foregroundStyle(dayDetailColor(isSelected: isSelected, isHoliday: holidayTitle != nil))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                HStack(spacing: 3) {
+                    ForEach(Array(events.prefix(3))) { event in
+                        Circle()
+                            .fill(isSelected ? Color.white.opacity(0.9) : color(for: event))
+                            .frame(width: 4, height: 4)
+                    }
+                }
+                .frame(height: 4)
+            }
+            .foregroundStyle(isSelected ? Color.white : day.isToday ? Color.accentColor : Color.primary)
+            .frame(maxWidth: .infinity, minHeight: 66)
+            .background {
+                if isSelected {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 58, height: 58)
+                } else if day.isToday {
+                    Circle()
+                        .stroke(Color.accentColor.opacity(0.6), lineWidth: 1)
+                        .frame(width: 58, height: 58)
+                }
+            }
+            .contentShape(Rectangle())
+            .opacity(day.isInDisplayedMonth ? 1 : 0.42)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(for: day, events: events))
+    }
+
+    private func standaloneDays(in month: CalendarMonth) -> [CalendarDay] {
+        var days = month.days
+        while days.count > 35 {
+            let trailingWeek = days.suffix(7)
+            guard !trailingWeek.contains(where: { $0.isInDisplayedMonth }) else { break }
+            days.removeLast(7)
+        }
+        return days
+    }
+
     private func accessibilityLabel(for day: CalendarDay, events: [CalendarEventItem]) -> String {
         let dateText = day.date.formatted(
             .dateTime.weekday(.wide).year().month(.wide).day().locale(calendarLanguage.locale)
@@ -317,7 +524,7 @@ struct MenuBarCalendarView: View {
         return "\(baseText)，日程：\(eventTitles.joined(separator: "、"))"
     }
 
-    private func selectedDateSummary(in month: CalendarMonth) -> some View {
+    private func compactSelectedDateSummary(in month: CalendarMonth) -> some View {
         let lunarText = month.days.first {
             calendar.isDate($0.date, inSameDayAs: calendarState.selectedDate)
         }?.lunarText ?? ""
@@ -347,6 +554,63 @@ struct MenuBarCalendarView: View {
         .padding(.vertical, 6)
         .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityElement(children: .combine)
+    }
+
+    private func standaloneSelectedDateSummary(in month: CalendarMonth) -> some View {
+        let lunarText = month.days.first {
+            calendar.isDate($0.date, inSameDayAs: calendarState.selectedDate)
+        }?.lunarText ?? ""
+        let selectedDateText = calendarState.selectedDate.formatted(
+            .dateTime.month(.defaultDigits).day().weekday(.abbreviated).locale(calendarLanguage.locale)
+        )
+        let prefix = calendar.isDate(calendarState.selectedDate, inSameDayAs: currentDate.date)
+            ? "今天："
+            : "选中日期："
+
+        return HStack(spacing: 10) {
+            Circle()
+                .fill(Color.accentColor)
+                .frame(width: 12, height: 12)
+            Text("\(prefix)\(selectedDateText)")
+            .font(.system(size: 15, weight: .medium))
+            if !lunarText.isEmpty {
+                Text("农历 \(lunarText)")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func agendaView(
+        for month: CalendarMonth,
+        presentation: CalendarAgendaView.Presentation
+    ) -> some View {
+        let openEvent: ((CalendarEventItem) -> Void)? = presentation == .standalone
+            ? { event in openSystemCalendarApplication(for: event) }
+            : nil
+        return CalendarAgendaView(
+            events: systemCalendar.events(on: calendarState.selectedDate, calendar: calendar),
+            authorizationState: systemCalendar.authorizationState,
+            reminderAuthorizationState: systemCalendar.reminderAuthorizationState,
+            isLoading: systemCalendar.isLoading,
+            isRequestingAccess: systemCalendar.isRequestingAccess,
+            errorMessage: systemCalendar.errorMessage,
+            presentation: presentation,
+            title: presentation == .standalone ? agendaTitle : "日程与节假日",
+            openEvent: openEvent,
+            requestAccess: {
+                Task {
+                    await systemCalendar.requestFullAccess()
+                    loadSystemEvents(for: month)
+                }
+            },
+            openSettings: { systemCalendar.openPrivacySettings() }
+        )
     }
 
     private func selectToday() {
@@ -394,6 +658,50 @@ struct MenuBarCalendarView: View {
             from: firstDate,
             through: lastDate,
             calendar: calendar
+        )
+    }
+
+    private func reloadSystemEvents(for month: CalendarMonth) {
+        guard let firstDate = month.days.first?.date,
+              let lastDate = month.days.last?.date else {
+            return
+        }
+        systemCalendar.reloadEvents(
+            from: firstDate,
+            through: lastDate,
+            calendar: calendar
+        )
+    }
+
+    private func start() {
+        scrollCoordinator.onRowStep = { rows in
+            scrollByRows(rows)
+        }
+        scrollCoordinator.start()
+        loadSystemEvents(for: displayedMonth)
+    }
+
+    private var displayedMonth: CalendarMonth {
+        CalendarMonth(anchoredAt: calendarState.scrollAnchor, today: currentDate.date, calendar: calendar)
+    }
+
+    private var agendaTitle: String {
+        if calendar.isDate(calendarState.selectedDate, inSameDayAs: currentDate.date) {
+            return "今日事项"
+        }
+        let date = calendarState.selectedDate.formatted(
+            .dateTime.month(.defaultDigits).day().locale(calendarLanguage.locale)
+        )
+        return "\(date)事项"
+    }
+
+    private func openSystemCalendarApplication(for event: CalendarEventItem) {
+        let path = event.kind == .event
+            ? "/System/Applications/Calendar.app"
+            : "/System/Applications/Reminders.app"
+        NSWorkspace.shared.openApplication(
+            at: URL(fileURLWithPath: path),
+            configuration: NSWorkspace.OpenConfiguration()
         )
     }
 

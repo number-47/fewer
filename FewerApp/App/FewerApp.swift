@@ -434,42 +434,34 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             moduleID: "calendar",
             anchor: button,
             size: MenuBarCalendarView.preferredSize,
-            content: AnyView(
-                MenuBarPopoverChrome(
-                    title: "日历",
-                    systemImage: "calendar",
-                    openSettings: { [weak self] in
-                        self?.closePopover()
-                        SettingsWindowController.shared.show()
-                    },
-                    quitAction: { [weak self] in
-                        self?.closePopover()
-                        NSApp.terminate(nil)
-                    }
-                ) {
-                    MenuBarCalendarView(presentation: .standalone)
+            content: AnyView(MenuBarCalendarView(
+                presentation: .standalone,
+                openSettings: { [weak self] in
+                    self?.closePopover()
+                    SettingsWindowController.shared.show()
                 }
-            )
+            ))
         )
     }
 
     private func showMonitorPopover(moduleID: SystemMonitorModuleID, anchor: NSView) {
         let size: NSSize = switch moduleID {
-        case .cpu: NSSize(width: 360, height: 470)
-        case .memory: NSSize(width: 360, height: 500)
-        case .gpu: NSSize(width: 360, height: 420)
-        case .network: NSSize(width: 360, height: 360)
-        case .disk: NSSize(width: 360, height: 500)
+        case .cpu: NSSize(width: 280, height: 680)
+        case .memory: NSSize(width: 280, height: 600)
+        case .gpu: NSSize(width: 280, height: 500)
+        case .network: NSSize(width: 280, height: 680)
+        case .disk: NSSize(width: 280, height: 850)
         }
-        let openActivityMonitor: (() -> Void)? = switch moduleID {
-        case .cpu, .disk, .network: { [weak self] in
+        let openSystemMonitor: () -> Void = { [weak self] in
             self?.closePopover()
+            let applicationPath: String = switch moduleID {
+            case .disk: "/System/Applications/Utilities/Disk Utility.app"
+            case .cpu, .gpu, .memory, .network: "/System/Applications/Utilities/Activity Monitor.app"
+            }
             NSWorkspace.shared.openApplication(
-                at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
+                at: URL(fileURLWithPath: applicationPath),
                 configuration: NSWorkspace.OpenConfiguration()
             )
-        }
-        case .gpu, .memory: nil
         }
         showPopover(
             moduleID: moduleID.rawValue,
@@ -481,7 +473,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                     self?.closePopover()
                     SettingsWindowController.shared.show()
                 },
-                openActivityMonitor: openActivityMonitor
+                openSystemMonitor: openSystemMonitor
             ))
         )
     }

@@ -112,6 +112,18 @@ final class SystemCalendarService: NSObject, ObservableObject {
         isLoading = true
     }
 
+    func reloadEvents(from firstVisibleDate: Date, through lastVisibleDate: Date, calendar: Calendar) {
+        coalescedLoadTask?.cancel()
+        loadGeneration &+= 1
+        eventCache.clear()
+        eventDayIndex = CalendarEventDayIndex()
+        loadEvents(
+            from: firstVisibleDate,
+            through: lastVisibleDate,
+            calendar: calendar
+        )
+    }
+
     private func performLoad(visibleRange: DateInterval, calendar: Calendar) async {
         loadGeneration &+= 1
         let generation = loadGeneration

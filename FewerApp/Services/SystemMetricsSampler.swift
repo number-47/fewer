@@ -294,14 +294,24 @@ actor SystemMetricsSampler {
             guard let properties = registryProperties(for: service) else { continue }
             let ioClass = stringValue(properties["IOClass"]) ?? ""
             let statistics = properties["PerformanceStatistics"] as? [String: Any] ?? [:]
+            let gpuConfiguration = properties["GPUConfigurationVariable"] as? [String: Any]
+            let powerManagement = properties["IOPowerManagement"] as? [String: Any]
             let model = modelName(properties: properties, statistics: statistics, ioClass: ioClass)
             let vendor = gpuVendor(properties: properties, model: model, ioClass: ioClass)
             let deviceType = gpuDeviceType(model: model, ioClass: ioClass)
             let utilization = doubleValue(statistics["Device Utilization %"] ?? statistics["utilization %"])
             let renderUtilization = doubleValue(statistics["Renderer Utilization %"] ?? statistics["renderUtilization %"])
             let tilerUtilization = doubleValue(statistics["Tiler Utilization %"] ?? statistics["tilerUtilization %"])
-            let coreCount = integerValue(statistics["core count"] ?? statistics["Core Count"])
+            let coreCount = integerValue(
+                statistics["core count"]
+                    ?? statistics["Core Count"]
+                    ?? properties["gpu-core-count"]
+                    ?? gpuConfiguration?["num_cores"]
+            )
             let isActive = boolValue(statistics["Device Active"] ?? properties["Device Active"])
+                ?? boolValue(properties["CommandSubmissionEnabled"])
+                ?? integerValue(powerManagement?["CurrentPowerState"]).map { $0 > 0 }
+                ?? (!statistics.isEmpty)
 
             let baseID = (model.isEmpty ? (vendor ?? ioClass) : model) + "-" + deviceType.rawValue
             var deviceID = baseID
@@ -318,7 +328,7 @@ actor SystemMetricsSampler {
                 vendor: vendor,
                 type: deviceType,
                 coreCount: coreCount,
-                isActive: isActive ?? false,
+                isActive: isActive,
                 utilization: utilization,
                 renderUtilization: renderUtilization,
                 tilerUtilization: tilerUtilization,
@@ -331,11 +341,11 @@ actor SystemMetricsSampler {
 
     private static func gpuDeviceType(model: String, ioClass: String) -> GPUDeviceType {
         let lower = (model + " " + ioClass).lowercased()
-        if lower.contains("integrated") || lower.contains("gmux") || ioClass.contains("Intel") {
-            return .integrated
-        }
         if lower.contains("external") || lower.contains("egpu") {
             return .external
+        }
+        if lower.contains("apple") || lower.contains("agx") || lower.contains("integrated") || lower.contains("gmux") || lower.contains("intel") {
+            return .integrated
         }
         if lower.contains("discrete") || lower.contains("radeon") || lower.contains("nvidia") || lower.contains("amd") {
             return .discrete
@@ -344,7 +354,7 @@ actor SystemMetricsSampler {
     }
 
     private static func modelName(properties: [String: Any], statistics: [String: Any], ioClass: String) -> String {
-        if let model = stringValue(properties["Model"] ?? statistics["Model"] ?? properties["IOName"]) {
+        if let model = stringValue(properties["Model"] ?? properties["model"] ?? statistics["Model"] ?? properties["IOName"]) {
             return model
         }
         let reportClass = stringValue(statistics["classCode"] ?? properties["classCode"])
@@ -495,6 +505,17 @@ actor SystemMetricsSampler {
         }
         let counters = device.flatMap(Self.diskIOCounters)
         let rates = diskRates(counters, identifier: mountSource ?? rootURL.path, at: date)
+        let registrySMART = device.flatMap(Self.diskSMARTSnapshot)
+        let diskutilSMART = Self.diskutilSMARTSnapshot(for: rootURL.path)
+        let smart = registrySMART.map { registry in
+            DiskSMARTSnapshot(
+                temperatureCelsius: registry.temperatureCelsius,
+                health: registry.health ?? diskutilSMART?.health,
+                lifeRemainingPercent: registry.lifeRemainingPercent,
+                warning: registry.warning,
+                powerOnHours: registry.powerOnHours
+            )
+        } ?? diskutilSMART
         let totalBytes = UInt64(total)
         let availableBytes = UInt64(available)
         let used = totalBytes >= availableBytes ? totalBytes - availableBytes : 0
@@ -513,7 +534,7 @@ actor SystemMetricsSampler {
             writeBytes: counters?.writeBytes,
             readBytesPerSecond: rates.read,
             writeBytesPerSecond: rates.write,
-            smart: device.flatMap(Self.diskSMARTSnapshot)
+            smart: smart
         )
     }
 
@@ -739,6 +760,33 @@ actor SystemMetricsSampler {
             ownsEntry = true
         }
         return nil
+    }
+
+    private static func diskutilSMARTSnapshot(for path: String) -> DiskSMARTSnapshot? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/diskutil")
+        process.arguments = ["info", "-plist", path]
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+        guard (try? process.run()) != nil else { return nil }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        guard let propertyList = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+              let properties = propertyList as? [String: Any],
+              let health = stringValue(properties["SMARTStatus"]),
+              !health.isEmpty
+        else { return nil }
+
+        return DiskSMARTSnapshot(
+            temperatureCelsius: nil,
+            health: health,
+            lifeRemainingPercent: nil,
+            warning: nil,
+            powerOnHours: nil
+        )
     }
 
     private static func smartProperties(from properties: [String: Any]) -> DiskSMARTSnapshot? {

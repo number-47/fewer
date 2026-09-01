@@ -37,10 +37,15 @@ final class NetworkWiFiDetailsService: NSObject, ObservableObject, @preconcurren
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        if manager.authorizationStatus == .authorizedAlways {
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
             loadDetails()
-        } else if manager.authorizationStatus != .notDetermined {
+        case .notDetermined:
+            break
+        case .denied, .restricted:
             setUnavailable(status: "定位权限未授予")
+        @unknown default:
+            setUnavailable(status: "定位权限不可用")
         }
     }
 
