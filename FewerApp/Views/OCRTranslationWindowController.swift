@@ -159,6 +159,19 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         releaseResultWindow(notify: true)
     }
 
+    func windowDidResignKey(_ notification: Notification) {
+        guard let resigningPanel = notification.object as? NSPanel, resigningPanel === panel else { return }
+        Task { @MainActor [weak self, weak resigningPanel] in
+            await Task.yield()
+            guard let self, let resigningPanel, let currentPanel = self.panel,
+                  let viewModel = self.viewModel,
+                  currentPanel === resigningPanel,
+                  !viewModel.isPinned,
+                  !currentPanel.isKeyWindow else { return }
+            self.closeResultWindow(notify: true)
+        }
+    }
+
     private func closeResultWindow(notify: Bool) {
         guard let panel else { return }
         panel.delegate = nil
