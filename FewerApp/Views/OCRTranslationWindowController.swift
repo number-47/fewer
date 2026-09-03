@@ -20,12 +20,16 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         sourceText: String,
         sourceLanguageCode: String?,
         targetLanguageCode: String?,
+        provider: OCRTranslationProvider,
         translationState: OCRTranslationSession.TranslationState,
         translationGeneration: UInt64,
         selection: CGRect,
         screen: NSScreen?,
         onDismiss: @escaping () -> Void,
         onTargetLanguageSelected: @escaping (String) -> Void,
+        onProviderSelected: @escaping (OCRTranslationProvider) -> Void,
+        onRetryRequested: @escaping () -> Void,
+        onOpenScreenshotSettings: @escaping () -> Void,
         onTranslationStateChanged: @escaping (OCRTranslationSession.TranslationState, UInt64) -> Void
     ) {
         closeResultWindow(notify: true)
@@ -44,6 +48,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
             sourceText: sourceText,
             sourceLanguageCode: sourceLanguageCode,
             targetLanguageCode: targetLanguageCode,
+            provider: provider,
             translationState: translationState,
             translationGeneration: translationGeneration
         )
@@ -68,6 +73,9 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         panel.contentViewController = NSHostingController(rootView: OCRTranslationView(
             model: viewModel,
             onTargetLanguageSelected: onTargetLanguageSelected,
+            onProviderSelected: onProviderSelected,
+            onRetryRequested: onRetryRequested,
+            onOpenScreenshotSettings: onOpenScreenshotSettings,
             onTranslationStateChanged: onTranslationStateChanged
         ))
 
@@ -89,12 +97,14 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
 
     func updateTranslation(
         _ state: OCRTranslationSession.TranslationState,
+        provider: OCRTranslationProvider,
         sourceLanguageCode: String?,
         targetLanguageCode: String?,
         translationGeneration: UInt64
     ) {
         viewModel?.updateTranslation(
             state,
+            provider: provider,
             sourceLanguageCode: sourceLanguageCode,
             targetLanguageCode: targetLanguageCode,
             translationGeneration: translationGeneration

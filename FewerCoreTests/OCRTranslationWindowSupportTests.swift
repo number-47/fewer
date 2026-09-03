@@ -109,6 +109,36 @@ final class OCRTranslationWindowSupportTests: XCTestCase {
         XCTAssertNil(session.beginTranslation())
     }
 
+    func testAIProviderAllowsUndetectedSourceLanguageAndInvalidatesSystemGeneration() throws {
+        var session = OCRTranslationSession()
+        session.beginRecognition()
+        XCTAssertTrue(session.receiveOCRText("Recognized text", detectedLanguageCode: nil))
+
+        let aiGeneration = try XCTUnwrap(session.selectProvider(.ai))
+        XCTAssertEqual(session.provider, .ai)
+        XCTAssertEqual(session.translationState, .preparing)
+
+        session.updateTranslation(.completed("AI 译文"), generation: aiGeneration)
+        XCTAssertEqual(session.translationState, .completed("AI 译文"))
+
+        XCTAssertNil(session.selectProvider(.system))
+        XCTAssertGreaterThan(session.translationGeneration, aiGeneration)
+        XCTAssertEqual(session.translationState, .languageDetectionFailed)
+        session.updateTranslation(.completed("过期 AI 译文"), generation: aiGeneration)
+        XCTAssertEqual(session.translationState, .languageDetectionFailed)
+    }
+
+    func testNewRecognitionResetsProviderToSystem() throws {
+        var session = OCRTranslationSession()
+        session.beginRecognition()
+        XCTAssertTrue(session.receiveOCRText("Recognized text", detectedLanguageCode: "en"))
+        _ = try XCTUnwrap(session.selectProvider(.ai))
+
+        session.beginRecognition()
+
+        XCTAssertEqual(session.provider, .system)
+    }
+
     func testWindowPrefersRightSideOfSelection() {
         let frame = OCRTranslationWindowLayout.frame(
             selection: CGRect(x: 180, y: 260, width: 220, height: 180),

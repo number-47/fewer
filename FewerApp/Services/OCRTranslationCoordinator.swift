@@ -9,6 +9,7 @@ final class OCRTranslationCoordinator {
     private var session = OCRTranslationSession()
     private var generation: UInt64 = 0
     private var recognitionTask: Task<Void, Never>?
+    private var aiTranslationTask: Task<Void, Never>?
 
     private init() {}
 
@@ -37,6 +38,8 @@ final class OCRTranslationCoordinator {
         generation &+= 1
         recognitionTask?.cancel()
         recognitionTask = nil
+        aiTranslationTask?.cancel()
+        aiTranslationTask = nil
         session.cancel()
         OCRTranslationWindowController.shared.close()
     }
@@ -59,6 +62,7 @@ final class OCRTranslationCoordinator {
             sourceText: sourceText,
             sourceLanguageCode: session.sourceLanguageCode,
             targetLanguageCode: session.targetLanguageCode,
+            provider: session.provider,
             translationState: session.translationState,
             translationGeneration: session.translationGeneration,
             selection: selection,
@@ -66,6 +70,15 @@ final class OCRTranslationCoordinator {
             onDismiss: { [weak self] in self?.dismissed(generation: generation) },
             onTargetLanguageSelected: { [weak self] languageCode in
                 self?.selectTargetLanguage(languageCode)
+            },
+            onProviderSelected: { [weak self] provider in
+                self?.selectProvider(provider)
+            },
+            onRetryRequested: { [weak self] in
+                self?.retryTranslation()
+            },
+            onOpenScreenshotSettings: {
+                SettingsWindowController.shared.show(section: .screenshot)
             },
             onTranslationStateChanged: { [weak self] state, translationGeneration in
                 self?.updateTranslation(state, generation: translationGeneration)
@@ -82,27 +95,97 @@ final class OCRTranslationCoordinator {
 
     private func dismissed(generation: UInt64) {
         guard generation == self.generation else { return }
+        aiTranslationTask?.cancel()
+        aiTranslationTask = nil
         session.cancel()
     }
 
     private func selectTargetLanguage(_ languageCode: String) {
-        guard #available(macOS 15.0, *), let translationGeneration = session.selectTargetLanguage(languageCode) else { return }
+        aiTranslationTask?.cancel()
+        aiTranslationTask = nil
+        guard let translationGeneration = session.selectTargetLanguage(languageCode) else { return }
+        presentCurrentTranslation(generation: translationGeneration)
+        if session.provider == .ai {
+            startAITranslation(generation: translationGeneration)
+        }
+    }
+
+    private func selectProvider(_ provider: OCRTranslationProvider) {
+        aiTranslationTask?.cancel()
+        aiTranslationTask = nil
+        guard let translationGeneration = session.selectProvider(provider) else {
+            presentCurrentTranslation(generation: session.translationGeneration)
+            return
+        }
+        presentCurrentTranslation(generation: translationGeneration)
+        if provider == .ai {
+            startAITranslation(generation: translationGeneration)
+        }
+    }
+
+    private func retryTranslation() {
+        aiTranslationTask?.cancel()
+        aiTranslationTask = nil
+        guard let translationGeneration = session.beginTranslation() else { return }
+        presentCurrentTranslation(generation: translationGeneration)
+        if session.provider == .ai {
+            startAITranslation(generation: translationGeneration)
+        }
+    }
+
+    private func startAITranslation(generation: UInt64) {
+        guard session.provider == .ai,
+              let sourceText = session.sourceText,
+              let targetLanguageCode = session.targetLanguageCode
+        else { return }
+
+        let credentials: AITranslationCredentials
+        do {
+            guard let storedCredentials = try AITranslationSettingsStore().loadCredentials() else {
+                updateTranslation(.aiConfigurationUnavailable, generation: generation)
+                return
+            }
+            credentials = storedCredentials
+        } catch {
+            updateTranslation(.aiConfigurationUnavailable, generation: generation)
+            return
+        }
+
+        let sourceLanguageCode = session.sourceLanguageCode
+        let client = AITranslationClient()
+        aiTranslationTask = Task { [weak self] in
+            do {
+                let translation = try await client.translate(
+                    sourceText: sourceText,
+                    sourceLanguageCode: sourceLanguageCode,
+                    targetLanguageCode: targetLanguageCode,
+                    credentials: credentials
+                )
+                guard !Task.isCancelled else { return }
+                self?.updateTranslation(.completed(translation), generation: generation)
+            } catch let error as AITranslationError {
+                guard !Task.isCancelled else { return }
+                self?.updateTranslation(.aiRequestFailed(error), generation: generation)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.updateTranslation(.aiRequestFailed(.networkFailure), generation: generation)
+            }
+        }
+    }
+
+    private func presentCurrentTranslation(generation: UInt64) {
         OCRTranslationWindowController.shared.updateTranslation(
             session.translationState,
+            provider: session.provider,
             sourceLanguageCode: session.sourceLanguageCode,
             targetLanguageCode: session.targetLanguageCode,
-            translationGeneration: translationGeneration
+            translationGeneration: generation
         )
     }
 
     private func updateTranslation(_ state: OCRTranslationSession.TranslationState, generation: UInt64) {
         session.updateTranslation(state, generation: generation)
         guard session.translationGeneration == generation else { return }
-        OCRTranslationWindowController.shared.updateTranslation(
-            session.translationState,
-            sourceLanguageCode: session.sourceLanguageCode,
-            targetLanguageCode: session.targetLanguageCode,
-            translationGeneration: generation
-        )
+        presentCurrentTranslation(generation: generation)
     }
 }

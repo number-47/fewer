@@ -22,12 +22,15 @@ public struct OCRTranslationSession: Equatable, Sendable {
         case unsupportedLanguagePair
         case preparationFailed
         case requestFailed
+        case aiConfigurationUnavailable
+        case aiRequestFailed(AITranslationError)
     }
 
     public private(set) var phase: Phase = .idle
     public private(set) var sourceText: String?
     public private(set) var sourceLanguageCode: String?
     public private(set) var targetLanguageCode: String?
+    public private(set) var provider: OCRTranslationProvider = .system
     public private(set) var translationState: TranslationState = .preparing
     public private(set) var translationGeneration: UInt64 = 0
 
@@ -37,6 +40,7 @@ public struct OCRTranslationSession: Equatable, Sendable {
         sourceText = nil
         sourceLanguageCode = nil
         targetLanguageCode = nil
+        provider = .system
         translationState = .preparing
         phase = .recognizing
     }
@@ -64,7 +68,11 @@ public struct OCRTranslationSession: Equatable, Sendable {
     public mutating func beginTranslation() -> UInt64? {
         guard sourceText != nil, phase == .displaying else { return nil }
         translationGeneration &+= 1
-        guard sourceLanguageCode != nil, targetLanguageCode != nil else {
+        guard targetLanguageCode != nil else {
+            translationState = .languageDetectionFailed
+            return nil
+        }
+        guard provider == .ai || sourceLanguageCode != nil else {
             translationState = .languageDetectionFailed
             return nil
         }
@@ -76,6 +84,14 @@ public struct OCRTranslationSession: Equatable, Sendable {
     public mutating func selectTargetLanguage(_ languageCode: String) -> UInt64? {
         guard sourceText != nil, phase == .displaying else { return nil }
         targetLanguageCode = languageCode
+        return beginTranslation()
+    }
+
+    /// 切换翻译源会使之前源的异步结果失效。
+    @discardableResult
+    public mutating func selectProvider(_ provider: OCRTranslationProvider) -> UInt64? {
+        guard sourceText != nil, phase == .displaying else { return nil }
+        self.provider = provider
         return beginTranslation()
     }
 
@@ -94,6 +110,7 @@ public struct OCRTranslationSession: Equatable, Sendable {
         sourceText = nil
         sourceLanguageCode = nil
         targetLanguageCode = nil
+        provider = .system
         translationState = .preparing
         phase = .failed
     }

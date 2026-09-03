@@ -87,6 +87,7 @@
 		766862A9A256E382B1B4A1DA /* OCRTranslationWindowSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B38F79305D073F15BD9A9656 /* OCRTranslationWindowSupportTests.swift */; };
 		77484FACBEF12DF0EAC0649A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D748A2A7AA7B727ED681025A /* Assets.xcassets */; };
 		79A9AE0E06FBD94FBBF1EB32 /* ConflictNameResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751E7709532065ED071D6A32 /* ConflictNameResolverTests.swift */; };
+		79C7727390FADEBF1A8749F2 /* AITranslationClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD375691A6669BB911EDEE01 /* AITranslationClientTests.swift */; };
 		841011E027F2B8455D9627BF /* ModuleSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFEE5C3899774ECADEF93BBD /* ModuleSettingsView.swift */; };
 		86576D312BC53DF7029911A3 /* RollingCaptureFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DF888A3AA96672242F1ED0C /* RollingCaptureFlowTests.swift */; };
 		86D59A17D888D466EC1DA5BE /* FinderShortcutRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A2C7FEE3C2050BAF4E64DAF /* FinderShortcutRouterTests.swift */; };
@@ -172,6 +173,7 @@
 		F5191DB9C5ECC37D34E2D46A /* CPUFrequencyReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E8E41E71F08EDEEEF23F24 /* CPUFrequencyReader.swift */; };
 		F736DEBCD6A403EA73ACFCD0 /* InputEnhancementSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83050A5E7BAB4B2680FAF634 /* InputEnhancementSettings.swift */; };
 		F7F75A54BBD375202A1948AE /* EventTapController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A84FF39755B17BFEC9FB885B /* EventTapController.swift */; };
+		F813CF11518AFBEA6BDABCAE /* AITranslationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FA965FFE5D420DFE78A42C2 /* AITranslationClient.swift */; };
 		F859001DB2E8E82AADDD25B2 /* TemplateManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004F4C2A39A8BF5043549D0A /* TemplateManifest.swift */; };
 		FC16A435530A9D857E91231B /* InputProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CEC06F4656B160F926EDE72 /* InputProcessing.swift */; };
 		FCDC27F213C7CB0578F8F28D /* Markdown.md in Resources */ = {isa = PBXBuildFile; fileRef = 5DCBAB18206B48A164123D21 /* Markdown.md */; };
@@ -272,6 +274,7 @@
 		2C4376AD2525EACD08426FD3 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
 		2DB5CEEFF898CECC7187F318 /* GestureHUDController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GestureHUDController.swift; sourceTree = "<group>"; };
 		2F3A7C61EF67BF66E65B9903 /* FewerCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FewerCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		2FA965FFE5D420DFE78A42C2 /* AITranslationClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITranslationClient.swift; sourceTree = "<group>"; };
 		2FD09E799CC7609BCE2DB189 /* FinderSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSync.swift; sourceTree = "<group>"; };
 		3221C394BFDDE460A10E1CED /* ModulePreferencesStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModulePreferencesStore.swift; sourceTree = "<group>"; };
 		3262BCD2A97C69B5B26F2BED /* InputEnhancementSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnhancementSettingsView.swift; sourceTree = "<group>"; };
@@ -368,6 +371,7 @@
 		B7C9D9EDECFADB33C325F806 /* ProcessTerminationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTerminationService.swift; sourceTree = "<group>"; };
 		B9BCAB8874C03C7E03DA17F6 /* PinItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinItem.swift; sourceTree = "<group>"; };
 		BC6B0C5A1CF3E12AB3D1FAF8 /* FileOperationResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileOperationResult.swift; sourceTree = "<group>"; };
+		BD375691A6669BB911EDEE01 /* AITranslationClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITranslationClientTests.swift; sourceTree = "<group>"; };
 		BED413342A044C49F9602170 /* OCRTranslationWindowSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRTranslationWindowSupport.swift; sourceTree = "<group>"; };
 		BFE6149A04358B6C689E3D64 /* SystemCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemCalendarService.swift; sourceTree = "<group>"; };
 		C2E229E0B9013C6448C106E4 /* SystemMetricsSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMetricsSampler.swift; sourceTree = "<group>"; };
@@ -562,6 +566,7 @@
 		55B4382E3A3E33F2427F8A2C /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				2FA965FFE5D420DFE78A42C2 /* AITranslationClient.swift */,
 				DAF73F5AACFD5B9A89ABEBC3 /* CPUFrequencyCalculator.swift */,
 				D0DD90EC9FDC4B40D3FCEE9E /* CutTransactionStore.swift */,
 				E2B5D5B09515F2B4D82DA2AB /* FileOperationCoordinator.swift */,
@@ -660,6 +665,7 @@
 		A1748EB9C97D49E92979B878 /* FewerCoreTests */ = {
 			isa = PBXGroup;
 			children = (
+				BD375691A6669BB911EDEE01 /* AITranslationClientTests.swift */,
 				B5100E86C99EAF672AA83AA5 /* CalendarEventCacheTests.swift */,
 				1997D67E5E6F93AF2A35ABBB /* CalendarEventItemTests.swift */,
 				670BAEAFBCAEA461D7DB6583 /* CalendarMonthTests.swift */,
@@ -1070,6 +1076,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F813CF11518AFBEA6BDABCAE /* AITranslationClient.swift in Sources */,
 				BB38364851A79AE33538A401 /* AppGroupConstants.swift in Sources */,
 				A234CF10753CD02E78478EC6 /* CPUFrequencyCalculator.swift in Sources */,
 				A20E509BFC7AD19DF6E32A6C /* CalendarEventCache.swift in Sources */,
@@ -1205,6 +1212,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				79C7727390FADEBF1A8749F2 /* AITranslationClientTests.swift in Sources */,
 				68A312F9DB7E7D6DE9B5F07D /* CPUFrequencyCalculatorTests.swift in Sources */,
 				8E7CF123BB4ED443C901662A /* CalendarEventCacheTests.swift in Sources */,
 				CED849B3951D17337BB31B52 /* CalendarEventItemTests.swift in Sources */,

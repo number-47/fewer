@@ -8,6 +8,7 @@ final class OCRTranslationViewModel: ObservableObject {
     @Published private(set) var sourceText: String
     @Published private(set) var sourceLanguageCode: String?
     @Published private(set) var targetLanguageCode: String?
+    @Published private(set) var provider: OCRTranslationProvider
     @Published private(set) var translationState: OCRTranslationSession.TranslationState
     @Published private(set) var translationGeneration: UInt64
 
@@ -15,23 +16,27 @@ final class OCRTranslationViewModel: ObservableObject {
         sourceText: String,
         sourceLanguageCode: String?,
         targetLanguageCode: String?,
+        provider: OCRTranslationProvider,
         translationState: OCRTranslationSession.TranslationState,
         translationGeneration: UInt64
     ) {
         self.sourceText = sourceText
         self.sourceLanguageCode = sourceLanguageCode
         self.targetLanguageCode = targetLanguageCode
+        self.provider = provider
         self.translationState = translationState
         self.translationGeneration = translationGeneration
     }
 
     func updateTranslation(
         _ state: OCRTranslationSession.TranslationState,
+        provider: OCRTranslationProvider,
         sourceLanguageCode: String?,
         targetLanguageCode: String?,
         translationGeneration: UInt64
     ) {
         translationState = state
+        self.provider = provider
         self.sourceLanguageCode = sourceLanguageCode
         self.targetLanguageCode = targetLanguageCode
         self.translationGeneration = translationGeneration
@@ -41,6 +46,7 @@ final class OCRTranslationViewModel: ObservableObject {
         sourceText = ""
         sourceLanguageCode = nil
         targetLanguageCode = nil
+        provider = .system
         translationState = .preparing
         translationGeneration = 0
     }
@@ -49,6 +55,9 @@ final class OCRTranslationViewModel: ObservableObject {
 struct OCRTranslationView: View {
     @ObservedObject var model: OCRTranslationViewModel
     let onTargetLanguageSelected: (String) -> Void
+    let onProviderSelected: (OCRTranslationProvider) -> Void
+    let onRetryRequested: () -> Void
+    let onOpenScreenshotSettings: () -> Void
     let onTranslationStateChanged: (OCRTranslationSession.TranslationState, UInt64) -> Void
 
     var body: some View {
@@ -60,7 +69,7 @@ struct OCRTranslationView: View {
 
             translationSection
         }
-        .frame(minWidth: 360, minHeight: 260, maxWidth: .infinity, maxHeight: .infinity)
+        .frame(minWidth: 360, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -70,6 +79,9 @@ struct OCRTranslationView: View {
             AppleTranslationTaskHost(
                 model: model,
                 onTargetLanguageSelected: onTargetLanguageSelected,
+                onProviderSelected: onProviderSelected,
+                onRetryRequested: onRetryRequested,
+                onOpenScreenshotSettings: onOpenScreenshotSettings,
                 onTranslationStateChanged: onTranslationStateChanged
             )
         } else {
@@ -83,6 +95,7 @@ struct OCRTranslationView: View {
     private var translationContent: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
+                providerPicker
                 Text(sourceLanguageLabel)
                 Image(systemName: "arrow.right")
                     .foregroundStyle(.secondary)
@@ -101,6 +114,8 @@ struct OCRTranslationView: View {
                     .textSelection(.enabled)
                     .padding(.bottom, 2)
             }
+
+            translationActions
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -135,6 +150,34 @@ struct OCRTranslationView: View {
         .disabled(text.isEmpty)
     }
 
+    private var providerPicker: some View {
+        Picker("翻译源", selection: Binding(
+            get: { model.provider },
+            set: { provider in onProviderSelected(provider) }
+        )) {
+            Text("系统").tag(OCRTranslationProvider.system)
+            Text("AI").tag(OCRTranslationProvider.ai)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 116)
+    }
+
+    @ViewBuilder
+    private var translationActions: some View {
+        switch model.translationState {
+        case .aiConfigurationUnavailable:
+            Button("前往截屏设置", action: onOpenScreenshotSettings)
+        case .aiRequestFailed:
+            HStack {
+                Button("重试", action: onRetryRequested)
+                Button("切回系统") { onProviderSelected(.system) }
+            }
+        default:
+            EmptyView()
+        }
+    }
+
     private var translationText: String {
         switch model.translationState {
         case .preparing:
@@ -155,6 +198,10 @@ struct OCRTranslationView: View {
             "翻译语言准备失败"
         case .requestFailed:
             "翻译请求失败"
+        case .aiConfigurationUnavailable:
+            "尚未配置 AI 翻译服务"
+        case let .aiRequestFailed(error):
+            error.errorDescription ?? "AI 翻译请求失败"
         }
     }
 
@@ -163,7 +210,8 @@ struct OCRTranslationView: View {
         case .completed:
             .primary
         case .preparing, .translating, .unsupportedSystem, .languageDetectionFailed,
-             .availabilityCheckFailed, .unsupportedLanguagePair, .preparationFailed, .requestFailed:
+             .availabilityCheckFailed, .unsupportedLanguagePair, .preparationFailed, .requestFailed,
+             .aiConfigurationUnavailable, .aiRequestFailed:
             .secondary
         }
     }

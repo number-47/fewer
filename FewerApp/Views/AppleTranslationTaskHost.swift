@@ -8,6 +8,9 @@ import SwiftUI
 struct AppleTranslationTaskHost: View {
     @ObservedObject var model: OCRTranslationViewModel
     let onTargetLanguageSelected: (String) -> Void
+    let onProviderSelected: (OCRTranslationProvider) -> Void
+    let onRetryRequested: () -> Void
+    let onOpenScreenshotSettings: () -> Void
     let onTranslationStateChanged: (OCRTranslationSession.TranslationState, UInt64) -> Void
 
     @State private var supportedLanguages: [Locale.Language] = []
@@ -17,6 +20,7 @@ struct AppleTranslationTaskHost: View {
         let sourceText = model.sourceText
         let targetLanguageCode = model.targetLanguageCode
         let translationGeneration = model.translationGeneration
+        let provider = model.provider
 
         content
             .task {
@@ -39,8 +43,8 @@ struct AppleTranslationTaskHost: View {
                 automaticallySelectedLanguageCode = selectedLanguageCode
                 onTargetLanguageSelected(selectedLanguageCode)
             }
-            .translationTask(configuration) { session in
-                guard let targetLanguageCode else { return }
+            .translationTask(provider == .system ? configuration : nil) { session in
+                guard provider == .system, let targetLanguageCode else { return }
                 await translate(
                     sourceText: sourceText,
                     targetLanguageCode: targetLanguageCode,
@@ -53,6 +57,7 @@ struct AppleTranslationTaskHost: View {
     private var content: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
+                providerPicker
                 Text(sourceLanguageLabel)
                 Image(systemName: "arrow.right")
                     .foregroundStyle(.secondary)
@@ -70,6 +75,8 @@ struct AppleTranslationTaskHost: View {
                     .textSelection(.enabled)
                     .padding(.bottom, 2)
             }
+
+            translationActions
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -94,6 +101,34 @@ struct AppleTranslationTaskHost: View {
             }
             .labelsHidden()
             .frame(maxWidth: 150)
+        }
+    }
+
+    private var providerPicker: some View {
+        Picker("翻译源", selection: Binding(
+            get: { model.provider },
+            set: { provider in onProviderSelected(provider) }
+        )) {
+            Text("系统").tag(OCRTranslationProvider.system)
+            Text("AI").tag(OCRTranslationProvider.ai)
+        }
+        .labelsHidden()
+        .pickerStyle(.segmented)
+        .frame(width: 116)
+    }
+
+    @ViewBuilder
+    private var translationActions: some View {
+        switch model.translationState {
+        case .aiConfigurationUnavailable:
+            Button("前往截屏设置", action: onOpenScreenshotSettings)
+        case .aiRequestFailed:
+            HStack {
+                Button("重试", action: onRetryRequested)
+                Button("切回系统") { onProviderSelected(.system) }
+            }
+        default:
+            EmptyView()
         }
     }
 
@@ -208,6 +243,10 @@ struct AppleTranslationTaskHost: View {
             "翻译语言准备失败"
         case .requestFailed:
             "翻译请求失败"
+        case .aiConfigurationUnavailable:
+            "尚未配置 AI 翻译服务"
+        case let .aiRequestFailed(error):
+            error.errorDescription ?? "AI 翻译请求失败"
         }
     }
 

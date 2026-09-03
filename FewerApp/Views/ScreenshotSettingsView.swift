@@ -7,7 +7,14 @@ struct ScreenshotSettingsView: View {
     @State private var settings = ScreenshotSettings.default
     @State private var hasScreenCapturePermission = ScreenshotCapture.hasPermission
     @State private var permissionWasRequested = ScreenshotCapture.permissionWasRequested
+    @State private var aiEndpoint = ""
+    @State private var aiModel = ""
+    @State private var aiAPIKey = ""
+    @State private var isTestingAIConfiguration = false
+    @State private var showsClearAIConfigurationConfirmation = false
+    @State private var aiConfigurationMessage: String?
     private let store = ScreenshotSettingsStore()
+    private let aiConfigurationService = AITranslationConfigurationService()
 
     var body: some View {
         ScrollView {
@@ -50,6 +57,38 @@ struct ScreenshotSettingsView: View {
                     }
                 }
                 FewerSettingsCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("AI 翻译")
+                            .fontWeight(.semibold)
+                        Text("启用后，只有你在截图翻译结果中切换到 AI 时，Fewer 才会向你配置的服务发送 OCR 文本、原文语言和目标语言；不会发送截图、文字坐标或其他屏幕信息。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("完整 Chat Completions 地址", text: $aiEndpoint)
+                            .textFieldStyle(.roundedBorder)
+                        TextField("模型", text: $aiModel)
+                            .textFieldStyle(.roundedBorder)
+                        SecureField("API 密钥（本机服务可留空）", text: $aiAPIKey)
+                            .textFieldStyle(.roundedBorder)
+                        HStack {
+                            Button(isTestingAIConfiguration ? "正在测试连接…" : "保存并测试连接") {
+                                saveAndTestAIConfiguration()
+                            }
+                            .disabled(isTestingAIConfiguration)
+                            Button("清除配置", role: .destructive) {
+                                showsClearAIConfigurationConfirmation = true
+                            }
+                            .disabled(isTestingAIConfiguration || !hasAIConfiguration)
+                            Spacer()
+                        }
+                        if let aiConfigurationMessage {
+                            Text(aiConfigurationMessage)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(16)
+                }
+                FewerSettingsCard {
                     FewerSettingsRow { Text("快捷键录制").fontWeight(.semibold) }
                     Divider(); FewerSettingsRow { HotKeyRecorder(title: "区域截图", spec: $settings.regionHotKey) }
                     Divider(); FewerSettingsRow { HotKeyRecorder(title: "窗口截图", spec: $settings.windowHotKey) }
@@ -61,6 +100,7 @@ struct ScreenshotSettingsView: View {
         .onAppear {
             settings = store.load()
             refreshScreenCapturePermission()
+            loadAIConfiguration()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshScreenCapturePermission()
@@ -74,6 +114,17 @@ struct ScreenshotSettingsView: View {
             } else {
                 HotKeyManager.shared.unregisterAll()
             }
+        }
+        .onDisappear {
+            aiAPIKey = ""
+        }
+        .alert("清除 AI 翻译配置？", isPresented: $showsClearAIConfigurationConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("清除", role: .destructive) {
+                clearAIConfiguration()
+            }
+        } message: {
+            Text("将删除服务地址、模型和保存在钥匙串中的 API 密钥。")
         }
     }
 
@@ -135,6 +186,58 @@ struct ScreenshotSettingsView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         settings.customSaveDirectory = url.standardizedFileURL.path
         settings.saveLocation = .custom
+    }
+
+    private var hasAIConfiguration: Bool {
+        !aiEndpoint.isEmpty || !aiModel.isEmpty
+    }
+
+    private func loadAIConfiguration() {
+        guard let configuration = AITranslationSettingsStore().loadConfiguration() else { return }
+        aiEndpoint = configuration.endpoint.absoluteString
+        aiModel = configuration.model
+        aiConfigurationMessage = "已配置；重新保存远程服务时需要再次输入 API 密钥。"
+    }
+
+    private func saveAndTestAIConfiguration() {
+        let draft = AITranslationConfigurationDraft(
+            endpoint: aiEndpoint,
+            model: aiModel,
+            apiKey: aiAPIKey
+        )
+        isTestingAIConfiguration = true
+        aiConfigurationMessage = nil
+        Task {
+            do {
+                try await aiConfigurationService.testAndSave(draft)
+                guard !Task.isCancelled else { return }
+                aiAPIKey = ""
+                aiConfigurationMessage = "AI 翻译服务已保存。"
+            } catch {
+                guard !Task.isCancelled else { return }
+                aiConfigurationMessage = error.localizedDescription
+            }
+            isTestingAIConfiguration = false
+        }
+    }
+
+    private func clearAIConfiguration() {
+        isTestingAIConfiguration = true
+        aiConfigurationMessage = nil
+        Task {
+            do {
+                try await aiConfigurationService.clear()
+                guard !Task.isCancelled else { return }
+                aiEndpoint = ""
+                aiModel = ""
+                aiAPIKey = ""
+                aiConfigurationMessage = "AI 翻译配置已清除。"
+            } catch {
+                guard !Task.isCancelled else { return }
+                aiConfigurationMessage = error.localizedDescription
+            }
+            isTestingAIConfiguration = false
+        }
     }
 }
 
