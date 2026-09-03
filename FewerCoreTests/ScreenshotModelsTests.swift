@@ -131,6 +131,7 @@ final class ScreenshotModelsTests: XCTestCase {
         XCTAssertEqual(settings.pinDefaultOpacity, 1.0)
         XCTAssertEqual(settings.saveLocation, .desktop)
         XCTAssertNil(settings.customSaveDirectory)
+        XCTAssertEqual(settings.ocrTranslationWindowPosition, .nearSelection)
     }
 
     func testDefaultHotKeySpecs() {
@@ -156,6 +157,7 @@ final class ScreenshotModelsTests: XCTestCase {
         settings.customSaveDirectory = "/tmp/Fewer Screenshots"
         settings.rollingCaptureEnabled = false
         settings.regionHotKey = HotKeySpec(keyCode: 0x12, modifiers: HotKeySpec.option)
+        settings.ocrTranslationWindowPosition = .bottomTrailing
 
         let data = try JSONEncoder().encode(settings)
         let decoded = try JSONDecoder().decode(ScreenshotSettings.self, from: data)
@@ -174,6 +176,7 @@ final class ScreenshotModelsTests: XCTestCase {
         XCTAssertTrue(decoded.rollingCaptureEnabled)
         XCTAssertEqual(decoded.saveLocation, .desktop)
         XCTAssertNil(decoded.customSaveDirectory)
+        XCTAssertEqual(decoded.ocrTranslationWindowPosition, .nearSelection)
     }
 
     func testSettingsDecodeLegacyJSONUsesOCRTranslateDefault() throws {
@@ -185,6 +188,17 @@ final class ScreenshotModelsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(ScreenshotSettings.self, from: legacyData)
 
         XCTAssertEqual(decoded.ocrTranslateHotKey, .ocrTranslateDefault)
+    }
+
+    func testSettingsDecodeLegacyJSONUsesNearSelectionForOCRTranslationWindowPosition() throws {
+        let data = try JSONEncoder().encode(ScreenshotSettings.default)
+        var legacyObject = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        legacyObject.removeValue(forKey: "ocrTranslationWindowPosition")
+
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let decoded = try JSONDecoder().decode(ScreenshotSettings.self, from: legacyData)
+
+        XCTAssertEqual(decoded.ocrTranslationWindowPosition, .nearSelection)
     }
 
     func testCustomSaveDirectoryRoundTrip() throws {

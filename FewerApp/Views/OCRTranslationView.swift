@@ -54,13 +54,13 @@ struct OCRTranslationView: View {
     var body: some View {
         VStack(spacing: 0) {
             textSection(title: "原文", text: model.sourceText, canCopy: true)
-                .frame(maxHeight: 160)
+                .frame(maxHeight: .infinity)
 
             Divider()
 
             translationSection
         }
-        .frame(minWidth: 360, minHeight: 260)
+        .frame(minWidth: 360, minHeight: 260, maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

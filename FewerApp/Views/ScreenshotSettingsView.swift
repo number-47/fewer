@@ -33,6 +33,21 @@ struct ScreenshotSettingsView: View {
                         Spacer()
                         Picker("", selection: $settings.saveLocation) { ForEach(ScreenshotSaveLocation.allCases) { Text($0.title).tag($0) } }.labelsHidden().frame(width: 130)
                     }
+                    Divider()
+                    FewerSettingsRow {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("翻译结果位置")
+                            Text("截图翻译结果窗的打开位置").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Picker("", selection: $settings.ocrTranslationWindowPosition) {
+                            ForEach(OCRTranslationWindowPosition.allCases) {
+                                Text($0.title).tag($0)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 130)
+                    }
                 }
                 FewerSettingsCard {
                     FewerSettingsRow { Text("快捷键录制").fontWeight(.semibold) }

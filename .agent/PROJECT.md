@@ -2,7 +2,7 @@
 
 ## Objective
 
-在不触碰现有发布安全边界和 T041 工作区改动的前提下，交付以 macOS 26 为最低版本的 OCR 截图翻译 V1：独立快捷键、区域选取、端侧 Vision OCR、浮窗原文/译文、Apple Translation 与回归验证。
+在不触碰现有发布安全边界和 T041 工作区改动的前提下，交付以 macOS 26 为最低版本的 OCR 截图翻译：独立快捷键、区域选取、端侧 Vision OCR、可配置且充分展开的浮窗原文/译文、可靠的 Apple Translation 目标语言选择与回归验证。
 
 ## Constraints
 
@@ -21,11 +21,12 @@
 - T033：当前 XCTest UI host 没有辅助功能授权，不能将该 smoke 纳入阻断 CI。
 - 代码知识图索引在 2026-09-02 连续两次崩溃；OCR 开发期间以定向源码检索补充架构核对，待索引服务修复后重新索引。
 - T047：OCR 截图翻译仍需物理全局按键、屏幕录制、Apple Translation 语言资源与多显示器证据；代码层验证不能替代这些实机证据。
+- T050：结果窗位置、内容展开和目标语言修复已完成代码与静态验收，但当前 WSL 环境没有 Xcode/Swift 工具链；需在 macOS 26 完成 XCTest、Debug 构建和签名 UI 交互后归档。
 
 ## Next Action
 
-等待 T047 的物理全局按键、屏幕录制、Translation 语言资源与多显示器验收；macOS 26 部署、构建和签名 Debug 基线已通过。
+在 macOS 26/Xcode 环境验证 T050 的 FewerCore XCTest、Debug 构建及设置页/结果窗/目标语言交互；通过后归档 T050，并继续 T047 的完整实机矩阵。
 
 ## Last Reconciled
 
-2026-09-02
+2026-09-03

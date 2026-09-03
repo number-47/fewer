@@ -50,6 +50,39 @@ final class OCRTranslationWindowSupportTests: XCTestCase {
         XCTAssertEqual(OCRTranslationLanguage.defaultTargetCode(for: nil), "zh-Hans")
     }
 
+    func testTargetSelectionMatchesPreferredLanguageByMinimalIdentifier() {
+        let selected = OCRTranslationLanguage.selectTargetLanguage(
+            preferredTargetCode: "en-US",
+            sourceLanguageCode: "zh-Hans",
+            supportedLanguageCodes: ["zh-Hans", "en"]
+        )
+
+        XCTAssertEqual(selected, "en")
+    }
+
+    func testTargetSelectionFallsBackToLanguageDifferentFromSource() {
+        let selected = OCRTranslationLanguage.selectTargetLanguage(
+            preferredTargetCode: "ko",
+            sourceLanguageCode: "en-US",
+            supportedLanguageCodes: ["en", "ja", "zh-Hans"]
+        )
+
+        XCTAssertEqual(selected, "ja")
+    }
+
+    func testTargetSelectionReturnsNilWithoutValidCandidate() {
+        XCTAssertNil(OCRTranslationLanguage.selectTargetLanguage(
+            preferredTargetCode: nil,
+            sourceLanguageCode: "en",
+            supportedLanguageCodes: []
+        ))
+        XCTAssertNil(OCRTranslationLanguage.selectTargetLanguage(
+            preferredTargetCode: "ko",
+            sourceLanguageCode: "en",
+            supportedLanguageCodes: ["en-US"]
+        ))
+    }
+
     func testSelectingTargetCancelsEarlierTranslationGenerationWithoutClearingOCRText() throws {
         var session = OCRTranslationSession()
         session.beginRecognition()
@@ -109,5 +142,50 @@ final class OCRTranslationWindowSupportTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(frame.minX, visibleFrame.minX + 8)
         XCTAssertLessThanOrEqual(frame.maxX, visibleFrame.maxX - 8)
         XCTAssertLessThanOrEqual(frame.maxY, visibleFrame.maxY - 8)
+    }
+
+    func testWindowUsesFixedScreenAnchors() {
+        let visibleFrame = CGRect(x: 100, y: 200, width: 1_000, height: 700)
+        let windowSize = CGSize(width: 200, height: 100)
+
+        XCTAssertEqual(
+            OCRTranslationWindowLayout.frame(
+                selection: .zero,
+                visibleFrame: visibleFrame,
+                windowSize: windowSize,
+                position: .topLeading
+            ).origin,
+            CGPoint(x: 108, y: 792)
+        )
+        XCTAssertEqual(
+            OCRTranslationWindowLayout.frame(
+                selection: .zero,
+                visibleFrame: visibleFrame,
+                windowSize: windowSize,
+                position: .center
+            ).origin,
+            CGPoint(x: 500, y: 500)
+        )
+        XCTAssertEqual(
+            OCRTranslationWindowLayout.frame(
+                selection: .zero,
+                visibleFrame: visibleFrame,
+                windowSize: windowSize,
+                position: .bottomTrailing
+            ).origin,
+            CGPoint(x: 892, y: 208)
+        )
+    }
+
+    func testFixedWindowAnchorClampsOversizedWindowToVisibleFrame() {
+        let visibleFrame = CGRect(x: 100, y: 200, width: 300, height: 180)
+        let frame = OCRTranslationWindowLayout.frame(
+            selection: .zero,
+            visibleFrame: visibleFrame,
+            windowSize: CGSize(width: 600, height: 400),
+            position: .topTrailing
+        )
+
+        XCTAssertEqual(frame, CGRect(x: 108, y: 208, width: 284, height: 164))
     }
 }

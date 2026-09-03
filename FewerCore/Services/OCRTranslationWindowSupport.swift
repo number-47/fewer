@@ -117,6 +117,34 @@ public enum OCRTranslationLanguage {
             "zh-Hans"
         }
     }
+
+    /// 从系统支持的语言中选择实际可用于 Picker 和 Translation 的目标语言代码。
+    public static func selectTargetLanguage(
+        preferredTargetCode: String?,
+        sourceLanguageCode: String?,
+        supportedLanguageCodes: [String]
+    ) -> String? {
+        guard !supportedLanguageCodes.isEmpty else { return nil }
+
+        if let preferredTargetCode,
+           let matchedLanguage = supportedLanguageCodes.first(where: {
+               minimalIdentifier(for: $0) == minimalIdentifier(for: preferredTargetCode)
+           }) {
+            return matchedLanguage
+        }
+
+        guard let sourceLanguageCode else {
+            return supportedLanguageCodes.first
+        }
+        let sourceIdentifier = minimalIdentifier(for: sourceLanguageCode)
+        return supportedLanguageCodes.first {
+            minimalIdentifier(for: $0) != sourceIdentifier
+        }
+    }
+
+    private static func minimalIdentifier(for languageCode: String) -> String {
+        Locale.Language(identifier: languageCode).minimalIdentifier.lowercased()
+    }
 }
 
 /// 在 AppKit 全局坐标系内，将 OCR 结果浮窗放在选区附近并约束到可见区域。
@@ -125,6 +153,7 @@ public enum OCRTranslationWindowLayout {
         selection: CGRect,
         visibleFrame: CGRect,
         windowSize: CGSize,
+        position: OCRTranslationWindowPosition = .nearSelection,
         spacing: CGFloat = 12,
         margin: CGFloat = 8
     ) -> CGRect {
@@ -136,6 +165,15 @@ public enum OCRTranslationWindowLayout {
             width: min(max(windowSize.width, 1), maximumSize.width),
             height: min(max(windowSize.height, 1), maximumSize.height)
         )
+        guard position == .nearSelection else {
+            return fixedFrame(
+                for: position,
+                visibleFrame: visibleFrame,
+                size: size,
+                margin: margin
+            )
+        }
+
         let alignedY = selection.maxY - size.height
         let right = CGRect(x: selection.maxX + spacing, y: alignedY, width: size.width, height: size.height)
         if right.maxX <= visibleFrame.maxX - margin {
@@ -154,6 +192,60 @@ public enum OCRTranslationWindowLayout {
             height: size.height
         )
         return clamped(below, within: visibleFrame, margin: margin)
+    }
+
+    private static func fixedFrame(
+        for position: OCRTranslationWindowPosition,
+        visibleFrame: CGRect,
+        size: CGSize,
+        margin: CGFloat
+    ) -> CGRect {
+        let horizontalAlignment: CGFloat
+        let verticalAlignment: CGFloat
+        switch position {
+        case .nearSelection:
+            return .zero
+        case .topLeading:
+            horizontalAlignment = 0
+            verticalAlignment = 1
+        case .top:
+            horizontalAlignment = 0.5
+            verticalAlignment = 1
+        case .topTrailing:
+            horizontalAlignment = 1
+            verticalAlignment = 1
+        case .leading:
+            horizontalAlignment = 0
+            verticalAlignment = 0.5
+        case .center:
+            horizontalAlignment = 0.5
+            verticalAlignment = 0.5
+        case .trailing:
+            horizontalAlignment = 1
+            verticalAlignment = 0.5
+        case .bottomLeading:
+            horizontalAlignment = 0
+            verticalAlignment = 0
+        case .bottom:
+            horizontalAlignment = 0.5
+            verticalAlignment = 0
+        case .bottomTrailing:
+            horizontalAlignment = 1
+            verticalAlignment = 0
+        }
+
+        let availableWidth = visibleFrame.width - margin * 2 - size.width
+        let availableHeight = visibleFrame.height - margin * 2 - size.height
+        return clamped(
+            CGRect(
+                x: visibleFrame.minX + margin + availableWidth * horizontalAlignment,
+                y: visibleFrame.minY + margin + availableHeight * verticalAlignment,
+                width: size.width,
+                height: size.height
+            ),
+            within: visibleFrame,
+            margin: margin
+        )
     }
 
     private static func clamped(_ frame: CGRect, within visibleFrame: CGRect, margin: CGFloat) -> CGRect {

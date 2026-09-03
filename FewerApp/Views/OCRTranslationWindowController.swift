@@ -12,6 +12,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
     private var feedbackDismissTask: Task<Void, Never>?
     private var viewModel: OCRTranslationViewModel?
     private var onDismiss: (() -> Void)?
+    private let screenshotSettingsStore = ScreenshotSettingsStore()
 
     private override init() {}
 
@@ -29,6 +30,16 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
     ) {
         closeResultWindow(notify: true)
 
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+            ?? NSRect(x: 0, y: 0, width: 1_200, height: 800)
+        let maximumSize = NSSize(
+            width: max(visibleFrame.width - 16, 1),
+            height: max(visibleFrame.height - 16, 1)
+        )
+        let initialSize = NSSize(
+            width: min(maximumSize.width, max(420, maximumSize.width * 0.55)),
+            height: min(maximumSize.height, max(400, maximumSize.height * 0.7))
+        )
         let viewModel = OCRTranslationViewModel(
             sourceText: sourceText,
             sourceLanguageCode: sourceLanguageCode,
@@ -37,15 +48,18 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
             translationGeneration: translationGeneration
         )
         let panel = OCRTranslationPanel(
-            contentRect: NSRect(origin: .zero, size: NSSize(width: 420, height: 400)),
+            contentRect: NSRect(origin: .zero, size: initialSize),
             styleMask: [.titled, .closable, .resizable, .utilityWindow],
             backing: .buffered,
             defer: false
         )
         panel.identifier = NSUserInterfaceItemIdentifier("ocr-translation-result")
         panel.title = "截图翻译"
-        panel.minSize = NSSize(width: 360, height: 260)
-        panel.maxSize = NSSize(width: 600, height: 600)
+        panel.minSize = NSSize(
+            width: min(360, maximumSize.width),
+            height: min(260, maximumSize.height)
+        )
+        panel.maxSize = maximumSize
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
@@ -57,13 +71,12 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
             onTranslationStateChanged: onTranslationStateChanged
         ))
 
-        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-            ?? NSRect(x: 0, y: 0, width: 1_200, height: 800)
         let frameSize = panel.frame.size
         let frame = OCRTranslationWindowLayout.frame(
             selection: selection,
             visibleFrame: visibleFrame,
-            windowSize: frameSize
+            windowSize: frameSize,
+            position: screenshotSettingsStore.load().ocrTranslationWindowPosition
         )
         panel.setFrame(frame, display: false)
         panel.makeKeyAndOrderFront(nil)

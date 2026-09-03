@@ -95,6 +95,37 @@ public enum ScreenshotSaveLocation: String, Codable, CaseIterable, Identifiable,
     }
 }
 
+/// 截图翻译结果窗的位置。
+public enum OCRTranslationWindowPosition: String, Codable, CaseIterable, Identifiable, Sendable {
+    case nearSelection
+    case topLeading
+    case top
+    case topTrailing
+    case leading
+    case center
+    case trailing
+    case bottomLeading
+    case bottom
+    case bottomTrailing
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .nearSelection: "选区附近"
+        case .topLeading: "屏幕左上"
+        case .top: "屏幕上方"
+        case .topTrailing: "屏幕右上"
+        case .leading: "屏幕左侧"
+        case .center: "屏幕中央"
+        case .trailing: "屏幕右侧"
+        case .bottomLeading: "屏幕左下"
+        case .bottom: "屏幕下方"
+        case .bottomTrailing: "屏幕右下"
+        }
+    }
+}
+
 /// 截屏功能设置（独立于右键菜单设置）。
 public struct ScreenshotSettings: Codable, Equatable, Sendable {
     public static let storageKey = "fewer.screenshotSettings"
@@ -111,6 +142,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
     public var saveLocation: ScreenshotSaveLocation
     /// 自定义保存目录的绝对路径；仅在 saveLocation == .custom 时使用。
     public var customSaveDirectory: String?
+    public var ocrTranslationWindowPosition: OCRTranslationWindowPosition
 
     public init(
         shortcutsEnabled: Bool = true,
@@ -122,7 +154,8 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         rollingCaptureEnabled: Bool = true,
         pinDefaultOpacity: Double = 1.0,
         saveLocation: ScreenshotSaveLocation = .desktop,
-        customSaveDirectory: String? = nil
+        customSaveDirectory: String? = nil,
+        ocrTranslationWindowPosition: OCRTranslationWindowPosition = .nearSelection
     ) {
         self.shortcutsEnabled = shortcutsEnabled
         self.regionHotKey = regionHotKey
@@ -134,6 +167,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         self.pinDefaultOpacity = pinDefaultOpacity
         self.saveLocation = saveLocation
         self.customSaveDirectory = customSaveDirectory
+        self.ocrTranslationWindowPosition = ocrTranslationWindowPosition
     }
 
     public static let `default` = ScreenshotSettings()
@@ -149,6 +183,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         case pinDefaultOpacity
         case saveLocation
         case customSaveDirectory
+        case ocrTranslationWindowPosition
     }
 
     /// 解码旧数据：缺失字段回退默认，兼容后续新增字段。
@@ -175,6 +210,10 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
             ?? defaults.saveLocation
         customSaveDirectory = try values.decodeIfPresent(String.self, forKey: .customSaveDirectory)
             ?? defaults.customSaveDirectory
+        ocrTranslationWindowPosition = try values.decodeIfPresent(
+            OCRTranslationWindowPosition.self,
+            forKey: .ocrTranslationWindowPosition
+        ) ?? defaults.ocrTranslationWindowPosition
     }
 
     /// 编码时显式写出全部字段，保证格式稳定。
@@ -190,6 +229,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         try container.encode(pinDefaultOpacity, forKey: .pinDefaultOpacity)
         try container.encode(saveLocation, forKey: .saveLocation)
         try container.encodeIfPresent(customSaveDirectory, forKey: .customSaveDirectory)
+        try container.encode(ocrTranslationWindowPosition, forKey: .ocrTranslationWindowPosition)
     }
 }
 

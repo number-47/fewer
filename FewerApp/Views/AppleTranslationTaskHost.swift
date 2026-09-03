@@ -11,6 +11,7 @@ struct AppleTranslationTaskHost: View {
     let onTranslationStateChanged: (OCRTranslationSession.TranslationState, UInt64) -> Void
 
     @State private var supportedLanguages: [Locale.Language] = []
+    @State private var automaticallySelectedLanguageCode: String?
 
     var body: some View {
         let sourceText = model.sourceText
@@ -21,9 +22,22 @@ struct AppleTranslationTaskHost: View {
             .task {
                 let languages = await LanguageAvailability().supportedLanguages
                 guard !Task.isCancelled else { return }
-                supportedLanguages = languages.sorted {
+                let sortedLanguages = languages.sorted {
                     languageName($0).localizedStandardCompare(languageName($1)) == .orderedAscending
                 }
+                supportedLanguages = sortedLanguages
+
+                guard let selectedLanguageCode = OCRTranslationLanguage.selectTargetLanguage(
+                    preferredTargetCode: targetLanguageCode,
+                    sourceLanguageCode: model.sourceLanguageCode,
+                    supportedLanguageCodes: sortedLanguages.map(\.minimalIdentifier)
+                ),
+                selectedLanguageCode != targetLanguageCode,
+                automaticallySelectedLanguageCode != selectedLanguageCode
+                else { return }
+
+                automaticallySelectedLanguageCode = selectedLanguageCode
+                onTargetLanguageSelected(selectedLanguageCode)
             }
             .translationTask(configuration) { session in
                 guard let targetLanguageCode else { return }
@@ -68,9 +82,9 @@ struct AppleTranslationTaskHost: View {
                 .foregroundStyle(.secondary)
         } else {
             Picker("目标语言", selection: Binding(
-                get: { model.targetLanguageCode ?? "" },
+                get: { selectedTargetLanguageCode ?? "" },
                 set: { languageCode in
-                    guard !languageCode.isEmpty else { return }
+                    guard !languageCode.isEmpty, languageCode != model.targetLanguageCode else { return }
                     onTargetLanguageSelected(languageCode)
                 }
             )) {
@@ -85,11 +99,20 @@ struct AppleTranslationTaskHost: View {
 
     private var configuration: TranslationSession.Configuration? {
         guard let sourceLanguageCode = model.sourceLanguageCode,
-              let targetLanguageCode = model.targetLanguageCode
+              let targetLanguageCode = model.targetLanguageCode,
+              targetLanguageCode == selectedTargetLanguageCode
         else { return nil }
         return TranslationSession.Configuration(
             source: Locale.Language(identifier: sourceLanguageCode),
             target: Locale.Language(identifier: targetLanguageCode)
+        )
+    }
+
+    private var selectedTargetLanguageCode: String? {
+        OCRTranslationLanguage.selectTargetLanguage(
+            preferredTargetCode: model.targetLanguageCode,
+            sourceLanguageCode: model.sourceLanguageCode,
+            supportedLanguageCodes: supportedLanguages.map(\.minimalIdentifier)
         )
     }
 
