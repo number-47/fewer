@@ -19,9 +19,14 @@ actor SystemMetricsSampler {
     private var lastCoreCPU: [Int: CPUTicks] = [:]
     private var lastNetwork: (interfaceName: String, inBytes: UInt64, outBytes: UInt64, date: Date)?
     private var lastDiskIO: (identifier: String, counters: DiskIOCounters, date: Date)?
+    private var lastProcessCPU: [ProcessIdentity: UInt64] = [:]
+    private var lastProcessCPUDate: Date?
+    private var lastGPUProcessTime: [ProcessIdentity: GPUProcessBaseline] = [:]
+    private var lastGPUProcessDate: Date?
     private let cpuFrequencyReader = CPUFrequencyReader()
     private let cpuTemperatureReader = CPUTemperatureReader()
     private let gpuReportReader = GPUReportReader()
+    private let processTimebase = SystemMetricsSampler.machTimebase()
 
     private var isSampling = false
 
@@ -33,6 +38,8 @@ actor SystemMetricsSampler {
         if modules.contains(.cpu) {
             lastCPU = nil
             lastCoreCPU.removeAll()
+            lastProcessCPU.removeAll()
+            lastProcessCPUDate = nil
         }
         if modules.contains(.disk) {
             lastDiskIO = nil
@@ -43,6 +50,8 @@ actor SystemMetricsSampler {
         }
         if modules.contains(.gpu) {
             cachedGPU = nil
+            lastGPUProcessTime.removeAll()
+            lastGPUProcessDate = nil
         }
     }
 
@@ -69,11 +78,16 @@ actor SystemMetricsSampler {
         let shouldSampleDisk = plan.modulesToSample.contains(.disk)
         let shouldSampleNetwork = plan.modulesToSample.contains(.network)
 
+        let shouldSampleProcesses = shouldSampleCPU || shouldSampleGPU || shouldSampleMemory
+        let processSamples = shouldSampleProcesses ? Self.processSamples(timebase: processTimebase) : []
         let network = shouldSampleNetwork ? Self.defaultNetworkInterfaceSnapshot() : nil
         let rates = shouldSampleNetwork ? networkRates(network, at: now) : nil
         let cpu = shouldSampleCPU ? cpuSnapshot(at: now) : nil
+        let cpuProcesses = shouldSampleCPU ? cpuProcessMetrics(from: processSamples, at: now) : nil
         let gpu = shouldSampleGPU ? gpuSnapshot(at: now, selectionID: gpuSelectionID) : nil
+        let gpuProcesses = shouldSampleGPU ? gpuProcessMetrics(from: processSamples, at: now) : nil
         let memory = shouldSampleMemory ? memorySnapshot(at: now) : nil
+        let memoryProcesses = shouldSampleMemory ? Self.memoryProcessMetrics(from: processSamples) : nil
         let disk = shouldSampleDisk ? diskSnapshot(at: now) : nil
 
         if shouldSampleGPU { cachedGPU = gpu }
@@ -88,8 +102,11 @@ actor SystemMetricsSampler {
             date: now,
             cpuUsage: isCPUActive ? (cpu?.total ?? prev?.cpuUsage ?? 0) : (prev?.cpuUsage ?? 0),
             cpu: isCPUActive ? (shouldSampleCPU ? cpu : prev?.cpu) : prev?.cpu,
+            cpuProcesses: isCPUActive ? (shouldSampleCPU ? cpuProcesses : prev?.cpuProcesses) : prev?.cpuProcesses,
             gpu: isGPUActive ? gpuValue : prev?.gpu,
+            gpuProcesses: isGPUActive ? (shouldSampleGPU ? gpuProcesses : prev?.gpuProcesses) : prev?.gpuProcesses,
             memory: isMemoryActive ? (shouldSampleMemory ? memory : prev?.memory) : prev?.memory,
+            memoryProcesses: isMemoryActive ? (shouldSampleMemory ? memoryProcesses : prev?.memoryProcesses) : prev?.memoryProcesses,
             memoryUsage: isMemoryActive ? (memory?.usageRatio ?? prev?.memoryUsage ?? 0) : (prev?.memoryUsage ?? 0),
             diskUsage: isDiskActive ? (diskValue?.usageRatio ?? prev?.diskUsage ?? 0) : (prev?.diskUsage ?? 0),
             disk: isDiskActive ? diskValue : prev?.disk,
@@ -258,6 +275,210 @@ actor SystemMetricsSampler {
         var size = MemoryLayout<UInt64>.size
         guard sysctlbyname(name, &value, &size, nil, 0) == 0, value > 0 else { return nil }
         return value
+    }
+
+    // MARK: - Processes
+
+    private func cpuProcessMetrics(from samples: [RawProcessSample], at date: Date) -> [ProcessMetric]? {
+        let current = Dictionary(uniqueKeysWithValues: samples.map { ($0.identity, $0.cpuTime) })
+        defer {
+            lastProcessCPU = current
+            lastProcessCPUDate = date
+        }
+        guard let lastProcessCPUDate else { return nil }
+        let elapsed = date.timeIntervalSince(lastProcessCPUDate)
+        let metrics = samples.map { sample in
+            Self.processMetric(
+                sample,
+                cpuUsage: ProcessMetricLogic.intervalRatio(
+                    current: sample.cpuTime,
+                    previous: lastProcessCPU[sample.identity],
+                    elapsed: elapsed
+                ),
+                gpuUsage: nil
+            )
+        }
+        return ProcessMetricLogic.topCPU(metrics)
+    }
+
+    private static func memoryProcessMetrics(from samples: [RawProcessSample]) -> [ProcessMetric] {
+        ProcessMetricLogic.topMemory(samples.map { processMetric($0, cpuUsage: nil, gpuUsage: nil) })
+    }
+
+    private func gpuProcessMetrics(from samples: [RawProcessSample], at date: Date) -> [ProcessMetric]? {
+        guard let counters = Self.gpuProcessCounters() else {
+            lastGPUProcessTime.removeAll()
+            lastGPUProcessDate = nil
+            return nil
+        }
+        let samplesByPID = Dictionary(uniqueKeysWithValues: samples.map { ($0.identity.pid, $0) })
+        let processSamples = counters.times.compactMap { pid, counter -> (RawProcessSample, UInt64)? in
+            let sample = samplesByPID[pid]
+                ?? Self.gpuFallbackProcessSample(pid: pid, name: counters.names[pid] ?? "PID \(pid)")
+            return sample.map { ($0, counter) }
+        }
+        let current = Dictionary(uniqueKeysWithValues: processSamples.map { sample, counter in
+            (sample.identity, GPUProcessBaseline(name: sample.name, accumulatedTime: counter))
+        })
+        defer {
+            lastGPUProcessTime = current
+            lastGPUProcessDate = date
+        }
+        guard let lastGPUProcessDate else { return nil }
+        let elapsed = date.timeIntervalSince(lastGPUProcessDate)
+        let metrics = processSamples.map { sample, counter in
+            let previous = lastGPUProcessTime[sample.identity]
+            return Self.processMetric(
+                sample,
+                cpuUsage: nil,
+                gpuUsage: ProcessMetricLogic.intervalRatio(
+                    current: counter,
+                    previous: previous?.name == sample.name ? previous?.accumulatedTime : nil,
+                    elapsed: elapsed
+                )
+            )
+        }
+        return ProcessMetricLogic.topGPU(metrics)
+    }
+
+    private static func processSamples(timebase: (numerator: UInt64, denominator: UInt64)) -> [RawProcessSample] {
+        let estimatedCount = max(proc_listallpids(nil, 0), 0)
+        guard estimatedCount > 0 else { return [] }
+        var pids = [pid_t](repeating: 0, count: Int(estimatedCount) + 32)
+        let count = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard count > 0 else { return [] }
+
+        return pids.prefix(min(Int(count), pids.count)).compactMap { pid in
+            guard pid > 0 else { return nil }
+            var usage = rusage_info_v4()
+            let usageResult = withUnsafeMutablePointer(to: &usage) { pointer in
+                pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) {
+                    proc_pid_rusage(pid, RUSAGE_INFO_V4, $0)
+                }
+            }
+            guard usageResult == 0, usage.ri_proc_start_abstime > 0 else { return nil }
+
+            var nameBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+            let nameLength = proc_name(pid, &nameBuffer, UInt32(nameBuffer.count))
+            var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN * 4))
+            let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+            let path = pathLength > 0 ? string(from: pathBuffer) : nil
+            let name = nameLength > 0
+                ? string(from: nameBuffer)
+                : path.map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+            guard !name.isEmpty else { return nil }
+
+            let userID = processUserID(pid: pid)
+            let (cpuTimeTicks, overflow) = usage.ri_user_time.addingReportingOverflow(usage.ri_system_time)
+            let cpuTime = overflow ? UInt64.max : ProcessMetricLogic.absoluteTimeToNanoseconds(
+                cpuTimeTicks,
+                numerator: timebase.numerator,
+                denominator: timebase.denominator
+            )
+            return RawProcessSample(
+                identity: ProcessIdentity(pid: pid, startTime: usage.ri_proc_start_abstime),
+                name: name,
+                executablePath: path,
+                userID: userID,
+                cpuTime: cpuTime,
+                memoryBytes: usage.ri_phys_footprint > 0 ? usage.ri_phys_footprint : usage.ri_resident_size
+            )
+        }
+    }
+
+    private static func machTimebase() -> (numerator: UInt64, denominator: UInt64) {
+        var info = mach_timebase_info_data_t()
+        guard mach_timebase_info(&info) == KERN_SUCCESS, info.denom > 0 else { return (1, 1) }
+        return (UInt64(info.numer), UInt64(info.denom))
+    }
+
+    private static func gpuFallbackProcessSample(pid: pid_t, name: String) -> RawProcessSample? {
+        guard pid > 0 else { return nil }
+        var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN * 4))
+        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+        return RawProcessSample(
+            identity: ProcessIdentity(pid: pid, startTime: 0),
+            name: name,
+            executablePath: pathLength > 0 ? string(from: pathBuffer) : nil,
+            userID: processUserID(pid: pid),
+            cpuTime: 0,
+            memoryBytes: 0
+        )
+    }
+
+    private static func processUserID(pid: pid_t) -> UInt32 {
+        var bsdInfo = proc_bsdinfo()
+        let bsdInfoSize = Int32(MemoryLayout<proc_bsdinfo>.size)
+        let bsdResult = withUnsafeMutablePointer(to: &bsdInfo) {
+            proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, $0, bsdInfoSize)
+        }
+        if bsdResult == bsdInfoSize { return bsdInfo.pbi_uid }
+
+        var shortInfo = proc_bsdshortinfo()
+        let shortInfoSize = Int32(MemoryLayout<proc_bsdshortinfo>.size)
+        let shortResult = withUnsafeMutablePointer(to: &shortInfo) {
+            proc_pidinfo(pid, PROC_PIDT_SHORTBSDINFO, 0, $0, shortInfoSize)
+        }
+        return shortResult == shortInfoSize ? shortInfo.pbsi_uid : .max
+    }
+
+    private static func gpuProcessCounters() -> GPUProcessCounterSample? {
+        let root = IORegistryGetRootEntry(kIOMainPortDefault)
+        guard root != 0 else { return nil }
+        defer { IOObjectRelease(root) }
+
+        var iterator: io_iterator_t = 0
+        guard IORegistryEntryCreateIterator(
+            root,
+            kIOServicePlane,
+            IOOptionBits(kIORegistryIterateRecursively),
+            &iterator
+        ) == KERN_SUCCESS else { return nil }
+        defer { IOObjectRelease(iterator) }
+
+        var foundService = false
+        var entries: [GPUProcessCounter] = []
+        while true {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            defer { IOObjectRelease(service) }
+            guard IOObjectConformsTo(service, "AGXDeviceUserClient") != 0 else { continue }
+            foundService = true
+            guard let properties = registryProperties(for: service),
+                  let creator = stringValue(properties["IOUserClientCreator"])
+            else { continue }
+            let usage = properties["AppUsage"] as? [[String: Any]] ?? []
+            for item in usage {
+                guard let accumulatedTime = uint64Value(item["accumulatedGPUTime"]) else { continue }
+                entries.append(GPUProcessCounter(creator: creator, accumulatedTime: accumulatedTime))
+            }
+        }
+        guard foundService else { return nil }
+        var names: [Int32: String] = [:]
+        for entry in entries {
+            guard let creator = ProcessMetricLogic.gpuCreator(from: entry.creator) else { continue }
+            names[creator.pid] = creator.name
+        }
+        return GPUProcessCounterSample(
+            times: ProcessMetricLogic.aggregateGPU(entries),
+            names: names
+        )
+    }
+
+    private static func processMetric(
+        _ sample: RawProcessSample,
+        cpuUsage: Double?,
+        gpuUsage: Double?
+    ) -> ProcessMetric {
+        ProcessMetric(
+            id: sample.identity,
+            name: sample.name,
+            executablePath: sample.executablePath,
+            userID: sample.userID,
+            cpuUsage: cpuUsage,
+            memoryBytes: sample.memoryBytes,
+            gpuUsage: gpuUsage
+        )
     }
 
     // MARK: - GPU
@@ -858,6 +1079,10 @@ actor SystemMetricsSampler {
         return nil
     }
 
+    private static func string(from buffer: [CChar]) -> String {
+        String(decoding: buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+
     private static func string<T>(from tuple: T) -> String? {
         var tuple = tuple
         return withUnsafePointer(to: &tuple) { pointer in
@@ -870,6 +1095,25 @@ actor SystemMetricsSampler {
 }
 
 // MARK: - Supporting Types
+
+struct GPUProcessBaseline {
+    let name: String
+    let accumulatedTime: UInt64
+}
+
+struct GPUProcessCounterSample {
+    let times: [Int32: UInt64]
+    let names: [Int32: String]
+}
+
+struct RawProcessSample {
+    let identity: ProcessIdentity
+    let name: String
+    let executablePath: String?
+    let userID: UInt32
+    let cpuTime: UInt64
+    let memoryBytes: UInt64
+}
 
 struct CPUTicks {
     let user: UInt64

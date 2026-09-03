@@ -6,8 +6,11 @@ struct SystemMetricsSnapshot: Identifiable, Sendable {
     let date: Date
     let cpuUsage: Double
     let cpu: CPUSnapshot?
+    let cpuProcesses: [ProcessMetric]?
     let gpu: GPUSnapshot?
+    let gpuProcesses: [ProcessMetric]?
     let memory: MemorySnapshot?
+    let memoryProcesses: [ProcessMetric]?
     let memoryUsage: Double
     let diskUsage: Double
     let disk: DiskSnapshot?
@@ -210,8 +213,11 @@ final class SystemMetricsService: ObservableObject {
         date: .now,
         cpuUsage: 0,
         cpu: nil,
+        cpuProcesses: nil,
         gpu: nil,
+        gpuProcesses: nil,
         memory: nil,
+        memoryProcesses: nil,
         memoryUsage: 0,
         diskUsage: 0,
         disk: nil,

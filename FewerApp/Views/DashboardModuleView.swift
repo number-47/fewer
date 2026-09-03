@@ -220,12 +220,18 @@ struct MonitorModuleContent: View {
             switch moduleID {
             case .cpu: CPUDetailsView(
                 snapshot: metrics.current.cpu,
-                history: metrics.history.compactMap { $0.cpu?.total }
+                history: metrics.history.compactMap { $0.cpu?.total },
+                processes: metrics.current.cpuProcesses
             )
-            case .gpu: GPUDetailsView(snapshot: metrics.current.gpu, history: gpuHistory)
+            case .gpu: GPUDetailsView(
+                snapshot: metrics.current.gpu,
+                history: gpuHistory,
+                processes: metrics.current.gpuProcesses
+            )
             case .memory: MemoryDetailsView(
                 snapshot: metrics.current.memory,
-                history: metrics.history.compactMap { $0.memory?.usageRatio }
+                history: metrics.history.compactMap { $0.memory?.usageRatio },
+                processes: metrics.current.memoryProcesses
             )
             case .disk: DiskDetailsView(
                 snapshot: metrics.current.disk,
@@ -463,6 +469,7 @@ private struct DiskDetailsView: View {
 private struct MemoryDetailsView: View {
     let snapshot: MemorySnapshot?
     let history: [Double]
+    let processes: [ProcessMetric]?
 
     var body: some View {
         Group {
@@ -490,6 +497,7 @@ private struct MemoryDetailsView: View {
                         MonitorMetricRow(title: "状态", value: snapshot.pressure?.level.rawValue ?? "不可用")
                         MonitorMetricRow(title: "Swap", value: swap(snapshot.swap))
                     }
+                    ProcessTopCard(kind: .memory, processes: processes, color: color)
                 }
             } else {
                 ContentUnavailableView("内存数据不可用", systemImage: "memorychip", description: Text("系统没有返回可读取的 Mach VM 内存统计。"))
@@ -516,6 +524,7 @@ private struct MemoryDetailsView: View {
 private struct GPUDetailsView: View {
     let snapshot: GPUSnapshot?
     let history: [Double]
+    let processes: [ProcessMetric]?
 
     var body: some View {
         Group {
@@ -545,6 +554,7 @@ private struct GPUDetailsView: View {
                             MonitorMetricRow(title: "已发现 GPU", value: "\(snapshot.devices.count)")
                         }
                     }
+                    ProcessTopCard(kind: .gpu, processes: processes, color: color)
                 }
             } else {
                 ContentUnavailableView("GPU 数据不可用", systemImage: "memorychip", description: Text("系统没有返回可读取的 GPU 加速器。"))
@@ -568,6 +578,7 @@ private struct GPUDetailsView: View {
 private struct CPUDetailsView: View {
     let snapshot: CPUSnapshot?
     let history: [Double]
+    let processes: [ProcessMetric]?
 
     var body: some View {
         Group {
@@ -597,6 +608,7 @@ private struct CPUDetailsView: View {
                     MonitorCard("核心利用率", color: color) {
                         coreDetails(snapshot.cores)
                     }
+                    ProcessTopCard(kind: .cpu, processes: processes, color: color)
                 }
             } else {
                 ContentUnavailableView("CPU 数据不可用", systemImage: "cpu", description: Text("首次采样或系统暂时无法读取 CPU 计数。"))
@@ -649,6 +661,190 @@ private struct CPUDetailsView: View {
         return formatter.string(from: value) ?? "不可用"
     }
     private func frequency(_ value: UInt64) -> String { String(format: "%.2f GHz", Double(value) / 1_000_000_000) }
+}
+
+private enum ProcessMetricKind {
+    case cpu
+    case gpu
+    case memory
+
+    var title: String {
+        switch self {
+        case .cpu: "CPU 进程 Top 5"
+        case .gpu: "GPU 进程 Top 5"
+        case .memory: "内存进程 Top 5"
+        }
+    }
+
+    var waitingText: String {
+        switch self {
+        case .cpu, .memory: "正在读取进程数据…"
+        case .gpu: "等待采样或当前设备不支持逐进程 GPU 数据"
+        }
+    }
+
+    func value(for process: ProcessMetric) -> String {
+        switch self {
+        case .cpu:
+            return process.cpuUsage.map { String(format: "%.1f%%", $0 * 100) } ?? "不可用"
+        case .gpu:
+            return process.gpuUsage.map { String(format: "%.1f%%", $0 * 100) } ?? "不可用"
+        case .memory:
+            return ByteCountFormatter.string(fromByteCount: Int64(clamping: process.memoryBytes), countStyle: .memory)
+        }
+    }
+}
+
+private struct ProcessTopCard: View {
+    let kind: ProcessMetricKind
+    let processes: [ProcessMetric]?
+    let color: Color
+
+    @State private var processToConfirm: ProcessMetric?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        MonitorCard(kind.title, color: color) {
+            if let processes {
+                if processes.isEmpty {
+                    Text("暂无可读取的活跃进程")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(spacing: 2) {
+                        ForEach(Array(processes.prefix(5).enumerated()), id: \.element.id) { index, process in
+                            ProcessTopRow(
+                                rank: index + 1,
+                                process: process,
+                                value: kind.value(for: process),
+                                terminate: { requestTermination(of: process) }
+                            )
+                        }
+                    }
+                }
+            } else {
+                Text(kind.waitingText)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .confirmationDialog(
+            confirmationTitle,
+            isPresented: Binding(
+                get: { processToConfirm != nil },
+                set: { if !$0 { processToConfirm = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let processToConfirm {
+                Button("正常退出", role: .destructive) {
+                    terminate(processToConfirm)
+                }
+                Button("取消", role: .cancel) {}
+            }
+        }
+        .alert(
+            "无法退出进程",
+            isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )
+        ) {
+            Button("好") { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "未知错误")
+        }
+    }
+
+    private var confirmationTitle: String {
+        guard let processToConfirm else { return "确认退出系统进程？" }
+        return "退出系统进程 \(processToConfirm.name)（PID \(processToConfirm.pid)）？"
+    }
+
+    private func requestTermination(of process: ProcessMetric) {
+        if ProcessTerminationPolicy.requiresConfirmation(
+            userID: process.userID,
+            currentUserID: getuid(),
+            executablePath: process.executablePath,
+            name: process.name
+        ) {
+            processToConfirm = process
+        } else {
+            terminate(process)
+        }
+    }
+
+    private func terminate(_ process: ProcessMetric) {
+        processToConfirm = nil
+        do {
+            try ProcessTerminationService.terminate(process)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct ProcessTopRow: View {
+    let rank: Int
+    let process: ProcessMetric
+    let value: String
+    let terminate: () -> Void
+
+    @State private var isHoveringClose = false
+
+    private var canTerminate: Bool {
+        ProcessTerminationPolicy.canTerminate(
+            identity: process.id,
+            currentPID: ProcessInfo.processInfo.processIdentifier
+        )
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Group {
+                if canTerminate {
+                    Button(action: terminate) {
+                        Group {
+                            if isHoveringClose {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
+                            } else {
+                                Text("\(rank)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { isHoveringClose = $0 }
+                    .help("正常退出 \(process.name)")
+                } else {
+                    Text("\(rank)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 20, height: 20)
+                        .help("此进程不可从 Fewer 退出")
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(process.name)
+                    .lineLimit(1)
+                Text("PID \(process.pid)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+            }
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 11, design: .monospaced))
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .font(.system(size: 11))
+        .frame(minHeight: 24)
+    }
 }
 
 private struct NetworkDetailsView: View {
