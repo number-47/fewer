@@ -146,9 +146,12 @@ final class AITranslationClientTests: XCTestCase {
         XCTAssertEqual(json["model"] as? String, "model-a")
         XCTAssertEqual(json["stream"] as? Bool, false)
         let messages = try XCTUnwrap(json["messages"] as? [[String: String]])
-        XCTAssertEqual(messages.count, 2)
-        XCTAssertEqual(messages[0]["content"], AITranslationClient.systemInstruction)
-        XCTAssertEqual(messages[1]["content"], "Source language: auto\nTarget language: zh-Hans\nOCR text:\nHello\nworld")
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0]["role"], "user")
+        XCTAssertEqual(
+            messages[0]["content"],
+            "\(AITranslationClient.systemInstruction)\nSource language: auto\nTarget language: zh-Hans\nOCR text:\nHello\nworld"
+        )
         XCTAssertFalse(String(data: body, encoding: .utf8)!.contains("image"))
         XCTAssertFalse(String(data: body, encoding: .utf8)!.contains("coordinates"))
     }

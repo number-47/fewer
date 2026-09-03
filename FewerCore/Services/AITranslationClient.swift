@@ -416,19 +416,18 @@ public struct AITranslationClient: Sendable {
             request.setValue("Bearer \(credentials.apiKey)", forHTTPHeaderField: "Authorization")
         }
         let sourceLanguage = sourceLanguageCode?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let userContent = """
+        let messageContent = """
+        \(Self.systemInstruction)
         Source language: \(sourceLanguage?.isEmpty == false ? sourceLanguage! : "auto")
         Target language: \(targetLanguageCode)
         OCR text:
         \(sourceText)
         """
+        // 部分兼容服务的 chat 模板拒绝以 system 开头的对话，统一只用单条 user 消息。
         request.httpBody = try JSONEncoder().encode(ChatCompletionsRequest(
             model: credentials.configuration.model,
             stream: false,
-            messages: [
-                .init(role: "system", content: Self.systemInstruction),
-                .init(role: "user", content: userContent),
-            ]
+            messages: [.init(role: "user", content: messageContent)]
         ))
         return request
     }
