@@ -27,6 +27,7 @@ enum ModuleRegistry {
         module("screenshot", "智能截图", "区域、窗口、全屏与滚动截图", "camera.viewfinder", 60, .menu, [.dashboard], [
             ("smart", "智能截图", "viewfinder"), ("region", "区域截图", "rectangle.dashed"),
             ("window", "窗口截图", "macwindow"), ("fullscreen", "全屏截图", "display"),
+            ("ocr-translate", "截图翻译", "text.viewfinder"),
         ], [ModulePermission(id: "screen", kind: .screenRecording, title: "屏幕录制", detail: "读取屏幕像素")]),
         module("input", "输入增强", "鼠标滚动、轨迹手势与按键展示", "cursorarrow.motionlines", 0, .menu, [.actions], [
             ("toggle-scroll", "切换滚动增强", "scroll"), ("toggle-keycast", "切换按键展示", "keyboard"),
@@ -171,6 +172,7 @@ final class ModuleHost: ObservableObject {
         case ("screenshot", "region"): ScreenshotService.shared.begin(.region)
         case ("screenshot", "window"): ScreenshotService.shared.begin(.window)
         case ("screenshot", "fullscreen"): ScreenshotService.shared.begin(.fullscreen)
+        case ("screenshot", "ocr-translate"): ScreenshotService.shared.beginOCRTranslation()
         case ("input", "toggle-scroll"), ("input", "toggle-keycast"), ("input", "toggle-gesture"):
             let inputStore = InputEnhancementStore(access: .mainAppWriter)
             var settings = inputStore.load()

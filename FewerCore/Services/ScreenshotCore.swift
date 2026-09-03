@@ -122,6 +122,160 @@ public struct ScreenshotCaptureSessionGate: Sendable {
     }
 }
 
+/// 既有截图交互模式。OCR 通过 capture purpose 区分，不向此枚举增加新 case。
+public enum ScreenshotMode: Equatable, Sendable {
+    case region
+    case smart
+    case window
+    case fullscreen
+}
+
+/// 截图完成后交给哪个端侧流程处理。
+public enum ScreenshotCapturePurpose: Equatable, Sendable {
+    case screenshot
+    case ocrTranslation
+}
+
+/// 截图交互模式与完成后用途的组合。
+public struct ScreenshotCaptureIntent: Equatable, Sendable {
+    public let mode: ScreenshotMode
+    public let purpose: ScreenshotCapturePurpose
+
+    public init(mode: ScreenshotMode, purpose: ScreenshotCapturePurpose = .screenshot) {
+        self.mode = mode
+        self.purpose = purpose
+    }
+
+    public static let ocrTranslation = ScreenshotCaptureIntent(mode: .region, purpose: .ocrTranslation)
+}
+
+/// OCR 仅为异常大的原始截图降采样，普通文字截图始终保留原始物理像素。
+public enum OCRCaptureImageBudget {
+    public static let maximumPixelCount = 20_000_000
+
+    public static func outputSize(for size: CGSize) -> CGSize {
+        guard size.width > 0, size.height > 0 else { return .zero }
+        let pixelCount = size.width * size.height
+        guard pixelCount > CGFloat(maximumPixelCount) else { return size }
+
+        let scale = sqrt(CGFloat(maximumPixelCount) / pixelCount)
+        return CGSize(
+            width: max(1, floor(size.width * scale)),
+            height: max(1, floor(size.height * scale))
+        )
+    }
+
+    /// 返回 nil 表示无法安全创建预算内图像，调用方必须中止 OCR 而非继续占用大图内存。
+    public static func downsampled(_ image: CGImage) -> CGImage? {
+        let outputSize = outputSize(for: CGSize(width: image.width, height: image.height))
+        guard outputSize.width > 0, outputSize.height > 0 else { return nil }
+        guard outputSize.width < CGFloat(image.width) || outputSize.height < CGFloat(image.height) else {
+            return image
+        }
+
+        let width = Int(outputSize.width)
+        let height = Int(outputSize.height)
+        let colorSpace = image.colorSpace ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(origin: .zero, size: outputSize))
+        return context.makeImage()
+    }
+}
+
+/// 全局快捷键触发的动作；OCR 保持为独立动作而非新增 ScreenshotMode。
+public enum ScreenshotHotKeyAction: Equatable, Sendable {
+    case capture(ScreenshotMode)
+    case ocrTranslation
+
+    public var captureIntent: ScreenshotCaptureIntent {
+        switch self {
+        case .capture(let mode): ScreenshotCaptureIntent(mode: mode)
+        case .ocrTranslation: .ocrTranslation
+        }
+    }
+}
+
+/// Vision 识别出的单个文本块。boundingBox 使用图像像素坐标，原点在左下。
+public struct OCRTextBlock: Equatable, Sendable {
+    public let text: String
+    public let confidence: Float
+    public let boundingBox: CGRect
+    public let languageCode: String?
+
+    public init(text: String, confidence: Float, boundingBox: CGRect, languageCode: String?) {
+        self.text = text
+        self.confidence = confidence
+        self.boundingBox = boundingBox
+        self.languageCode = languageCode
+    }
+}
+
+/// OCR 的内存结果；不会编码、持久化或写入日志。
+public struct OCRResult: Equatable, Sendable {
+    public let blocks: [OCRTextBlock]
+    public let fullText: String
+    public let languageCodes: [String]
+    public let detectedLanguageCode: String?
+
+    public init(blocks: [OCRTextBlock]) {
+        let orderedBlocks = OCRReadingOrder.sorted(blocks)
+        self.blocks = orderedBlocks
+        fullText = orderedBlocks.map(\.text).joined(separator: "\n")
+        languageCodes = orderedBlocks.reduce(into: []) { codes, block in
+            guard let languageCode = block.languageCode, !codes.contains(languageCode) else { return }
+            codes.append(languageCode)
+        }
+        let counts = orderedBlocks.reduce(into: [String: Int]()) { counts, block in
+            guard let languageCode = block.languageCode else { return }
+            counts[languageCode, default: 0] += 1
+        }
+        var highestCount = 0
+        var detectedLanguageCode: String?
+        for languageCode in languageCodes {
+            let count = counts[languageCode, default: 0]
+            if count > highestCount {
+                highestCount = count
+                detectedLanguageCode = languageCode
+            }
+        }
+        self.detectedLanguageCode = detectedLanguageCode
+    }
+}
+
+/// Vision 使用左下原点；阅读顺序应先由上至下，再由左至右。
+public enum OCRReadingOrder {
+    public static func sorted(_ blocks: [OCRTextBlock]) -> [OCRTextBlock] {
+        var lines: [(bounds: CGRect, blocks: [OCRTextBlock])] = []
+        for block in blocks.sorted(by: { $0.boundingBox.midY > $1.boundingBox.midY }) {
+            if let lineIndex = lines.firstIndex(where: { visualLineBounds in
+                verticalOverlap(block.boundingBox, visualLineBounds.bounds)
+                    >= min(block.boundingBox.height, visualLineBounds.bounds.height) * 0.4
+            }) {
+                lines[lineIndex].blocks.append(block)
+                lines[lineIndex].bounds = lines[lineIndex].bounds.union(block.boundingBox)
+            } else {
+                lines.append((bounds: block.boundingBox, blocks: [block]))
+            }
+        }
+        return lines
+            .sorted { $0.bounds.midY > $1.bounds.midY }
+            .flatMap { line in line.blocks.sorted { $0.boundingBox.minX < $1.boundingBox.minX } }
+    }
+
+    private static func verticalOverlap(_ lhs: CGRect, _ rhs: CGRect) -> CGFloat {
+        max(0, min(lhs.maxY, rhs.maxY) - max(lhs.minY, rhs.minY))
+    }
+}
+
 /// 截屏区域工具：任意方向拖拽规范化、屏幕内裁剪。
 public enum CaptureRegion {
     /// 由任意方向的拖拽起点/终点生成规范化矩形（宽高恒为正）。

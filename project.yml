@@ -3,7 +3,7 @@ name: Fewer
 options:
   bundleIdPrefix: com.number47
   deploymentTarget:
-    macOS: "14.0"
+    macOS: "26.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
 

@@ -446,9 +446,9 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
 
     private func showMonitorPopover(moduleID: SystemMonitorModuleID, anchor: NSView) {
         let size: NSSize = switch moduleID {
-        case .cpu: NSSize(width: 280, height: 680)
-        case .memory: NSSize(width: 280, height: 600)
-        case .gpu: NSSize(width: 280, height: 500)
+        case .cpu: NSSize(width: 280, height: 850)
+        case .memory: NSSize(width: 280, height: 780)
+        case .gpu: NSSize(width: 280, height: 680)
         case .network: NSSize(width: 280, height: 680)
         case .disk: NSSize(width: 280, height: 850)
         }
@@ -739,6 +739,7 @@ private struct ModuleMenuPanelView: View {
             item("区域截图", value: "⌘⌥A", icon: "rectangle.dashed") { execute("screenshot", "region") }
             item("窗口截图", value: "⌘⌥W", icon: "macwindow") { execute("screenshot", "window") }
             item("全屏截图", value: "⌘⌥F", icon: "display") { execute("screenshot", "fullscreen") }
+            item("截图翻译", value: ScreenshotSettingsStore().load().ocrTranslateHotKey.displayString, icon: "text.viewfinder") { execute("screenshot", "ocr-translate") }
             divider; section("最近截图")
             item("暂无最近截图", icon: "photo.on.rectangle", disabled: true)
             divider
@@ -925,7 +926,7 @@ private struct ModuleMenuPanelView: View {
         switch moduleID {
         case "dashboard": 320
         case "calendar": 430 + CGFloat(max(0, min(6, calendarEventCount) - 1)) * 28
-        case "screenshot": 270
+        case "screenshot": 300
         case "input": 370
         case "finder": 312
         case "system": 256

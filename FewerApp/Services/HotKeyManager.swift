@@ -1,14 +1,6 @@
 import Carbon.HIToolbox
 import FewerCore
 
-/// 截屏模式。
-enum ScreenshotMode: Equatable {
-    case region
-    case smart
-    case window
-    case fullscreen
-}
-
 /// Carbon 全局热键管理：注册/刷新区域、窗口、全屏截屏快捷键。
 /// RegisterEventHotKey 为系统级热键，无需任何权限，回调经事件分发目标投递。
 @MainActor
@@ -17,7 +9,7 @@ final class HotKeyManager {
 
     private let store = ScreenshotSettingsStore()
     private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
-    private var modeByID: [UInt32: ScreenshotMode] = [:]
+    private var actionByID: [UInt32: ScreenshotHotKeyAction] = [:]
     private var rollingEscapeRef: EventHotKeyRef?
     private var rollingEscapeHandler: (() -> Void)?
     private var eventHandlerRef: EventHandlerRef?
@@ -34,9 +26,10 @@ final class HotKeyManager {
         guard ModulePreferencesStore().isEnabled(moduleID: "screenshot") else { return }
         let settings = store.load()
         guard settings.shortcutsEnabled else { return }
-        register(id: 1, spec: settings.regionHotKey, mode: .smart)
-        register(id: 2, spec: settings.windowHotKey, mode: .window)
-        register(id: 3, spec: settings.fullscreenHotKey, mode: .fullscreen)
+        register(id: 1, spec: settings.regionHotKey, action: .capture(.smart))
+        register(id: 2, spec: settings.windowHotKey, action: .capture(.window))
+        register(id: 3, spec: settings.fullscreenHotKey, action: .capture(.fullscreen))
+        register(id: 4, spec: settings.ocrTranslateHotKey, action: .ocrTranslation)
     }
 
     func unregisterAll() {
@@ -44,7 +37,7 @@ final class HotKeyManager {
             UnregisterEventHotKey(ref)
         }
         hotKeyRefs.removeAll()
-        modeByID.removeAll()
+        actionByID.removeAll()
     }
 
     func installRollingEscapeHandler(_ handler: @escaping () -> Void) {
@@ -70,7 +63,7 @@ final class HotKeyManager {
         rollingEscapeHandler = nil
     }
 
-    private func register(id: UInt32, spec: HotKeySpec, mode: ScreenshotMode) {
+    private func register(id: UInt32, spec: HotKeySpec, action: ScreenshotHotKeyAction) {
         guard !spec.isEmpty else { return }
         var ref: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(signature: Self.hotKeySignature, id: id)
@@ -85,7 +78,7 @@ final class HotKeyManager {
         Self.debugLog("register id=\(id) status=\(status) ref=\(ref == nil ? "nil" : "ok")")
         guard status == noErr, let ref else { return }
         hotKeyRefs[id] = ref
-        modeByID[id] = mode
+        actionByID[id] = action
     }
 
     private func installEventHandlerIfNeeded() {
@@ -112,9 +105,12 @@ final class HotKeyManager {
             rollingEscapeHandler?()
             return
         }
-        guard let mode = modeByID[id] else { return }
+        guard let action = actionByID[id] else { return }
         DispatchQueue.main.async {
-            ScreenshotService.shared.begin(mode)
+            switch action {
+            case .capture(let mode): ScreenshotService.shared.begin(mode)
+            case .ocrTranslation: ScreenshotService.shared.beginOCRTranslation()
+            }
         }
     }
 

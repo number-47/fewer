@@ -287,14 +287,46 @@ enum ScreenshotCapture {
     // MARK: - 捕获
 
     /// 鼠标所在屏幕的全屏图像。
-    static func fullscreenImage() -> CGImage? {
-        guard let displayID = displayIDUnderMouse() else { return nil }
-        return CGDisplayCreateImage(displayID)
+    static func fullscreenImage() async throws -> CGImage {
+        guard let displayID = displayIDUnderMouse() else {
+            throw RollingCaptureError.displayUnavailable
+        }
+        return try await fullscreenImage(displayID: displayID)
     }
 
-    /// 指定显示器全屏图像。
-    static func fullscreenImage(displayID: CGDirectDisplayID) -> CGImage? {
-        CGDisplayCreateImage(displayID)
+    /// 使用 ScreenCaptureKit 按指定显示器的物理像素尺寸捕获全屏图像。
+    static func fullscreenImage(displayID: CGDirectDisplayID) async throws -> CGImage {
+        let content = try await SCShareableContent.excludingDesktopWindows(
+            false,
+            onScreenWindowsOnly: true
+        )
+        guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
+            throw RollingCaptureError.displayUnavailable
+        }
+        let filter = SCContentFilter(
+            display: display,
+            excludingApplications: [],
+            exceptingWindows: []
+        )
+        let outputSize = ScreenshotPixelGeometry.outputSize(
+            pointSize: display.frame.size,
+            pointPixelScale: CGFloat(filter.pointPixelScale)
+        )
+        let configuration = SCStreamConfiguration()
+        configuration.width = Int(outputSize.width)
+        configuration.height = Int(outputSize.height)
+        configuration.captureResolution = .best
+        configuration.scalesToFit = false
+        configuration.preservesAspectRatio = true
+        configuration.showsCursor = false
+        configuration.capturesAudio = false
+        guard let image = try await SCScreenshotManager.captureImage(
+            contentFilter: filter,
+            configuration: configuration
+        ) as CGImage? else {
+            throw RollingCaptureError.captureFailed
+        }
+        return image
     }
 
     /// 使用 ScreenCaptureKit 按窗口所在屏幕的物理像素尺寸捕获，避免旧 API 返回低分辨率图像。

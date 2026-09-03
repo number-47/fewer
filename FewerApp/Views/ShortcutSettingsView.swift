@@ -33,6 +33,8 @@ struct ShortcutSettingsView: View {
                     FewerSettingsRow { HotKeyRecorder(title: "窗口截图", spec: $screenshotSettings.windowHotKey) }
                    Divider()
                     FewerSettingsRow { HotKeyRecorder(title: "全屏截图", spec: $screenshotSettings.fullscreenHotKey) }
+                   Divider()
+                    FewerSettingsRow { HotKeyRecorder(title: "截图翻译", spec: $screenshotSettings.ocrTranslateHotKey) }
                }
                 FewerSettingsCard {
                     FewerSettingsRow {

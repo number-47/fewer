@@ -625,7 +625,7 @@ struct InputEnhancementSettingsView: View {
     private var screenshotShortcuts: [InputShortcut] {
         let settings = ScreenshotSettingsStore().load()
         guard settings.shortcutsEnabled else { return [] }
-        return [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey]
+        return [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey, settings.ocrTranslateHotKey]
             .map(InputShortcut.init)
     }
 }

@@ -125,6 +125,7 @@ final class ScreenshotModelsTests: XCTestCase {
         XCTAssertEqual(settings.regionHotKey, .regionDefault)
         XCTAssertEqual(settings.windowHotKey, .windowDefault)
         XCTAssertEqual(settings.fullscreenHotKey, .fullscreenDefault)
+        XCTAssertEqual(settings.ocrTranslateHotKey, .ocrTranslateDefault)
         XCTAssertEqual(settings.afterAction, .editThenPin)
         XCTAssertTrue(settings.rollingCaptureEnabled)
         XCTAssertEqual(settings.pinDefaultOpacity, 1.0)
@@ -137,6 +138,8 @@ final class ScreenshotModelsTests: XCTestCase {
         XCTAssertEqual(HotKeySpec.regionDefault.modifiers, HotKeySpec.command | HotKeySpec.option)
         XCTAssertEqual(HotKeySpec.windowDefault.keyCode, UInt32(kVK_ANSI_W))
         XCTAssertEqual(HotKeySpec.fullscreenDefault.keyCode, UInt32(kVK_ANSI_F))
+        XCTAssertEqual(HotKeySpec.ocrTranslateDefault.keyCode, UInt32(kVK_ANSI_T))
+        XCTAssertEqual(HotKeySpec.ocrTranslateDefault.modifiers, HotKeySpec.command | HotKeySpec.option)
     }
 
     func testHotKeySpecIsEmpty() {
@@ -166,10 +169,22 @@ final class ScreenshotModelsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(ScreenshotSettings.self, from: data)
         XCTAssertFalse(decoded.shortcutsEnabled)
         XCTAssertEqual(decoded.regionHotKey, .regionDefault)
+        XCTAssertEqual(decoded.ocrTranslateHotKey, .ocrTranslateDefault)
         XCTAssertEqual(decoded.afterAction, .editThenPin)
         XCTAssertTrue(decoded.rollingCaptureEnabled)
         XCTAssertEqual(decoded.saveLocation, .desktop)
         XCTAssertNil(decoded.customSaveDirectory)
+    }
+
+    func testSettingsDecodeLegacyJSONUsesOCRTranslateDefault() throws {
+        let data = try JSONEncoder().encode(ScreenshotSettings.default)
+        var legacyObject = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        legacyObject.removeValue(forKey: "ocrTranslateHotKey")
+
+        let legacyData = try JSONSerialization.data(withJSONObject: legacyObject)
+        let decoded = try JSONDecoder().decode(ScreenshotSettings.self, from: legacyData)
+
+        XCTAssertEqual(decoded.ocrTranslateHotKey, .ocrTranslateDefault)
     }
 
     func testCustomSaveDirectoryRoundTrip() throws {

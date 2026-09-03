@@ -101,6 +101,64 @@ final class ScreenshotCoreTests: XCTestCase {
         XCTAssertFalse(gate.hasActiveSession)
     }
 
+    // MARK: - ScreenshotCaptureIntent / OCR
+
+    func testOCRHotKeyActionUsesRegionIntentWithoutChangingScreenshotMode() {
+        XCTAssertEqual(ScreenshotHotKeyAction.ocrTranslation.captureIntent, .ocrTranslation)
+        XCTAssertEqual(ScreenshotHotKeyAction.ocrTranslation.captureIntent.mode, .region)
+        XCTAssertEqual(ScreenshotHotKeyAction.ocrTranslation.captureIntent.purpose, .ocrTranslation)
+    }
+
+    func testOCRCaptureImageBudgetPreservesSmallRetinaImageSize() {
+        let size = CGSize(width: 3_024, height: 1_964)
+
+        XCTAssertEqual(OCRCaptureImageBudget.outputSize(for: size), size)
+    }
+
+    func testOCRCaptureImageBudgetDownsamplesOnlyImagesAboveTwentyMegapixels() {
+        let source = CGSize(width: 8_000, height: 4_000)
+        let output = OCRCaptureImageBudget.outputSize(for: source)
+
+        XCTAssertLessThanOrEqual(output.width * output.height, CGFloat(OCRCaptureImageBudget.maximumPixelCount))
+        XCTAssertEqual(output.width / output.height, source.width / source.height, accuracy: 0.001)
+        XCTAssertNotEqual(output.width, 1_920)
+        XCTAssertNotEqual(output.height, 1_920)
+    }
+
+    func testOCRResultOrdersBlocksTopToBottomThenLeftToRight() {
+        let result = OCRResult(blocks: [
+            OCRTextBlock(text: "right", confidence: 0.8, boundingBox: CGRect(x: 80, y: 160, width: 30, height: 20), languageCode: "en"),
+            OCRTextBlock(text: "bottom", confidence: 0.7, boundingBox: CGRect(x: 10, y: 40, width: 40, height: 20), languageCode: "en"),
+            OCRTextBlock(text: "left", confidence: 0.9, boundingBox: CGRect(x: 10, y: 158, width: 30, height: 20), languageCode: "zh-Hans"),
+        ])
+
+        XCTAssertEqual(result.blocks.map(\.text), ["left", "right", "bottom"])
+        XCTAssertEqual(result.fullText, "left\nright\nbottom")
+        XCTAssertEqual(result.languageCodes, ["zh-Hans", "en"])
+        XCTAssertEqual(result.detectedLanguageCode, "en")
+    }
+
+    func testOCRResultKeepsAnEmptyResult() {
+        let result = OCRResult(blocks: [])
+
+        XCTAssertTrue(result.blocks.isEmpty)
+        XCTAssertEqual(result.fullText, "")
+        XCTAssertTrue(result.languageCodes.isEmpty)
+        XCTAssertNil(result.detectedLanguageCode)
+    }
+
+    func testOCRReadingOrderGroupsVisualLinesBeforeSortingWithinLine() {
+        let result = OCRResult(blocks: [
+            OCRTextBlock(text: "第二行右", confidence: 0.7, boundingBox: CGRect(x: 200, y: 86, width: 45, height: 30), languageCode: "zh-Hans"),
+            OCRTextBlock(text: "Top English", confidence: 0.9, boundingBox: CGRect(x: 120, y: 205, width: 80, height: 14), languageCode: "en"),
+            OCRTextBlock(text: "顶部中文", confidence: 0.9, boundingBox: CGRect(x: 10, y: 200, width: 70, height: 26), languageCode: "zh-Hans"),
+            OCRTextBlock(text: "第二行左", confidence: 0.8, boundingBox: CGRect(x: 20, y: 90, width: 55, height: 17), languageCode: "zh-Hans"),
+            OCRTextBlock(text: "third line", confidence: 0.8, boundingBox: CGRect(x: 15, y: 30, width: 80, height: 42), languageCode: "en"),
+        ])
+
+        XCTAssertEqual(result.blocks.map(\.text), ["顶部中文", "Top English", "第二行左", "第二行右", "third line"])
+    }
+
     // MARK: - CaptureRegion
 
     func testNormalizedFromTopLeftToBottomRight() {

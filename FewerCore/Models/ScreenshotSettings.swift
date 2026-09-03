@@ -22,6 +22,8 @@ public struct HotKeySpec: Codable, Equatable, Sendable {
     public static let windowDefault = HotKeySpec(keyCode: UInt32(kVK_ANSI_W), modifiers: command | option)
     /// 全屏截屏：⌘⌥F
     public static let fullscreenDefault = HotKeySpec(keyCode: UInt32(kVK_ANSI_F), modifiers: command | option)
+    /// 截图翻译：⌘⌥T
+    public static let ocrTranslateDefault = HotKeySpec(keyCode: UInt32(kVK_ANSI_T), modifiers: command | option)
 
     /// 修饰键是否为空（无效快捷键）。
     public var isEmpty: Bool { modifiers == 0 }
@@ -101,6 +103,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
     public var regionHotKey: HotKeySpec
     public var windowHotKey: HotKeySpec
     public var fullscreenHotKey: HotKeySpec
+    public var ocrTranslateHotKey: HotKeySpec
     /// 兼容旧设置；截图流程不再读取此值。
     public var afterAction: ScreenshotAfterAction
     public var rollingCaptureEnabled: Bool
@@ -114,6 +117,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         regionHotKey: HotKeySpec = .regionDefault,
         windowHotKey: HotKeySpec = .windowDefault,
         fullscreenHotKey: HotKeySpec = .fullscreenDefault,
+        ocrTranslateHotKey: HotKeySpec = .ocrTranslateDefault,
         afterAction: ScreenshotAfterAction = .editThenPin,
         rollingCaptureEnabled: Bool = true,
         pinDefaultOpacity: Double = 1.0,
@@ -124,6 +128,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         self.regionHotKey = regionHotKey
         self.windowHotKey = windowHotKey
         self.fullscreenHotKey = fullscreenHotKey
+        self.ocrTranslateHotKey = ocrTranslateHotKey
         self.afterAction = afterAction
         self.rollingCaptureEnabled = rollingCaptureEnabled
         self.pinDefaultOpacity = pinDefaultOpacity
@@ -138,6 +143,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         case regionHotKey
         case windowHotKey
         case fullscreenHotKey
+        case ocrTranslateHotKey
         case afterAction
         case rollingCaptureEnabled
         case pinDefaultOpacity
@@ -157,6 +163,8 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
             ?? defaults.windowHotKey
         fullscreenHotKey = try values.decodeIfPresent(HotKeySpec.self, forKey: .fullscreenHotKey)
             ?? defaults.fullscreenHotKey
+        ocrTranslateHotKey = try values.decodeIfPresent(HotKeySpec.self, forKey: .ocrTranslateHotKey)
+            ?? defaults.ocrTranslateHotKey
         afterAction = try values.decodeIfPresent(ScreenshotAfterAction.self, forKey: .afterAction)
             ?? defaults.afterAction
         rollingCaptureEnabled = try values.decodeIfPresent(Bool.self, forKey: .rollingCaptureEnabled)
@@ -176,6 +184,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
         try container.encode(regionHotKey, forKey: .regionHotKey)
         try container.encode(windowHotKey, forKey: .windowHotKey)
         try container.encode(fullscreenHotKey, forKey: .fullscreenHotKey)
+        try container.encode(ocrTranslateHotKey, forKey: .ocrTranslateHotKey)
         try container.encode(afterAction, forKey: .afterAction)
         try container.encode(rollingCaptureEnabled, forKey: .rollingCaptureEnabled)
         try container.encode(pinDefaultOpacity, forKey: .pinDefaultOpacity)

@@ -13,13 +13,32 @@ final class ScreenshotService: CaptureOverlayDelegate {
     private(set) var currentMode: ScreenshotMode?
     private var didShowPermissionRecoveryThisLaunch = false
     private var captureSessions = ScreenshotCaptureSessionGate()
+    private let ocrCoordinator = OCRTranslationCoordinator.shared
 
     private init() {}
 
     /// 进入指定截屏模式。全屏直接捕获；区域/窗口显示遮罩。
     func begin(_ mode: ScreenshotMode) {
+        begin(ScreenshotCaptureIntent(mode: mode))
+    }
+
+    func beginOCRTranslation() {
+        // OCR 是可替换的请求：新请求必须立即使旧 OCR/译文与选择遮罩失效。
+        // 不能等待新 session 成功创建，否则快速连续触发会让旧结果重新出现。
+        ocrCoordinator.cancel()
+        if captureSessions.hasActiveSession {
+            captureSessions.cancel()
+            currentMode = nil
+            dismissOverlay()
+            setKeycastSuppressed(false)
+        }
+        begin(.ocrTranslation)
+    }
+
+    /// OCR 通过独立 purpose 复用截图交互，不改变既有 ScreenshotMode。
+    func begin(_ intent: ScreenshotCaptureIntent) {
         Self.debugLog(
-            "begin mode=\(mode) hasPermission=\(ScreenshotCapture.hasPermission) "
+            "begin mode=\(intent.mode) hasPermission=\(ScreenshotCapture.hasPermission) "
                 + "requested=\(ScreenshotCapture.permissionWasRequested) "
                 + "identity=\(ScreenshotCapture.permissionIdentity)"
         )
@@ -30,7 +49,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
             } else {
                 let granted = ScreenshotCapture.requestPermission()
                 if granted, ScreenshotCapture.hasPermission {
-                    begin(mode)
+                    begin(intent)
                 }
             }
             return
@@ -39,9 +58,10 @@ final class ScreenshotService: CaptureOverlayDelegate {
         setKeycastSuppressed(true)
         // 上一张结果窗口不能继续留在屏幕上，否则新的区域/全屏截图会再次截到旧图。
         ScreenshotResultWindowController.shared.close()
-        currentMode = mode
+        ocrCoordinator.cancel()
+        currentMode = intent.mode
         captureTargetApplication = NSWorkspace.shared.frontmostApplication
-        switch mode {
+        switch intent.mode {
         case .fullscreen:
             // 等旧结果窗口从 WindowServer 合成画面中消失后再读取当前屏幕。
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
@@ -49,7 +69,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
                 self.captureFullscreen(captureID: captureID)
             }
         case .region, .smart, .window:
-            showOverlay(mode: mode)
+            showOverlay(intent: intent)
         }
     }
 
@@ -59,18 +79,27 @@ final class ScreenshotService: CaptureOverlayDelegate {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
         guard let screen,
-              let displayID = ScreenshotCapture.displayID(for: screen),
-              let image = ScreenshotCapture.fullscreenImage(displayID: displayID)
+              let displayID = ScreenshotCapture.displayID(for: screen)
         else {
             captureFailed(message: "无法读取当前屏幕，请检查屏幕录制权限后重试。")
             return
         }
-        finish(with: image, pointSize: screen.frame.size, captureID: captureID)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let image = try await ScreenshotCapture.fullscreenImage(displayID: displayID)
+                guard self.captureSessions.isActive(captureID) else { return }
+                self.finish(with: image, pointSize: screen.frame.size, captureID: captureID)
+            } catch {
+                guard self.captureSessions.isActive(captureID) else { return }
+                self.captureFailed(message: "无法读取当前屏幕，请检查屏幕录制权限后重试。")
+            }
+        }
     }
 
     // MARK: - 遮罩
 
-    private func showOverlay(mode: ScreenshotMode) {
+    private func showOverlay(intent: ScreenshotCaptureIntent) {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main
         guard let screen else {
@@ -96,8 +125,9 @@ final class ScreenshotService: CaptureOverlayDelegate {
         window.identifier = NSUserInterfaceItemIdentifier("screenshot-overlay")
 
         let view = CaptureOverlayView(
-            mode: mode,
-            rollingCaptureEnabled: ScreenshotSettingsStore().load().rollingCaptureEnabled,
+            intent: intent,
+            rollingCaptureEnabled: intent.purpose == .screenshot
+                && ScreenshotSettingsStore().load().rollingCaptureEnabled,
             screenFrame: screen.frame,
             delegate: self
         )
@@ -164,6 +194,39 @@ final class ScreenshotService: CaptureOverlayDelegate {
         cancel()
     }
 
+    func overlayDidSelectOCRRegion(_ cgRect: CGRect) {
+        guard let captureID = captureSessions.activeID else { return }
+        ocrCoordinator.start()
+        let selection = Self.appKitRect(fromCaptureRect: cgRect)
+        let screen = NSScreen.screens.first(where: { $0.frame.intersects(selection) }) ?? NSScreen.main
+        dismissOverlay()
+        // 先让遮罩窗口从 WindowServer 合成画面移除，再读取原始区域图像。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+            guard let self, self.captureSessions.isActive(captureID) else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    let capturedImage = try await ScreenshotCapture.rollingRegionImage(cgRect)
+                    guard self.captureSessions.complete(captureID) else { return }
+                    self.currentMode = nil
+                    self.setKeycastSuppressed(false)
+                    guard let image = OCRCaptureImageBudget.downsampled(capturedImage) else {
+                        self.ocrCoordinator.cancel()
+                        OCRTranslationWindowController.shared.showFeedback("截图失败", near: selection, on: screen)
+                        return
+                    }
+                    self.ocrCoordinator.recognize(image: image, selection: selection, on: screen)
+                } catch {
+                    guard self.captureSessions.complete(captureID) else { return }
+                    self.currentMode = nil
+                    self.setKeycastSuppressed(false)
+                    self.ocrCoordinator.cancel()
+                    OCRTranslationWindowController.shared.showFeedback("截图失败", near: selection, on: screen)
+                }
+            }
+        }
+    }
+
     // MARK: - 完成/取消
 
     private func finish(with image: CGImage, pointSize: CGSize? = nil, captureID: UInt64) {
@@ -185,6 +248,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
             return
         }
         captureSessions.cancel()
+        ocrCoordinator.cancel()
         currentMode = nil
         dismissOverlay()
         setKeycastSuppressed(false)
@@ -250,6 +314,12 @@ final class ScreenshotService: CaptureOverlayDelegate {
             rep.size = pointSize
         }
         return rep.representation(using: .png, properties: [:])
+    }
+
+    /// CaptureOverlay 的选区使用全局左上原点；窗口定位使用 AppKit 左下原点。
+    private static func appKitRect(fromCaptureRect rect: CGRect) -> CGRect {
+        let top = NSScreen.screens.map(\.frame.maxY).max() ?? rect.maxY
+        return CGRect(x: rect.minX, y: top - rect.maxY, width: rect.width, height: rect.height)
     }
 
     /// 沙盒调试：无屏幕录制权限时用合成图像走完流程（仅验证用）。

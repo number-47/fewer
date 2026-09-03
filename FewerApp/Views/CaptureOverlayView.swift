@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 protocol CaptureOverlayDelegate: AnyObject {
     func overlayDidStartRollingCapture(_ cgRect: CGRect)
+    func overlayDidSelectOCRRegion(_ cgRect: CGRect)
     func overlayDidFinishEditing()
     func overlayDidPin(_ pngData: Data)
     func overlayDidCancel()
@@ -13,7 +14,7 @@ protocol CaptureOverlayDelegate: AnyObject {
 
 /// 全屏截屏遮罩：区域拖拽 / 窗口高亮点击 + 工具条。
 struct CaptureOverlayView: View {
-    let mode: ScreenshotMode
+    let intent: ScreenshotCaptureIntent
     let rollingCaptureEnabled: Bool
     /// 所在屏幕的 AppKit frame。
     let screenFrame: NSRect
@@ -31,8 +32,12 @@ struct CaptureOverlayView: View {
     @State private var isDraggingSelection = false
     @State private var captureWindowID: CGWindowID?
 
+    private var mode: ScreenshotMode { intent.mode }
+    private var isOCRSelection: Bool { intent.purpose == .ocrTranslation }
+
     private var hint: String {
-        switch mode {
+        if isOCRSelection { return "拖拽选择文字区域，Esc 取消" }
+        return switch mode {
         case .region: "拖拽选择截屏区域，Esc 取消"
         case .smart: "单击窗口或拖拽选择区域，Esc 取消"
         case .window: "移动鼠标选择窗口，点击截取，Esc 取消"
@@ -46,7 +51,7 @@ struct CaptureOverlayView: View {
                 mode: mode,
                 screenFrame: screenFrame,
                 selection: captureRect,
-                allowsSelectionAdjustment: isAdjustingSelection && !hasMarkup,
+                allowsSelectionAdjustment: !isOCRSelection && isAdjustingSelection && !hasMarkup,
                 isEnabled: (editorSource == nil || isAdjustingSelection) && !isPreparing && captureError == nil,
                 onSelectionUpdate: { cgRect in
                     captureRect = cgRect
@@ -55,6 +60,10 @@ struct CaptureOverlayView: View {
                 onSelectionEnd: { cgRect in
                     captureRect = cgRect
                     selection = localRect(fromCG: cgRect)
+                    if isOCRSelection {
+                        delegate?.overlayDidSelectOCRRegion(cgRect)
+                        return
+                    }
                     isAdjustingSelection = true
                     prepareRegion(cgRect)
                 },

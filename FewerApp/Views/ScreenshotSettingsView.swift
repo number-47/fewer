@@ -39,6 +39,7 @@ struct ScreenshotSettingsView: View {
                     Divider(); FewerSettingsRow { HotKeyRecorder(title: "区域截图", spec: $settings.regionHotKey) }
                     Divider(); FewerSettingsRow { HotKeyRecorder(title: "窗口截图", spec: $settings.windowHotKey) }
                     Divider(); FewerSettingsRow { HotKeyRecorder(title: "全屏截图", spec: $settings.fullscreenHotKey) }
+                    Divider(); FewerSettingsRow { HotKeyRecorder(title: "截图翻译", spec: $settings.ocrTranslateHotKey) }
                 }
             }.padding(.bottom, 24)
         }
@@ -66,7 +67,7 @@ struct ScreenshotSettingsView: View {
         var inputSettings = inputStore.load()
         guard let shortcut = inputSettings.keycast.toggleShortcut else { return }
         let reserved = settings.shortcutsEnabled
-            ? [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey].map(InputShortcut.init)
+            ? [settings.regionHotKey, settings.windowHotKey, settings.fullscreenHotKey, settings.ocrTranslateHotKey].map(InputShortcut.init)
             : []
         guard !InputShortcutSafety.isAllowedGlobalToggle(shortcut, additionalReserved: reserved) else { return }
         inputSettings.keycast.toggleShortcut = nil
