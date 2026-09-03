@@ -238,6 +238,10 @@ final class ScreenshotService: CaptureOverlayDelegate {
             captureFailed(message: "截图编码失败，请重试。")
             return
         }
+        if ScreenshotSettingsStore().load().afterAction == .pin {
+            PinWindowController.shared.pin(pngData: pngData)
+            return
+        }
         Self.debugLog("showing result actions")
         ScreenshotResultWindowController.shared.show(pngData: pngData)
     }

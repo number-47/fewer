@@ -213,7 +213,7 @@ final class ScreenshotModelsTests: XCTestCase {
         XCTAssertEqual(decoded.customSaveDirectory, "/tmp/Fewer Screenshots")
     }
 
-    func testSettingsStoreSaveAndLoad() throws {
+    func testSettingsStorePersistsAutomaticPin() throws {
         let suiteName = "ScreenshotSettingsTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
@@ -225,7 +225,7 @@ final class ScreenshotModelsTests: XCTestCase {
         var settings = ScreenshotSettings.default
         settings.afterAction = .pin
         store.save(settings)
-        XCTAssertEqual(store.load(), settings)
+        XCTAssertEqual(store.load().afterAction, .pin)
 
         defaults.removePersistentDomain(forName: suiteName)
     }

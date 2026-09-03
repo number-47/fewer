@@ -28,7 +28,7 @@ struct ScreenshotSettingsView: View {
                 FewerSettingsCard {
                     FewerSettingsRow { VStack(alignment: .leading, spacing: 2) { Text("滚动截图"); Text("自动拼接长图，支持上下双向滚动").font(.caption).foregroundStyle(.secondary) }; Spacer(); Toggle("", isOn: Binding(get: { settings.rollingCaptureEnabled }, set: { settings.rollingCaptureEnabled = $0 })).labelsHidden() }
                     Divider()
-                    FewerSettingsRow { VStack(alignment: .leading, spacing: 2) { Text("自动贴图"); Text("截图后自动以浮动窗口置顶显示").font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("当前版本不支持").font(.caption).foregroundStyle(.secondary) }
+                    FewerSettingsRow { VStack(alignment: .leading, spacing: 2) { Text("自动贴图"); Text("开启后跳过标注和区域截图的滚动截图入口，直接以浮动窗口置顶显示").font(.caption).foregroundStyle(.secondary) }; Spacer(); Toggle("", isOn: Binding(get: { settings.afterAction == .pin }, set: { settings.afterAction = $0 ? .pin : .editThenPin })).labelsHidden() }
                     Divider()
                     FewerSettingsRow { Text("贴图默认透明度"); Spacer(); Slider(value: $settings.pinDefaultOpacity, in: 0.1...1.0).frame(width: 160); Text("\(Int((settings.pinDefaultOpacity * 100).rounded()))%").monospacedDigit().font(.caption) }
                     Divider()

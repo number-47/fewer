@@ -239,9 +239,16 @@ struct CaptureOverlayView: View {
     }
 
     private func installEditorSource(_ image: CGImage) {
-        guard let data = ScreenshotService.pngData(from: image, pointSize: captureRect?.size),
-              let source = MarkupImageSource(pngData: data)
-        else {
+        guard let data = ScreenshotService.pngData(from: image, pointSize: captureRect?.size) else {
+            isPreparing = false
+            captureError = "截图编码失败，请重试。"
+            return
+        }
+        if !isOCRSelection, ScreenshotSettingsStore().load().afterAction == .pin {
+            delegate?.overlayDidPin(data)
+            return
+        }
+        guard let source = MarkupImageSource(pngData: data) else {
             isPreparing = false
             captureError = "截图编码失败，请重试。"
             return

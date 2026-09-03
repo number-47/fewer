@@ -62,8 +62,7 @@ public struct HotKeySpec: Codable, Equatable, Sendable {
     }
 }
 
-/// 旧版本“截图后自动动作”字段，仅为解码已有设置保留。
-/// 当前版本统一在截图结果窗口中由用户选择复制、编辑、贴图或保存。
+/// 截图后的默认动作。
 public enum ScreenshotAfterAction: String, Codable, CaseIterable, Identifiable, Sendable {
     case pin
     case editThenPin
@@ -135,7 +134,7 @@ public struct ScreenshotSettings: Codable, Equatable, Sendable {
     public var windowHotKey: HotKeySpec
     public var fullscreenHotKey: HotKeySpec
     public var ocrTranslateHotKey: HotKeySpec
-    /// 兼容旧设置；截图流程不再读取此值。
+    /// `.pin` 表示自动贴图；`.editThenPin` 保持截图结果中的编辑后贴图流程。
     public var afterAction: ScreenshotAfterAction
     public var rollingCaptureEnabled: Bool
     public var pinDefaultOpacity: Double
