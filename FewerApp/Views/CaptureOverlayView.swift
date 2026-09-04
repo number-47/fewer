@@ -58,7 +58,7 @@ struct CaptureOverlayView: View {
                 mode: mode,
                 screenFrame: screenFrame,
                 selection: captureRect,
-                allowsSelectionAdjustment: !isOCRSelection && isAdjustingSelection && !hasMarkup,
+                allowsSelectionAdjustment: !isTextRecognitionSelection && isAdjustingSelection && !hasMarkup,
                 isEnabled: (editorSource == nil || isAdjustingSelection) && !isPreparing && captureError == nil,
                 onSelectionUpdate: { cgRect in
                     captureRect = cgRect
@@ -251,7 +251,7 @@ struct CaptureOverlayView: View {
             captureError = "截图编码失败，请重试。"
             return
         }
-        if !isOCRSelection, ScreenshotSettingsStore().load().afterAction == .pin {
+        if !isTextRecognitionSelection, ScreenshotSettingsStore().load().afterAction == .pin {
             delegate?.overlayDidPin(data)
             return
         }

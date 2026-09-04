@@ -363,7 +363,7 @@ final class SystemMetricsService: ObservableObject {
 
 private extension MonitorHistoryPoint {
     init(snapshot: SystemMetricsSnapshot) {
-        let gpuUtilizationByDeviceID = Dictionary(uniqueKeysWithValues: snapshot.gpu?.devices.compactMap {
+        let gpuUtilizationByDeviceID = Dictionary<String, Double>(uniqueKeysWithValues: snapshot.gpu?.devices.compactMap {
             guard let utilization = $0.utilization else { return nil }
             return ($0.id, utilization)
         } ?? [])
