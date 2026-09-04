@@ -43,8 +43,8 @@ final class OCRTranslationViewModel: ObservableObject {
         self.translationGeneration = translationGeneration
     }
 
-    func togglePinned() {
-        isPinned.toggle()
+    func setPinned(_ isPinned: Bool) {
+        self.isPinned = isPinned
     }
 
     func clear() {
@@ -58,13 +58,48 @@ final class OCRTranslationViewModel: ObservableObject {
     }
 }
 
+enum OCRTranslationContentHeightMetric: Hashable, Sendable {
+    case sourceHeader
+    case sourceText
+    case translationHeader
+    case translationText
+    case translationActions
+}
+
+struct OCRTranslationContentHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: [OCRTranslationContentHeightMetric: CGFloat] = [:]
+
+    static func reduce(
+        value: inout [OCRTranslationContentHeightMetric: CGFloat],
+        nextValue: () -> [OCRTranslationContentHeightMetric: CGFloat]
+    ) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
+extension View {
+    func reportsOCRTranslationContentHeight(_ metric: OCRTranslationContentHeightMetric) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: OCRTranslationContentHeightPreferenceKey.self,
+                    value: [metric: proxy.size.height]
+                )
+            }
+        )
+    }
+}
+
 struct OCRTranslationView: View {
     @ObservedObject var model: OCRTranslationViewModel
+    let onPinToggleRequested: () -> Void
+    let onPreferredContentHeightChange: (CGFloat) -> Void
     let onTargetLanguageSelected: (String) -> Void
     let onProviderSelected: (OCRTranslationProvider) -> Void
     let onRetryRequested: () -> Void
     let onOpenScreenshotSettings: () -> Void
     let onTranslationStateChanged: (OCRTranslationSession.TranslationState, UInt64) -> Void
+    @State private var lastReportedPreferredContentHeight: CGFloat?
 
     var body: some View {
         GeometryReader { geometry in
@@ -80,6 +115,14 @@ struct OCRTranslationView: View {
             }
         }
         .frame(minWidth: 360, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
+        .onPreferenceChange(OCRTranslationContentHeightPreferenceKey.self) { measurements in
+            let preferredContentHeight = preferredContentHeight(for: measurements)
+            guard lastReportedPreferredContentHeight.map({
+                abs($0 - preferredContentHeight) >= 1
+            }) ?? true else { return }
+            lastReportedPreferredContentHeight = preferredContentHeight
+            onPreferredContentHeightChange(preferredContentHeight)
+        }
     }
 
     @ViewBuilder
@@ -116,16 +159,20 @@ struct OCRTranslationView: View {
                     copyButton(text: text)
                 }
             }
+            .reportsOCRTranslationContentHeight(.translationHeader)
 
             ScrollView {
                 Text(translationText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(translationColor)
                     .textSelection(.enabled)
                     .padding(.bottom, 2)
+                    .reportsOCRTranslationContentHeight(.translationText)
             }
 
             translationActions
+                .reportsOCRTranslationContentHeight(.translationActions)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -138,7 +185,7 @@ struct OCRTranslationView: View {
                     .font(.headline)
                 Spacer()
                 Button {
-                    model.togglePinned()
+                    onPinToggleRequested()
                 } label: {
                     Image(systemName: model.isPinned ? "pin.slash" : "pin")
                 }
@@ -149,12 +196,15 @@ struct OCRTranslationView: View {
                     copyButton(text: text)
                 }
             }
+            .reportsOCRTranslationContentHeight(.sourceHeader)
 
             ScrollView {
                 Text(text)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .textSelection(.enabled)
                     .padding(.bottom, 2)
+                    .reportsOCRTranslationContentHeight(.sourceText)
             }
         }
         .padding(16)
@@ -245,6 +295,23 @@ struct OCRTranslationView: View {
     private func languageName(for languageCode: String?, fallback: String) -> String {
         guard let languageCode else { return fallback }
         return Locale.current.localizedString(forIdentifier: languageCode) ?? languageCode
+    }
+
+    private func preferredContentHeight(
+        for measurements: [OCRTranslationContentHeightMetric: CGFloat]
+    ) -> CGFloat {
+        let sourceSectionHeight = measurements[.sourceHeader, default: 0]
+            + 10
+            + measurements[.sourceText, default: 0]
+            + 32
+        var translationSectionHeight = measurements[.translationHeader, default: 0]
+            + 10
+            + measurements[.translationText, default: 0]
+            + 32
+        if let actionsHeight = measurements[.translationActions], actionsHeight > 0 {
+            translationSectionHeight += 10 + actionsHeight
+        }
+        return max(360, max(sourceSectionHeight, translationSectionHeight) * 2 + 1)
     }
 }
 

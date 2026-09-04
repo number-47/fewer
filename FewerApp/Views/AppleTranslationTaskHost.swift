@@ -67,16 +67,20 @@ struct AppleTranslationTaskHost: View {
                     copyButton(text: text)
                 }
             }
+            .reportsOCRTranslationContentHeight(.translationHeader)
 
             ScrollView {
                 Text(translationText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(translationColor)
                     .textSelection(.enabled)
                     .padding(.bottom, 2)
+                    .reportsOCRTranslationContentHeight(.translationText)
             }
 
             translationActions
+                .reportsOCRTranslationContentHeight(.translationActions)
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

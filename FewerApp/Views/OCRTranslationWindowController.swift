@@ -13,6 +13,11 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
     private var viewModel: OCRTranslationViewModel?
     private var onDismiss: (() -> Void)?
     private var isDismissalSuppressed = false
+    private var isPinned = false
+    private var resultWindowLayoutContext: ResultWindowLayoutContext?
+    private var lastPreferredContentHeight: CGFloat?
+    private var isProgrammaticResize = false
+    private var hasUserResized = false
     private let screenshotSettingsStore = ScreenshotSettingsStore()
 
     private override init() {}
@@ -37,13 +42,9 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
 
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame
             ?? NSRect(x: 0, y: 0, width: 1_200, height: 800)
-        let maximumSize = NSSize(
+        let maximumFrameSize = NSSize(
             width: max(visibleFrame.width - 16, 1),
             height: max(visibleFrame.height - 16, 1)
-        )
-        let initialSize = NSSize(
-            width: min(maximumSize.width, max(420, maximumSize.width * 0.55)),
-            height: min(maximumSize.height, max(500, visibleFrame.height * 0.85))
         )
         let viewModel = OCRTranslationViewModel(
             sourceText: sourceText,
@@ -54,46 +55,86 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
             translationGeneration: translationGeneration
         )
         let panel = OCRTranslationPanel(
-            contentRect: NSRect(origin: .zero, size: initialSize),
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 1, height: 1)),
             styleMask: [.titled, .closable, .resizable, .utilityWindow],
             backing: .buffered,
             defer: false
         )
+        let maximumContentSize = panel.contentRect(
+            forFrameRect: NSRect(origin: .zero, size: maximumFrameSize)
+        ).size
+        let initialFrameWidth = min(
+            maximumFrameSize.width,
+            max(420, maximumFrameSize.width * 0.55)
+        )
+        let initialContentWidth = max(
+            panel.contentRect(
+                forFrameRect: NSRect(
+                    origin: .zero,
+                    size: NSSize(width: initialFrameWidth, height: maximumFrameSize.height)
+                )
+            ).width,
+            1
+        )
+        let initialContentSize = NSSize(
+            width: initialContentWidth,
+            height: min(maximumContentSize.height, 360)
+        )
+        let position = screenshotSettingsStore.load().ocrTranslationWindowPosition
         panel.identifier = NSUserInterfaceItemIdentifier("ocr-translation-result")
         panel.title = "截图翻译"
         panel.minSize = NSSize(
-            width: min(360, maximumSize.width),
-            height: min(260, maximumSize.height)
+            width: min(360, maximumFrameSize.width),
+            height: min(260, maximumFrameSize.height)
         )
-        panel.maxSize = maximumSize
+        panel.maxSize = maximumFrameSize
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.delegate = self
-        panel.contentViewController = NSHostingController(rootView: OCRTranslationView(
+        let hostingController = NSHostingController(rootView: OCRTranslationView(
             model: viewModel,
+            onPinToggleRequested: { [weak self] in
+                self?.togglePinned()
+            },
+            onPreferredContentHeightChange: { [weak self] height in
+                Task { @MainActor [weak self] in
+                    self?.updatePreferredContentHeight(height)
+                }
+            },
             onTargetLanguageSelected: onTargetLanguageSelected,
             onProviderSelected: onProviderSelected,
             onRetryRequested: onRetryRequested,
             onOpenScreenshotSettings: onOpenScreenshotSettings,
             onTranslationStateChanged: onTranslationStateChanged
         ))
+        hostingController.sizingOptions = []
+        panel.contentViewController = hostingController
+        panel.setContentSize(initialContentSize)
 
         let frameSize = panel.frame.size
         let frame = OCRTranslationWindowLayout.frame(
             selection: selection,
             visibleFrame: visibleFrame,
             windowSize: frameSize,
-            position: screenshotSettingsStore.load().ocrTranslationWindowPosition
+            position: position
         )
         panel.setFrame(frame, display: false)
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
 
         self.panel = panel
         self.viewModel = viewModel
         self.onDismiss = onDismiss
+        resultWindowLayoutContext = ResultWindowLayoutContext(
+            selection: selection,
+            visibleFrame: visibleFrame,
+            position: position,
+            maximumContentHeight: maximumContentSize.height
+        )
+        setPinned(false)
+
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func updateTranslation(
@@ -174,17 +215,70 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         Task { @MainActor [weak self, weak resigningPanel] in
             await Task.yield()
             guard let self, let resigningPanel, let currentPanel = self.panel,
-                  let viewModel = self.viewModel,
                   currentPanel === resigningPanel,
-                  !viewModel.isPinned,
+                  !self.isPinned,
                   !self.isDismissalSuppressed,
                   !currentPanel.isKeyWindow else { return }
             self.closeResultWindow(notify: true)
         }
     }
 
+    func windowDidResize(_ notification: Notification) {
+        guard let resizedPanel = notification.object as? NSPanel, resizedPanel === panel,
+              !isProgrammaticResize else { return }
+        hasUserResized = true
+    }
+
+    private func togglePinned() {
+        setPinned(!isPinned)
+    }
+
+    private func setPinned(_ pinned: Bool) {
+        isPinned = pinned
+        viewModel?.setPinned(pinned)
+        guard pinned, let panel else { return }
+        panel.hidesOnDeactivate = false
+        panel.level = isDismissalSuppressed
+            ? NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+            : .floating
+        panel.orderFrontRegardless()
+    }
+
+    private func updatePreferredContentHeight(_ preferredContentHeight: CGFloat) {
+        guard preferredContentHeight.isFinite,
+              !hasUserResized,
+              let panel,
+              let resultWindowLayoutContext
+        else { return }
+
+        let contentHeight = min(
+            max(preferredContentHeight, 360),
+            resultWindowLayoutContext.maximumContentHeight
+        )
+        guard lastPreferredContentHeight.map({ abs($0 - contentHeight) >= 1 }) ?? true else { return }
+        lastPreferredContentHeight = contentHeight
+
+        let currentContentHeight = panel.contentRect(forFrameRect: panel.frame).height
+        guard abs(currentContentHeight - contentHeight) >= 1 else { return }
+
+        isProgrammaticResize = true
+        defer { isProgrammaticResize = false }
+        panel.setContentSize(NSSize(width: panel.contentView?.bounds.width ?? 1, height: contentHeight))
+        let frame = OCRTranslationWindowLayout.frame(
+            selection: resultWindowLayoutContext.selection,
+            visibleFrame: resultWindowLayoutContext.visibleFrame,
+            windowSize: panel.frame.size,
+            position: resultWindowLayoutContext.position
+        )
+        panel.setFrame(frame, display: true)
+    }
+
     private func closeResultWindow(notify: Bool) {
-        guard let panel else { return }
+        guard let panel else {
+            setPinned(false)
+            resetResultWindowSizing()
+            return
+        }
         panel.delegate = nil
         releaseResultWindow(notify: notify)
         panel.close()
@@ -195,6 +289,8 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         panel.contentViewController = nil
         self.panel = nil
         isDismissalSuppressed = false
+        setPinned(false)
+        resetResultWindowSizing()
         viewModel?.clear()
         viewModel = nil
         let handler = onDismiss
@@ -211,9 +307,23 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         feedbackPanel?.close()
         feedbackPanel = nil
     }
+
+    private func resetResultWindowSizing() {
+        resultWindowLayoutContext = nil
+        lastPreferredContentHeight = nil
+        isProgrammaticResize = false
+        hasUserResized = false
+    }
 }
 
 private final class OCRTranslationPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+}
+
+private struct ResultWindowLayoutContext {
+    let selection: CGRect
+    let visibleFrame: CGRect
+    let position: OCRTranslationWindowPosition
+    let maximumContentHeight: CGFloat
 }
