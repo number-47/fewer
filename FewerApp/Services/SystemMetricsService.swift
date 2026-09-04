@@ -226,7 +226,7 @@ final class SystemMetricsService: ObservableObject {
         networkInBytes: 0,
         networkOutBytes: 0
     )
-    @Published private(set) var history: [SystemMetricsSnapshot] = []
+    @Published private(set) var history: [MonitorHistoryPoint] = []
     @Published private(set) var localIPAddress = "未连接"
     @Published private(set) var localIPv4Address: String?
     @Published private(set) var localIPv6Address: String?
@@ -324,8 +324,10 @@ final class SystemMetricsService: ObservableObject {
 
     private func publish(_ result: SystemMetricsSampleResult) {
         current = result.snapshot
-        history.append(result.snapshot)
-        history.removeAll { Date().timeIntervalSince($0.date) > 3_600 }
+        MonitorHistoryRetention.append(
+            MonitorHistoryPoint(snapshot: result.snapshot),
+            to: &history
+        )
         if let name = result.networkInterfaceName {
             defaultNetworkInterface = name
             localIPv4Address = result.networkIPv4
@@ -356,5 +358,30 @@ final class SystemMetricsService: ObservableObject {
             }
         }
         publicIPError = "两个公网 IP 服务均不可用"
+    }
+}
+
+private extension MonitorHistoryPoint {
+    init(snapshot: SystemMetricsSnapshot) {
+        let gpuUtilizationByDeviceID = Dictionary(uniqueKeysWithValues: snapshot.gpu?.devices.compactMap {
+            guard let utilization = $0.utilization else { return nil }
+            return ($0.id, utilization)
+        } ?? [])
+        let disk = snapshot.disk.map {
+            MonitorDiskHistoryPoint(
+                usageRatio: $0.usageRatio,
+                readBytesPerSecond: $0.readBytesPerSecond,
+                writeBytesPerSecond: $0.writeBytesPerSecond
+            )
+        }
+        self.init(
+            date: snapshot.date,
+            cpuUsage: snapshot.cpu?.total,
+            gpuUtilizationByDeviceID: gpuUtilizationByDeviceID,
+            memoryUsage: snapshot.memory?.usageRatio,
+            disk: disk,
+            networkInBytesPerSecond: snapshot.networkInBytesPerSecond,
+            networkOutBytesPerSecond: snapshot.networkOutBytesPerSecond
+        )
     }
 }

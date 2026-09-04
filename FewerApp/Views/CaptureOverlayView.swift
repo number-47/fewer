@@ -33,10 +33,17 @@ struct CaptureOverlayView: View {
     @State private var captureWindowID: CGWindowID?
 
     private var mode: ScreenshotMode { intent.mode }
-    private var isOCRSelection: Bool { intent.purpose == .ocrTranslation }
+    private var isTextRecognitionSelection: Bool { intent.purpose != .screenshot }
 
     private var hint: String {
-        if isOCRSelection { return "拖拽选择文字区域，Esc 取消" }
+        switch intent.purpose {
+        case .ocrTranslation:
+            return "拖拽选择文字区域，Esc 取消"
+        case .ocrCopy:
+            return "拖拽选择文字区域，识别后复制，Esc 取消"
+        case .screenshot:
+            break
+        }
         return switch mode {
         case .region: "拖拽选择截屏区域，Esc 取消"
         case .smart: "单击窗口或拖拽选择区域，Esc 取消"
@@ -60,7 +67,7 @@ struct CaptureOverlayView: View {
                 onSelectionEnd: { cgRect in
                     captureRect = cgRect
                     selection = localRect(fromCG: cgRect)
-                    if isOCRSelection {
+                    if isTextRecognitionSelection {
                         delegate?.overlayDidSelectOCRRegion(cgRect)
                         return
                     }

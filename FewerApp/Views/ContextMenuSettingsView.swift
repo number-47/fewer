@@ -39,7 +39,7 @@ struct ContextMenuSettingsView: View {
                                 .labelsHidden()
                             }
                             .listRowInsets(EdgeInsets())
-                            .listRowBackground(Color.white)
+                            .listRowBackground(Color(nsColor: .controlBackgroundColor))
                         }
                         .onMove { offsets, destination in
                             model.moveFeatures(from: offsets, to: destination)
@@ -161,6 +161,7 @@ private extension FewerFeature {
         case .newFolder: "新建文件夹"
         case .copyPath: "复制路径"
         case .copyAs: "复制为"
+        case .batchRename: "批量重命名"
         case .cut: "剪切"
         case .paste: "粘贴"
         case .openInTerminal: "在终端打开"

@@ -11,15 +11,18 @@ final class ScreenshotService: CaptureOverlayDelegate {
     private var rollingController: RollingCaptureController?
     private var captureTargetApplication: NSRunningApplication?
     private(set) var currentMode: ScreenshotMode?
+    private var currentPurpose: ScreenshotCapturePurpose?
     private var didShowPermissionRecoveryThisLaunch = false
     private var captureSessions = ScreenshotCaptureSessionGate()
     private let ocrCoordinator = OCRTranslationCoordinator.shared
+    private let ocrCopyCoordinator = OCRCopyCoordinator.shared
     private var preservesOCRResultDuringCapture = false
 
     private init() {}
 
     /// 进入指定截屏模式。全屏直接捕获；区域/窗口显示遮罩。
     func begin(_ mode: ScreenshotMode) {
+        ocrCopyCoordinator.cancel()
         begin(ScreenshotCaptureIntent(mode: mode))
     }
 
@@ -29,13 +32,30 @@ final class ScreenshotService: CaptureOverlayDelegate {
         preservesOCRResultDuringCapture = false
         OCRTranslationWindowController.shared.setDismissalSuppressed(false)
         ocrCoordinator.cancel()
+        ocrCopyCoordinator.cancel()
         if captureSessions.hasActiveSession {
             captureSessions.cancel()
             currentMode = nil
+            currentPurpose = nil
             dismissOverlay()
             setKeycastSuppressed(false)
         }
         begin(.ocrTranslation)
+    }
+
+    func beginOCRCopy() {
+        preservesOCRResultDuringCapture = false
+        OCRTranslationWindowController.shared.setDismissalSuppressed(false)
+        ocrCoordinator.cancel()
+        ocrCopyCoordinator.cancel()
+        if captureSessions.hasActiveSession {
+            captureSessions.cancel()
+            currentMode = nil
+            currentPurpose = nil
+            dismissOverlay()
+            setKeycastSuppressed(false)
+        }
+        begin(.ocrCopy)
     }
 
     /// OCR 通过独立 purpose 复用截图交互，不改变既有 ScreenshotMode。
@@ -62,12 +82,15 @@ final class ScreenshotService: CaptureOverlayDelegate {
         // 上一张结果窗口不能继续留在屏幕上，否则新的区域/全屏截图会再次截到旧图。
         ScreenshotResultWindowController.shared.close()
         if intent.purpose == .screenshot {
+            ocrCopyCoordinator.cancel()
             preservesOCRResultDuringCapture = true
             OCRTranslationWindowController.shared.setDismissalSuppressed(true)
         } else {
             ocrCoordinator.cancel()
+            ocrCopyCoordinator.cancel()
         }
         currentMode = intent.mode
+        currentPurpose = intent.purpose
         captureTargetApplication = NSWorkspace.shared.frontmostApplication
         switch intent.mode {
         case .fullscreen:
@@ -174,6 +197,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
                 self.rollingController = nil
                 self.captureSessions.cancel()
                 self.currentMode = nil
+                self.currentPurpose = nil
                 self.restoreOCRResultDismissal()
                 self.setKeycastSuppressed(false)
             }
@@ -185,6 +209,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
               captureSessions.complete(captureID)
         else { return }
         currentMode = nil
+        currentPurpose = nil
         dismissOverlay()
         restoreOCRResultDismissal()
         setKeycastSuppressed(false)
@@ -195,6 +220,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
               captureSessions.complete(captureID)
         else { return }
         currentMode = nil
+        currentPurpose = nil
         dismissOverlay()
         restoreOCRResultDismissal()
         setKeycastSuppressed(false)
@@ -206,8 +232,18 @@ final class ScreenshotService: CaptureOverlayDelegate {
     }
 
     func overlayDidSelectOCRRegion(_ cgRect: CGRect) {
-        guard let captureID = captureSessions.activeID else { return }
-        ocrCoordinator.start()
+        guard let captureID = captureSessions.activeID,
+              let purpose = currentPurpose,
+              purpose != .screenshot
+        else { return }
+        switch purpose {
+        case .ocrTranslation:
+            ocrCoordinator.start()
+        case .ocrCopy:
+            ocrCopyCoordinator.start()
+        case .screenshot:
+            return
+        }
         let selection = Self.appKitRect(fromCaptureRect: cgRect)
         let screen = NSScreen.screens.first(where: { $0.frame.intersects(selection) }) ?? NSScreen.main
         dismissOverlay()
@@ -220,18 +256,29 @@ final class ScreenshotService: CaptureOverlayDelegate {
                     let capturedImage = try await ScreenshotCapture.rollingRegionImage(cgRect)
                     guard self.captureSessions.complete(captureID) else { return }
                     self.currentMode = nil
+                    self.currentPurpose = nil
                     self.setKeycastSuppressed(false)
                     guard let image = OCRCaptureImageBudget.downsampled(capturedImage) else {
                         self.ocrCoordinator.cancel()
+                        self.ocrCopyCoordinator.cancel()
                         OCRTranslationWindowController.shared.showFeedback("截图失败", near: selection, on: screen)
                         return
                     }
-                    self.ocrCoordinator.recognize(image: image, selection: selection, on: screen)
+                    switch purpose {
+                    case .ocrTranslation:
+                        self.ocrCoordinator.recognize(image: image, selection: selection, on: screen)
+                    case .ocrCopy:
+                        self.ocrCopyCoordinator.recognize(image: image, selection: selection, on: screen)
+                    case .screenshot:
+                        break
+                    }
                 } catch {
                     guard self.captureSessions.complete(captureID) else { return }
                     self.currentMode = nil
+                    self.currentPurpose = nil
                     self.setKeycastSuppressed(false)
                     self.ocrCoordinator.cancel()
+                    self.ocrCopyCoordinator.cancel()
                     OCRTranslationWindowController.shared.showFeedback("截图失败", near: selection, on: screen)
                 }
             }
@@ -244,6 +291,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
         guard captureSessions.complete(captureID) else { return }
         Self.debugLog("finish")
         currentMode = nil
+        currentPurpose = nil
         restoreOCRResultDismissal()
         setKeycastSuppressed(false)
         guard let pngData = Self.pngData(from: image, pointSize: pointSize) else {
@@ -268,8 +316,10 @@ final class ScreenshotService: CaptureOverlayDelegate {
             restoreOCRResultDismissal()
         } else {
             ocrCoordinator.cancel()
+            ocrCopyCoordinator.cancel()
         }
         currentMode = nil
+        currentPurpose = nil
         dismissOverlay()
         setKeycastSuppressed(false)
     }
@@ -289,6 +339,7 @@ final class ScreenshotService: CaptureOverlayDelegate {
     private func captureFailed(message: String) {
         captureSessions.cancel()
         currentMode = nil
+        currentPurpose = nil
         dismissOverlay()
         restoreOCRResultDismissal()
         setKeycastSuppressed(false)

@@ -220,7 +220,7 @@ struct MonitorModuleContent: View {
             switch moduleID {
             case .cpu: CPUDetailsView(
                 snapshot: metrics.current.cpu,
-                history: metrics.history.compactMap { $0.cpu?.total },
+                history: metrics.history.compactMap(\.cpuUsage),
                 processes: metrics.current.cpuProcesses
             )
             case .gpu: GPUDetailsView(
@@ -230,7 +230,7 @@ struct MonitorModuleContent: View {
             )
             case .memory: MemoryDetailsView(
                 snapshot: metrics.current.memory,
-                history: metrics.history.compactMap { $0.memory?.usageRatio },
+                history: metrics.history.compactMap(\.memoryUsage),
                 processes: metrics.current.memoryProcesses
             )
             case .disk: DiskDetailsView(
@@ -259,7 +259,7 @@ struct MonitorModuleContent: View {
 
     private var gpuHistory: [Double] {
         guard let deviceID = metrics.current.gpu?.selectedDevice?.id else { return [] }
-        return metrics.history.compactMap { $0.gpu?.device(id: deviceID)?.utilization }
+        return metrics.history.compactMap { $0.gpuUtilization(for: deviceID) }
     }
 }
 
@@ -392,7 +392,7 @@ private struct MonitorDualTrendGraph: View {
 
 private struct DiskDetailsView: View {
     let snapshot: DiskSnapshot?
-    let history: [DiskSnapshot]
+    let history: [MonitorDiskHistoryPoint]
 
     var body: some View {
         Group {

@@ -50,6 +50,13 @@ public struct MenuBuilder: Sendable {
             case (.items, .copyAs) where !context.selectedURLs.isEmpty:
                 return copyAsMenu()
 
+            case (.items, .batchRename) where context.selectedURLs.count >= 2:
+                return MenuEntry(
+                    command: .batchRename,
+                    title: "批量重命名",
+                    isEnabled: context.isTargetWritable
+                )
+
             case (.container, .copyAs):
                 return copyAsMenu()
 

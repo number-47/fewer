@@ -13,9 +13,8 @@ struct RootSettingsView: View {
         }
         .disabled(model.isLoading)
         .frame(minWidth: 880, minHeight: 600)
-        .background(Color.white)
+        .background(Color(nsColor: .windowBackgroundColor))
         .tint(Color(red: 0, green: 113 / 255, blue: 227 / 255))
-        .preferredColorScheme(.light)
         .task { await model.load() }
         .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.navigateNotification)) { notification in
             if let raw = notification.userInfo?["section"] as? String,
@@ -40,7 +39,7 @@ struct RootSettingsView: View {
             .padding(.vertical, 12)
         }
         .frame(width: 200)
-        .background(Color(red: 251 / 255, green: 251 / 255, blue: 253 / 255))
+        .background(Color(nsColor: .underPageBackgroundColor))
     }
 
     private func sidebarItem(_ section: SettingsSection) -> some View {
@@ -138,9 +137,9 @@ struct FewerSettingsCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             content
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+            .strokeBorder(Color(nsColor: .separatorColor)))
     }
 }
 

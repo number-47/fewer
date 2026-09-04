@@ -77,9 +77,9 @@ struct OverviewView: View {
 
     private func group<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0, content: content)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+                .strokeBorder(Color(nsColor: .separatorColor)))
     }
 
     private func statusRow(_ title: String, _ detail: String, _ status: String, _ okay: Bool) -> some View {

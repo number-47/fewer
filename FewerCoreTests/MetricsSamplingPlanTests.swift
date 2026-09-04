@@ -158,4 +158,69 @@ final class MetricsSamplingPlanTests: XCTestCase {
         let plan5 = MetricsSamplingPlan.plan(tick: coordinator.tick, activeModules: active)
         XCTAssertEqual(plan5.modulesToSample, [.cpu, .gpu])
     }
+
+    // MARK: - Lightweight history
+
+    func testMonitorHistoryPointLooksUpGPUByDeviceID() {
+        let point = MonitorHistoryPoint(
+            date: Date(timeIntervalSinceReferenceDate: 100),
+            cpuUsage: 0.25,
+            gpuUtilizationByDeviceID: ["gpu-1": 0.5],
+            memoryUsage: 0.75,
+            disk: MonitorDiskHistoryPoint(
+                usageRatio: 0.4,
+                readBytesPerSecond: 1_000,
+                writeBytesPerSecond: 2_000
+            ),
+            networkInBytesPerSecond: 3_000,
+            networkOutBytesPerSecond: 4_000
+        )
+
+        XCTAssertEqual(point.gpuUtilization(for: "gpu-1"), 0.5)
+        XCTAssertNil(point.gpuUtilization(for: "gpu-2"))
+        XCTAssertEqual(point.disk?.usageRatio, 0.4)
+    }
+
+    func testMonitorHistoryRetentionDropsOnlyPointsOlderThanMaximumAge() {
+        let now = Date(timeIntervalSinceReferenceDate: 10_000)
+        var history = [
+            historyPoint(date: now.addingTimeInterval(-3_601)),
+            historyPoint(date: now.addingTimeInterval(-3_600)),
+            historyPoint(date: now.addingTimeInterval(-10)),
+        ]
+        let latest = historyPoint(date: now)
+
+        MonitorHistoryRetention.append(latest, to: &history, now: now)
+
+        XCTAssertEqual(history.map(\.date), [
+            now.addingTimeInterval(-3_600),
+            now.addingTimeInterval(-10),
+            now,
+        ])
+    }
+
+    func testMonitorHistoryRetentionKeepsFuturePointAndNewSample() {
+        let now = Date(timeIntervalSinceReferenceDate: 20_000)
+        var history = [historyPoint(date: now.addingTimeInterval(10))]
+        let latest = historyPoint(date: now.addingTimeInterval(20))
+
+        MonitorHistoryRetention.append(latest, to: &history, now: now)
+
+        XCTAssertEqual(history.map(\.date), [
+            now.addingTimeInterval(10),
+            now.addingTimeInterval(20),
+        ])
+    }
+
+    private func historyPoint(date: Date) -> MonitorHistoryPoint {
+        MonitorHistoryPoint(
+            date: date,
+            cpuUsage: nil,
+            gpuUtilizationByDeviceID: [:],
+            memoryUsage: nil,
+            disk: nil,
+            networkInBytesPerSecond: 0,
+            networkOutBytesPerSecond: 0
+        )
+    }
 }

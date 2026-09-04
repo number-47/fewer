@@ -189,3 +189,83 @@ final class OCRTranslationCoordinator {
         presentCurrentTranslation(generation: generation)
     }
 }
+
+/// 管理“截图识别并复制”的单次 OCR 任务；识别文本只在成功时写入系统剪贴板。
+@MainActor
+final class OCRCopyCoordinator {
+    static let shared = OCRCopyCoordinator()
+
+    private var generation: UInt64 = 0
+    private var recognitionTask: Task<Void, Never>?
+
+    private init() {}
+
+    func start() {
+        cancel()
+        generation &+= 1
+    }
+
+    func recognize(image: CGImage, selection: CGRect, on screen: NSScreen?) {
+        let currentGeneration = generation
+        recognitionTask = Task { [weak self] in
+            do {
+                let result = try await VisionOCRService.shared.recognize(image: image)
+                guard !Task.isCancelled else { return }
+                self?.receive(result, selection: selection, screen: screen, generation: currentGeneration)
+            } catch {
+                guard !Task.isCancelled else { return }
+                self?.fail(selection: selection, screen: screen, generation: currentGeneration)
+            }
+        }
+    }
+
+    func cancel() {
+        generation &+= 1
+        recognitionTask?.cancel()
+        recognitionTask = nil
+    }
+
+    private func receive(_ result: OCRResult, selection: CGRect, screen: NSScreen?, generation: UInt64) {
+        guard generation == self.generation else { return }
+        recognitionTask = nil
+        guard let text = OCRClipboardText.copyableText(from: result.fullText) else {
+            OCRTranslationWindowController.shared.showFeedback("未识别到文字", near: selection, on: screen)
+            return
+        }
+        let pasteboard = NSPasteboard.general
+        let previousItems = Self.copyPasteboardItems(pasteboard.pasteboardItems)
+        let textItem = NSPasteboardItem()
+        guard textItem.setString(text, forType: .string) else {
+            OCRTranslationWindowController.shared.showFeedback("复制失败", near: selection, on: screen)
+            return
+        }
+        pasteboard.clearContents()
+        guard pasteboard.writeObjects([textItem]) else {
+            pasteboard.clearContents()
+            if !previousItems.isEmpty {
+                _ = pasteboard.writeObjects(previousItems)
+            }
+            OCRTranslationWindowController.shared.showFeedback("复制失败", near: selection, on: screen)
+            return
+        }
+        OCRTranslationWindowController.shared.showFeedback("识别文字已复制", near: selection, on: screen)
+    }
+
+    private func fail(selection: CGRect, screen: NSScreen?, generation: UInt64) {
+        guard generation == self.generation else { return }
+        recognitionTask = nil
+        OCRTranslationWindowController.shared.showFeedback("文字识别失败", near: selection, on: screen)
+    }
+
+    private static func copyPasteboardItems(_ items: [NSPasteboardItem]?) -> [NSPasteboardItem] {
+        (items ?? []).map { source in
+            let copy = NSPasteboardItem()
+            for type in source.types {
+                if let data = source.data(forType: type) {
+                    copy.setData(data, forType: type)
+                }
+            }
+            return copy
+        }
+    }
+}

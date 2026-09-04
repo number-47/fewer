@@ -361,8 +361,8 @@ struct PermissionsSettingsView: View {
             Divider()
             content()
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+            .strokeBorder(Color(nsColor: .separatorColor)))
     }
 }

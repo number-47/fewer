@@ -5,6 +5,7 @@ public enum FewerFeature: String, Codable, CaseIterable, Identifiable, Sendable 
     case newFolder
     case copyPath
     case copyAs
+    case batchRename
     case cut
     case paste
     case openInTerminal
@@ -45,8 +46,8 @@ public enum ConflictPolicy: String, Codable, CaseIterable, Identifiable, Sendabl
 }
 
 public struct FeatureSettings: Codable, Equatable, Sendable {
-    /// 当前配置结构版本：v2 起新增"在终端打开"功能；v3 起支持自定义终端应用；v4 起新增"刷新"功能。
-    public static let currentSchemaVersion = 5
+    /// 当前配置结构版本：v2 起新增"在终端打开"；v4 起新增"刷新"；v5 起补齐 Finder 功能；v6 起新增批量重命名。
+    public static let currentSchemaVersion = 6
 
     /// "在终端打开"默认使用的终端应用 Bundle Identifier。
     public static let defaultTerminalBundleID = "com.apple.Terminal"
@@ -151,6 +152,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             for feature in [FewerFeature.newFolder, .copyAs, .openWith] {
                 enabledFeatures.insert(feature)
                 if !menuOrder.contains(feature) { menuOrder.append(feature) }
+            }
+        }
+        if schemaVersion < 6 {
+            enabledFeatures.insert(.batchRename)
+            if !menuOrder.contains(.batchRename) {
+                menuOrder.append(.batchRename)
             }
         }
         if schemaVersion < Self.currentSchemaVersion {

@@ -43,6 +43,67 @@ final class MenuBuilderTests: XCTestCase {
         ])
     }
 
+    func testBatchRenameOnlyAppearsForMultipleSelectedItems() {
+        let single = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [target.appendingPathComponent("A.txt")],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+        let multiple = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [
+                target.appendingPathComponent("A.txt"),
+                target.appendingPathComponent("B.txt"),
+            ],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        XCTAssertFalse(MenuBuilder().entries(for: single, settings: .default, templates: [])
+            .contains(where: { $0.command == .batchRename }))
+        XCTAssertTrue(MenuBuilder().entries(for: multiple, settings: .default, templates: [])
+            .contains(where: { $0.command == .batchRename }))
+    }
+
+    func testBatchRenameCanBeDisabled() {
+        var settings = FeatureSettings.default
+        settings.enabledFeatures.remove(.batchRename)
+        let context = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [
+                target.appendingPathComponent("A.txt"),
+                target.appendingPathComponent("B.txt"),
+            ],
+            targetURL: target,
+            isTargetWritable: true,
+            hasCutTransaction: false
+        )
+
+        XCTAssertFalse(MenuBuilder().entries(for: context, settings: settings, templates: [])
+            .contains(where: { $0.command == .batchRename }))
+    }
+
+    func testBatchRenameIsDisabledForReadOnlyTarget() {
+        let context = FinderMenuContext(
+            kind: .items,
+            selectedURLs: [
+                target.appendingPathComponent("A.txt"),
+                target.appendingPathComponent("B.txt"),
+            ],
+            targetURL: target,
+            isTargetWritable: false,
+            hasCutTransaction: false
+        )
+
+        let entry = MenuBuilder().entries(for: context, settings: .default, templates: [])
+            .first(where: { $0.command == .batchRename })
+
+        XCTAssertEqual(entry?.isEnabled, false)
+    }
+
     func testDisabledFeatureIsRemovedAndOrderIsRespected() {
         var settings = FeatureSettings.default
         settings.enabledFeatures.remove(.cut)

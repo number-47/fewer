@@ -79,9 +79,9 @@ struct ModuleSettingsView: View {
                 }
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+            .strokeBorder(Color(nsColor: .separatorColor)))
     }
 
     private func monitorCard(_ monitorID: SystemMonitorModuleID) -> some View {
@@ -103,9 +103,9 @@ struct ModuleSettingsView: View {
             }
             .padding(16)
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+            .strokeBorder(Color(nsColor: .separatorColor)))
     }
 
     private func standardModuleCard(_ descriptor: ModuleDescriptor) -> some View {
@@ -121,9 +121,9 @@ struct ModuleSettingsView: View {
                 moduleRow("菜单栏独立图标", "点击显示完整日历", statusItemBinding(descriptor.id))
             }
         }
-        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Color(red: 232 / 255, green: 232 / 255, blue: 237 / 255)))
+            .strokeBorder(Color(nsColor: .separatorColor)))
     }
 
     private func isEnabledBinding(_ moduleID: String) -> Binding<Bool> {

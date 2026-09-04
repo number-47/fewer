@@ -6,6 +6,7 @@ public enum MenuCommand: Equatable, Sendable {
     case createFromTemplate(UUID)
     case copyPath
     case copyAs(FinderCopyFormat)
+    case batchRename
     case cut
     case pasteHere
     case pasteIntoFolder

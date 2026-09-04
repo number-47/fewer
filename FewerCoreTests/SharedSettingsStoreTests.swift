@@ -60,7 +60,7 @@ final class SharedSettingsStoreTests: XCTestCase {
         let result = SharedSettingsStore(defaults: defaults).load()
 
         XCTAssertEqual(result.settings.enabledFeatures, [
-            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith, .batchRename,
         ])
         XCTAssertEqual(result.settings.menuOrder, FewerFeature.allCases)
         XCTAssertEqual(result.settings.conflictPolicy, .keepBoth)
@@ -78,9 +78,11 @@ final class SharedSettingsStoreTests: XCTestCase {
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
         XCTAssertEqual(result.settings.enabledFeatures, [
             .copyPath, .cut, .paste, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+            .batchRename,
         ])
         XCTAssertEqual(result.settings.menuOrder, [
             .cut, .copyPath, .paste, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+            .batchRename,
         ])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
@@ -106,7 +108,7 @@ final class SharedSettingsStoreTests: XCTestCase {
         XCTAssertEqual(result.settings.schemaVersion, FeatureSettings.currentSchemaVersion)
         XCTAssertTrue(result.settings.enabledFeatures.contains(.refresh))
         XCTAssertEqual(result.settings.menuOrder, [
-            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith,
+            .copyPath, .openInTerminal, .refresh, .newFolder, .copyAs, .openWith, .batchRename,
         ])
         XCTAssertEqual(result.settings.terminalBundleID, FeatureSettings.defaultTerminalBundleID)
     }
@@ -117,9 +119,19 @@ final class SharedSettingsStoreTests: XCTestCase {
 
         let settings = SharedSettingsStore(defaults: defaults).load().settings
 
-        XCTAssertEqual(settings.enabledFeatures, [.copyPath, .newFolder, .copyAs, .openWith])
-        XCTAssertEqual(settings.menuOrder, [.copyPath, .newFolder, .copyAs, .openWith])
+        XCTAssertEqual(settings.enabledFeatures, [.copyPath, .newFolder, .copyAs, .openWith, .batchRename])
+        XCTAssertEqual(settings.menuOrder, [.copyPath, .newFolder, .copyAs, .openWith, .batchRename])
         XCTAssertFalse(settings.openWithApplications.isEmpty)
+    }
+
+    func testV5PayloadMigratesBatchRenameWithoutReorderingChoices() throws {
+        let v5 = Data(#"{"schemaVersion":5,"enabledFeatures":["copyPath"],"menuOrder":["copyPath"]}"#.utf8)
+        defaults.set(v5, forKey: AppGroupConstants.featureSettingsKey)
+
+        let settings = SharedSettingsStore(defaults: defaults).load().settings
+
+        XCTAssertEqual(settings.enabledFeatures, [.copyPath, .batchRename])
+        XCTAssertEqual(settings.menuOrder, [.copyPath, .batchRename])
     }
 
     func testCustomTerminalBundleIDRoundTrips() throws {

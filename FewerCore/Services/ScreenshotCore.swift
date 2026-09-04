@@ -134,6 +134,7 @@ public enum ScreenshotMode: Equatable, Sendable {
 public enum ScreenshotCapturePurpose: Equatable, Sendable {
     case screenshot
     case ocrTranslation
+    case ocrCopy
 }
 
 /// 截图交互模式与完成后用途的组合。
@@ -147,6 +148,7 @@ public struct ScreenshotCaptureIntent: Equatable, Sendable {
     }
 
     public static let ocrTranslation = ScreenshotCaptureIntent(mode: .region, purpose: .ocrTranslation)
+    public static let ocrCopy = ScreenshotCaptureIntent(mode: .region, purpose: .ocrCopy)
 }
 
 /// OCR 仅为异常大的原始截图降采样，普通文字截图始终保留原始物理像素。
@@ -248,6 +250,13 @@ public struct OCRResult: Equatable, Sendable {
             }
         }
         self.detectedLanguageCode = detectedLanguageCode
+    }
+}
+
+public enum OCRClipboardText {
+    public static func copyableText(from rawText: String) -> String? {
+        let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
     }
 }
 

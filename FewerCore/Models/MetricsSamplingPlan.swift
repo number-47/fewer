@@ -63,3 +63,69 @@ public struct SamplingCoordinator: Sendable {
         resultGeneration == generation
     }
 }
+
+/// 系统监控图表的一次轻量历史采样，不持有进程列表或当前详情快照。
+public struct MonitorHistoryPoint: Equatable, Sendable {
+    public let date: Date
+    public let cpuUsage: Double?
+    public let gpuUtilizationByDeviceID: [String: Double]
+    public let memoryUsage: Double?
+    public let disk: MonitorDiskHistoryPoint?
+    public let networkInBytesPerSecond: Double
+    public let networkOutBytesPerSecond: Double
+
+    public init(
+        date: Date,
+        cpuUsage: Double?,
+        gpuUtilizationByDeviceID: [String: Double],
+        memoryUsage: Double?,
+        disk: MonitorDiskHistoryPoint?,
+        networkInBytesPerSecond: Double,
+        networkOutBytesPerSecond: Double
+    ) {
+        self.date = date
+        self.cpuUsage = cpuUsage
+        self.gpuUtilizationByDeviceID = gpuUtilizationByDeviceID
+        self.memoryUsage = memoryUsage
+        self.disk = disk
+        self.networkInBytesPerSecond = networkInBytesPerSecond
+        self.networkOutBytesPerSecond = networkOutBytesPerSecond
+    }
+
+    public func gpuUtilization(for deviceID: String) -> Double? {
+        gpuUtilizationByDeviceID[deviceID]
+    }
+}
+
+public struct MonitorDiskHistoryPoint: Equatable, Sendable {
+    public let usageRatio: Double
+    public let readBytesPerSecond: Double?
+    public let writeBytesPerSecond: Double?
+
+    public init(
+        usageRatio: Double,
+        readBytesPerSecond: Double?,
+        writeBytesPerSecond: Double?
+    ) {
+        self.usageRatio = usageRatio
+        self.readBytesPerSecond = readBytesPerSecond
+        self.writeBytesPerSecond = writeBytesPerSecond
+    }
+}
+
+public enum MonitorHistoryRetention {
+    public static func append(
+        _ point: MonitorHistoryPoint,
+        to history: inout [MonitorHistoryPoint],
+        now: Date = .now,
+        maximumAge: TimeInterval = 3_600
+    ) {
+        history.append(point)
+        let expiredCount = history.prefix {
+            now.timeIntervalSince($0.date) > maximumAge
+        }.count
+        if expiredCount > 0 {
+            history.removeFirst(expiredCount)
+        }
+    }
+}

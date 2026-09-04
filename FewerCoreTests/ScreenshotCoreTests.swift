@@ -109,6 +109,22 @@ final class ScreenshotCoreTests: XCTestCase {
         XCTAssertEqual(ScreenshotHotKeyAction.ocrTranslation.captureIntent.purpose, .ocrTranslation)
     }
 
+    func testOCRCopyUsesIndependentCapturePurpose() {
+        XCTAssertEqual(ScreenshotCaptureIntent.ocrCopy.mode, .region)
+        XCTAssertEqual(ScreenshotCaptureIntent.ocrCopy.purpose, .ocrCopy)
+    }
+
+    func testOCRClipboardTextRejectsWhitespace() {
+        XCTAssertNil(OCRClipboardText.copyableText(from: "  \n\t "))
+    }
+
+    func testOCRClipboardTextTrimsOuterWhitespace() {
+        XCTAssertEqual(
+            OCRClipboardText.copyableText(from: "  第一行\n第二行  "),
+            "第一行\n第二行"
+        )
+    }
+
     func testOCRCaptureImageBudgetPreservesSmallRetinaImageSize() {
         let size = CGSize(width: 3_024, height: 1_964)
 

@@ -65,6 +65,147 @@ final class FileOperationCoordinatorTests: XCTestCase {
         XCTAssertEqual(result.items.first?.error, .destinationInsideSource)
     }
 
+    // MARK: - Batch rename
+
+    func testBatchRenameRulePreservesExtension() {
+        let rule = BatchRenameRule(
+            findText: "Report",
+            replacementText: "Invoice",
+            prefix: "2026-",
+            suffix: "-final",
+            addsSequenceNumber: true,
+            sequenceStart: 3
+        )
+
+        XCTAssertEqual(
+            rule.renamedName(for: "Report.txt", isDirectory: false, index: 0),
+            "2026-Invoice-final 3.txt"
+        )
+        XCTAssertEqual(
+            rule.renamedName(for: "Folder.name", isDirectory: true, index: 1),
+            "2026-Folder.name-final 4"
+        )
+    }
+
+    func testBatchRenamePlannerRejectsDuplicateDestinations() {
+        let first = source.appendingPathComponent("A.txt")
+        let second = source.appendingPathComponent("B.txt")
+        let rule = BatchRenameRule(findText: "A", replacementText: "B")
+
+        let plan = BatchRenamePlanner.plan(
+            urls: [first, second],
+            rule: rule,
+            fileExists: { _ in false },
+            isDirectory: { _ in false }
+        )
+
+        XCTAssertFalse(plan.canExecute)
+        XCTAssertTrue(plan.issues.contains {
+            if case .duplicateDestination = $0 { return true }
+            return false
+        })
+    }
+
+    func testBatchRenamePlannerRejectsInvalidAndExternalDestination() {
+        let first = source.appendingPathComponent("A.txt")
+        let second = source.appendingPathComponent("B.txt")
+        let invalid = BatchRenamePlanner.plan(
+            urls: [first, second],
+            rule: BatchRenameRule(prefix: "/"),
+            fileExists: { _ in false },
+            isDirectory: { _ in false }
+        )
+        XCTAssertTrue(invalid.issues.contains {
+            if case .invalidName = $0 { return true }
+            return false
+        })
+
+        let external = BatchRenamePlanner.plan(
+            urls: [first, second],
+            rule: BatchRenameRule(prefix: "New-"),
+            fileExists: { $0.lastPathComponent == "New-A.txt" },
+            isDirectory: { _ in false }
+        )
+        XCTAssertTrue(external.issues.contains {
+            if case .destinationExists = $0 { return true }
+            return false
+        })
+    }
+
+    func testBatchRenamePlannerRejectsEmptyNameAndNoChanges() {
+        let first = source.appendingPathComponent("A")
+        let second = source.appendingPathComponent("B")
+        let emptyName = BatchRenamePlanner.plan(
+            urls: [first, second],
+            rule: BatchRenameRule(findText: "A", replacementText: ""),
+            fileExists: { _ in false },
+            isDirectory: { _ in false }
+        )
+        XCTAssertTrue(emptyName.issues.contains {
+            if case let .invalidName(sourceURL, proposedName) = $0 {
+                return sourceURL == first && proposedName.isEmpty
+            }
+            return false
+        })
+
+        let noChanges = BatchRenamePlanner.plan(
+            urls: [first, second],
+            rule: BatchRenameRule(),
+            fileExists: { _ in false },
+            isDirectory: { _ in false }
+        )
+        XCTAssertEqual(noChanges.issues, [.noChanges])
+        XCTAssertFalse(noChanges.canExecute)
+    }
+
+    func testBatchRenameSupportsNameSwap() async throws {
+        let a = source.appendingPathComponent("A.txt")
+        let b = source.appendingPathComponent("B.txt")
+        try Data("A".utf8).write(to: a)
+        try Data("B".utf8).write(to: b)
+        let plan = BatchRenamePlan(
+            items: [
+                BatchRenameItem(sourceURL: a, destinationURL: b),
+                BatchRenameItem(sourceURL: b, destinationURL: a),
+            ],
+            issues: []
+        )
+
+        let result = await FileOperationCoordinator().batchRename(plan)
+
+        XCTAssertEqual(result.outcome, .success)
+        XCTAssertEqual(try Data(contentsOf: a), Data("B".utf8))
+        XCTAssertEqual(try Data(contentsOf: b), Data("A".utf8))
+        XCTAssertFalse(hasRenameRemnant(in: source))
+    }
+
+    func testBatchRenameInstallFailureRollsBackOriginalNames() async throws {
+        let a = source.appendingPathComponent("A.txt")
+        let b = source.appendingPathComponent("B.txt")
+        try Data("A".utf8).write(to: a)
+        try Data("B".utf8).write(to: b)
+        let plan = BatchRenamePlan(
+            items: [
+                BatchRenameItem(sourceURL: a, destinationURL: source.appendingPathComponent("One.txt")),
+                BatchRenameItem(sourceURL: b, destinationURL: source.appendingPathComponent("Two.txt")),
+            ],
+            issues: []
+        )
+        let injector = BatchRenameFailureInjector { phase in
+            if phase == .install(1) {
+                throw TestReplaceError.simulated
+            }
+        }
+
+        let result = await FileOperationCoordinator().batchRename(plan, failureInjector: injector)
+
+        XCTAssertEqual(result.outcome, .failedRolledBack)
+        XCTAssertEqual(try Data(contentsOf: a), Data("A".utf8))
+        XCTAssertEqual(try Data(contentsOf: b), Data("B".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.appendingPathComponent("One.txt").path))
+        XCTAssertFalse(hasRenameRemnant(in: source))
+    }
+
     // MARK: - Recoverable replace
 
     private enum TestReplaceError: Error { case simulated }
@@ -169,6 +310,11 @@ final class FileOperationCoordinatorTests: XCTestCase {
 
     private func hasBackupRemnant(in directory: URL) -> Bool {
         !backupRemnants(in: directory).isEmpty
+    }
+
+    private func hasRenameRemnant(in directory: URL) -> Bool {
+        let entries = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return entries.contains { $0.lastPathComponent.hasPrefix(".fewer-rename-") }
     }
 
     private func backupRemnants(in directory: URL) -> [URL] {

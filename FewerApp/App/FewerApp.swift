@@ -257,19 +257,24 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         for moduleID: SystemMonitorModuleID,
         kind: MonitorWidgetKind?,
         metrics: SystemMetricsSnapshot,
-        history: [SystemMetricsSnapshot]
+        history: [MonitorHistoryPoint]
     ) -> [Double] {
         switch moduleID {
         case .cpu:
-            return history.compactMap { $0.cpu?.total }
+            return history.compactMap(\.cpuUsage)
         case .gpu:
             guard let deviceID = metrics.gpu?.selectedDevice?.id else { return [] }
-            return history.compactMap { $0.gpu?.device(id: deviceID)?.utilization }
+            return history.compactMap { $0.gpuUtilization(for: deviceID) }
         case .memory:
-            return history.compactMap { $0.memory?.usageRatio }
+            return history.compactMap(\.memoryUsage)
         case .disk:
             if kind == .throughputChart {
-                return history.compactMap { diskThroughputLevel($0.disk) }
+                return history.compactMap {
+                    diskThroughputLevel(
+                        readBytesPerSecond: $0.disk?.readBytesPerSecond,
+                        writeBytesPerSecond: $0.disk?.writeBytesPerSecond
+                    )
+                }
             }
             return history.compactMap { $0.disk?.usageRatio }
         case .network:
@@ -288,9 +293,20 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     private func diskThroughputLevel(_ disk: DiskSnapshot?) -> Double? {
-        guard let disk else { return nil }
-        let rate = max(disk.readBytesPerSecond ?? 0, disk.writeBytesPerSecond ?? 0)
-        guard rate > 0 else { return disk.readBytesPerSecond == nil && disk.writeBytesPerSecond == nil ? nil : 0 }
+        diskThroughputLevel(
+            readBytesPerSecond: disk?.readBytesPerSecond,
+            writeBytesPerSecond: disk?.writeBytesPerSecond
+        )
+    }
+
+    private func diskThroughputLevel(
+        readBytesPerSecond: Double?,
+        writeBytesPerSecond: Double?
+    ) -> Double? {
+        let rate = max(readBytesPerSecond ?? 0, writeBytesPerSecond ?? 0)
+        guard rate > 0 else {
+            return readBytesPerSecond == nil && writeBytesPerSecond == nil ? nil : 0
+        }
         return min(rate / (100 * 1_024 * 1_024), 1)
     }
 
