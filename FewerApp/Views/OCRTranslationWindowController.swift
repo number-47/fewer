@@ -11,6 +11,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
     private var feedbackPanel: NSPanel?
     private var feedbackDismissTask: Task<Void, Never>?
     private var viewModel: OCRTranslationViewModel?
+    private var pinButton: NSButton?
     private var onDismiss: (() -> Void)?
     private var isDismissalSuppressed = false
     private var isPinned = false
@@ -63,7 +64,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         let maximumContentSize = panel.contentRect(
             forFrameRect: NSRect(origin: .zero, size: maximumFrameSize)
         ).size
-        let initialFrameWidth = min(maximumFrameSize.width, 520)
+        let initialFrameWidth = min(maximumFrameSize.width, 390)
         let initialContentWidth = max(
             panel.contentRect(
                 forFrameRect: NSRect(
@@ -80,6 +81,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         let position = screenshotSettingsStore.load().ocrTranslationWindowPosition
         panel.identifier = NSUserInterfaceItemIdentifier("ocr-translation-result")
         panel.title = "截图翻译"
+        installPinButton(on: panel)
         panel.minSize = NSSize(
             width: min(360, maximumFrameSize.width),
             height: min(260, maximumFrameSize.height)
@@ -92,9 +94,6 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         panel.delegate = self
         let hostingController = NSHostingController(rootView: OCRTranslationView(
             model: viewModel,
-            onPinToggleRequested: { [weak self] in
-                self?.togglePinned()
-            },
             onPreferredContentHeightChange: { [weak self] height in
                 Task { @MainActor [weak self] in
                     self?.updatePreferredContentHeight(height)
@@ -232,13 +231,44 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
 
     private func setPinned(_ pinned: Bool) {
         isPinned = pinned
-        viewModel?.setPinned(pinned)
+        updatePinButton()
         guard pinned, let panel else { return }
         panel.hidesOnDeactivate = false
         panel.level = isDismissalSuppressed
             ? NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
             : .floating
         panel.orderFrontRegardless()
+    }
+
+    @objc private func togglePinnedFromTitlebar(_ sender: NSButton) {
+        togglePinned()
+    }
+
+    private func installPinButton(on panel: NSPanel) {
+        let button = NSButton()
+        button.target = self
+        button.action = #selector(togglePinnedFromTitlebar(_:))
+        button.isBordered = false
+        button.imagePosition = .imageOnly
+        button.frame = NSRect(x: 0, y: 0, width: 28, height: 22)
+
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.layoutAttribute = .right
+        accessory.view = button
+        panel.addTitlebarAccessoryViewController(accessory)
+        pinButton = button
+        updatePinButton()
+    }
+
+    private func updatePinButton() {
+        let label = isPinned ? "取消固定浮窗" : "固定浮窗"
+        pinButton?.image = NSImage(
+            systemSymbolName: isPinned ? "pin.fill" : "pin",
+            accessibilityDescription: label
+        )
+        pinButton?.toolTip = label
+        pinButton?.setAccessibilityLabel(label)
+        pinButton?.state = isPinned ? .on : .off
     }
 
     private func updatePreferredContentHeight(_ preferredContentHeight: CGFloat) {
@@ -287,6 +317,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         self.panel = nil
         isDismissalSuppressed = false
         setPinned(false)
+        pinButton = nil
         resetResultWindowSizing()
         viewModel?.clear()
         viewModel = nil

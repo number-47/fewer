@@ -11,7 +11,6 @@ final class OCRTranslationViewModel: ObservableObject {
     @Published private(set) var provider: OCRTranslationProvider
     @Published private(set) var translationState: OCRTranslationSession.TranslationState
     @Published private(set) var translationGeneration: UInt64
-    @Published private(set) var isPinned = false
 
     init(
         sourceText: String,
@@ -43,10 +42,6 @@ final class OCRTranslationViewModel: ObservableObject {
         self.translationGeneration = translationGeneration
     }
 
-    func setPinned(_ isPinned: Bool) {
-        self.isPinned = isPinned
-    }
-
     func clear() {
         sourceText = ""
         sourceLanguageCode = nil
@@ -54,7 +49,6 @@ final class OCRTranslationViewModel: ObservableObject {
         provider = .system
         translationState = .preparing
         translationGeneration = 0
-        isPinned = false
     }
 }
 
@@ -92,7 +86,6 @@ extension View {
 
 struct OCRTranslationView: View {
     @ObservedObject var model: OCRTranslationViewModel
-    let onPinToggleRequested: () -> Void
     let onPreferredContentHeightChange: (CGFloat) -> Void
     let onTargetLanguageSelected: (String) -> Void
     let onProviderSelected: (OCRTranslationProvider) -> Void
@@ -184,14 +177,6 @@ struct OCRTranslationView: View {
                 Text(title)
                     .font(.headline)
                 Spacer()
-                Button {
-                    onPinToggleRequested()
-                } label: {
-                    Image(systemName: model.isPinned ? "pin.slash" : "pin")
-                }
-                .buttonStyle(.borderless)
-                .help(model.isPinned ? "取消固定浮窗" : "固定浮窗")
-                .accessibilityLabel(model.isPinned ? "取消固定浮窗" : "固定浮窗")
                 if canCopy {
                     copyButton(text: text)
                 }
