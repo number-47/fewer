@@ -63,10 +63,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         let maximumContentSize = panel.contentRect(
             forFrameRect: NSRect(origin: .zero, size: maximumFrameSize)
         ).size
-        let initialFrameWidth = min(
-            maximumFrameSize.width,
-            max(420, maximumFrameSize.width * 0.55)
-        )
+        let initialFrameWidth = min(maximumFrameSize.width, 520)
         let initialContentWidth = max(
             panel.contentRect(
                 forFrameRect: NSRect(
