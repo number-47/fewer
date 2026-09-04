@@ -13,7 +13,7 @@ struct RootSettingsView: View {
         }
         .disabled(model.isLoading)
         .frame(minWidth: 880, minHeight: 600)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color(nsColor: .controlBackgroundColor))
         .tint(Color(red: 0, green: 113 / 255, blue: 227 / 255))
         .task { await model.load() }
         .onReceive(NotificationCenter.default.publisher(for: SettingsWindowController.navigateNotification)) { notification in
@@ -39,7 +39,8 @@ struct RootSettingsView: View {
             .padding(.vertical, 12)
         }
         .frame(width: 200)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .scrollContentBackground(.hidden)
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     private func sidebarItem(_ section: SettingsSection) -> some View {
@@ -101,6 +102,7 @@ struct RootSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 32)
         .padding(.vertical, 24)
+        .background(Color(nsColor: .controlBackgroundColor))
         .alert("Fewer", isPresented: Binding(
             get: { model.errorMessage != nil },
             set: { if !$0 { model.errorMessage = nil } }

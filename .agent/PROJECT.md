@@ -36,7 +36,7 @@
 - T058：年月快速切换代码和静态校验已完成；当前 WSL 无 Xcode，仍需 Fewer Debug 构建和签名菜单栏交互验收。
 - T059：截图模块已增加“识别并复制”并使用独立可取消 OCR generation；当前 WSL 无 Xcode，仍需 XCTest、Debug 构建和屏幕录制实机矩阵。
 - T060：Finder 批量重命名已增加预览、冲突校验和可回滚两阶段执行；当前 WSL 无 Xcode，仍需 XCTest、Finder Extension/Fewer Debug 构建和签名 Finder 实机矩阵。
-- T061：侧栏已明确改用与内容区相同的窗口背景色；当前 WSL 无 Xcode，等待重新构建并实机确认灰色区域消失。
+- T061：根视图、侧栏和内容区已统一使用设置内容的控制背景色，并隐藏侧栏滚动内容背景；当前 WSL 无 Xcode，等待重新构建和实机确认。
 - T062：监控历史已改为轻量图表数据并补充裁剪测试；当前 WSL 无 Swift/Xcode，仍需 XCTest、Debug 构建和真实图表核对。
 
 ## Next Action
