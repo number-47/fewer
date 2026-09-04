@@ -67,13 +67,17 @@ struct OCRTranslationView: View {
     let onTranslationStateChanged: (OCRTranslationSession.TranslationState, UInt64) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            textSection(title: "原文", text: model.sourceText, canCopy: true)
-                .frame(maxHeight: .infinity)
+        GeometryReader { geometry in
+            let sectionHeight = max((geometry.size.height - 1) / 2, 0)
+            VStack(spacing: 0) {
+                textSection(title: "原文", text: model.sourceText, canCopy: true)
+                    .frame(height: sectionHeight)
 
-            Divider()
+                Divider()
 
-            translationSection
+                translationSection
+                    .frame(height: sectionHeight)
+            }
         }
         .frame(minWidth: 360, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity)
     }
@@ -154,7 +158,7 @@ struct OCRTranslationView: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private func copyButton(text: String) -> some View {

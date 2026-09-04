@@ -12,6 +12,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
     private var feedbackDismissTask: Task<Void, Never>?
     private var viewModel: OCRTranslationViewModel?
     private var onDismiss: (() -> Void)?
+    private var isDismissalSuppressed = false
     private let screenshotSettingsStore = ScreenshotSettingsStore()
 
     private override init() {}
@@ -42,7 +43,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         )
         let initialSize = NSSize(
             width: min(maximumSize.width, max(420, maximumSize.width * 0.55)),
-            height: min(maximumSize.height, max(400, maximumSize.height * 0.7))
+            height: min(maximumSize.height, max(500, visibleFrame.height * 0.85))
         )
         let viewModel = OCRTranslationViewModel(
             sourceText: sourceText,
@@ -111,6 +112,15 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         )
     }
 
+    func setDismissalSuppressed(_ suppressed: Bool) {
+        isDismissalSuppressed = suppressed
+        guard let panel else { return }
+        panel.level = suppressed
+            ? NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+            : .floating
+        panel.ignoresMouseEvents = suppressed
+    }
+
     func showFeedback(_ message: String, near selection: CGRect, on screen: NSScreen?) {
         closeFeedback()
         let panel = NSPanel(
@@ -167,6 +177,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
                   let viewModel = self.viewModel,
                   currentPanel === resigningPanel,
                   !viewModel.isPinned,
+                  !self.isDismissalSuppressed,
                   !currentPanel.isKeyWindow else { return }
             self.closeResultWindow(notify: true)
         }
@@ -183,6 +194,7 @@ final class OCRTranslationWindowController: NSObject, NSWindowDelegate {
         guard let panel else { return }
         panel.contentViewController = nil
         self.panel = nil
+        isDismissalSuppressed = false
         viewModel?.clear()
         viewModel = nil
         let handler = onDismiss
