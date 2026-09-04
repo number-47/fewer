@@ -67,22 +67,131 @@ final class AITranslationClientTests: XCTestCase {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let secrets = InMemorySecretStore()
         let store = AITranslationSettingsStore(defaults: defaults, secretStore: secrets)
-        let credentials = try AITranslationConfigurationValidator.credentials(from: .init(
+        let profile = AITranslationProfile(
+            name: "远程服务",
             endpoint: "https://api.example.com/v1/chat/completions",
-            model: "model-a",
+            model: "model-a"
+        )
+
+        try store.saveProfile(profile, apiKey: "super-secret")
+
+        XCTAssertEqual(store.loadProfiles(), [profile])
+        XCTAssertEqual(try store.loadCredentials(), try AITranslationConfigurationValidator.credentials(
+            configuration: .init(endpoint: URL(string: profile.endpoint)!, model: profile.model),
             apiKey: "super-secret"
         ))
+        XCTAssertEqual(try secrets.loadAPIKey(profileID: profile.id), "super-secret")
+        XCTAssertFalse(
+            String(data: defaults.data(forKey: AITranslationSettingsStore.profilesKey)!, encoding: .utf8)!.contains("super-secret")
+        )
 
-        try store.save(credentials)
+        try store.removeAPIKey(profileID: profile.id)
+        XCTAssertNil(try secrets.loadAPIKey(profileID: profile.id))
+        XCTAssertNil(try store.loadCredentials())
+    }
 
-        XCTAssertEqual(try store.loadCredentials(), credentials)
-        XCTAssertEqual(store.loadConfiguration(), credentials.configuration)
-        XCTAssertEqual(try secrets.load(), "super-secret")
-        XCTAssertFalse(String(data: defaults.data(forKey: AITranslationSettingsStore.configurationKey)!, encoding: .utf8)!.contains("super-secret"))
+    func testProfilesRoundTripPersistsListAndActiveID() {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AITranslationSettingsStore(defaults: defaults, secretStore: InMemorySecretStore())
+        let first = AITranslationProfile(name: "一", endpoint: "http://localhost:8080/v1/chat/completions", model: "a")
+        let second = AITranslationProfile(name: "二", endpoint: "http://localhost:8081/v1/chat/completions", model: "b")
 
-        try store.clear()
-        XCTAssertNil(store.loadConfiguration())
-        XCTAssertNil(try secrets.load())
+        store.saveProfiles([first, second], activeProfileID: second.id)
+
+        XCTAssertEqual(store.loadProfiles(), [first, second])
+        XCTAssertEqual(store.loadActiveProfileID(), second.id)
+    }
+
+    func testSaveProfilesIgnoresUnknownActiveProfileID() {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AITranslationSettingsStore(defaults: defaults, secretStore: InMemorySecretStore())
+        let profile = AITranslationProfile(name: "服务", endpoint: "", model: "")
+        let unknownID = UUID()
+
+        store.saveProfiles([profile], activeProfileID: unknownID)
+
+        XCTAssertNil(store.loadActiveProfileID())
+        XCTAssertEqual(store.loadProfiles(), [profile])
+    }
+
+    func testLegacyConfigurationMigratesToSingleProfileWithKeychainKey() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let secrets = InMemorySecretStore()
+        let store = AITranslationSettingsStore(defaults: defaults, secretStore: secrets)
+        let legacy = try AITranslationConfigurationValidator.credentials(from: .init(
+            endpoint: "https://api.example.com/v1/chat/completions",
+            model: "model-a",
+            apiKey: "legacy-key"
+        ))
+        defaults.set(try JSONEncoder().encode(legacy.configuration), forKey: AITranslationSettingsStore.configurationKey)
+        try secrets.saveLegacyAPIKey("legacy-key")
+
+        let profiles = store.loadProfiles()
+        XCTAssertEqual(profiles.count, 1)
+        XCTAssertEqual(profiles.first?.name, AITranslationSettingsStore.legacyProfileName)
+        XCTAssertEqual(profiles.first?.endpoint, "https://api.example.com/v1/chat/completions")
+        XCTAssertEqual(store.loadActiveProfileID(), profiles.first?.id)
+        XCTAssertEqual(try store.loadCredentials(), legacy)
+        // 旧 account 密钥已迁到 per-profile account 并清理。
+        XCTAssertEqual(try secrets.loadAPIKey(profileID: profiles.first!.id), "legacy-key")
+        XCTAssertNil(try secrets.loadLegacyAPIKey())
+    }
+
+    func testLoadCredentialsFallsBackToFirstProfileWhenActiveIDMissing() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let secrets = InMemorySecretStore()
+        let store = AITranslationSettingsStore(defaults: defaults, secretStore: secrets)
+        let profile = AITranslationProfile(
+            name: "本机服务",
+            endpoint: "http://localhost:8080/v1/chat/completions",
+            model: "local-model"
+        )
+        store.saveProfiles([profile], activeProfileID: nil)
+
+        let credentials = try store.loadCredentials()
+        XCTAssertEqual(credentials?.configuration.endpoint.absoluteString, profile.endpoint)
+        XCTAssertEqual(credentials?.apiKey, "")
+    }
+
+    func testLoadCredentialsReturnsNilForIncompleteOrKeylessRemoteProfile() throws {
+        let suiteName = "FewerCoreTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = AITranslationSettingsStore(defaults: defaults, secretStore: InMemorySecretStore())
+        let incomplete = AITranslationProfile(name: "未配置", endpoint: "", model: "")
+        let remoteKeyless = AITranslationProfile(
+            name: "远程未带密钥",
+            endpoint: "https://api.example.com/v1/chat/completions",
+            model: "model-a"
+        )
+        store.saveProfiles([incomplete, remoteKeyless], activeProfileID: remoteKeyless.id)
+
+        XCTAssertNil(try store.credentials(for: incomplete.id))
+        XCTAssertNil(try store.credentials(for: remoteKeyless.id))
+        XCTAssertNil(try store.loadCredentials())
+    }
+
+    func testSecretKeysAreIsolatedPerProfile() throws {
+        let secrets = InMemorySecretStore()
+        let first = UUID()
+        let second = UUID()
+
+        try secrets.saveAPIKey("key-one", profileID: first)
+        try secrets.saveAPIKey("key-two", profileID: second)
+
+        XCTAssertEqual(try secrets.loadAPIKey(profileID: first), "key-one")
+        XCTAssertEqual(try secrets.loadAPIKey(profileID: second), "key-two")
+        try secrets.removeAPIKey(profileID: first)
+        XCTAssertNil(try secrets.loadAPIKey(profileID: first))
+        XCTAssertEqual(try secrets.loadAPIKey(profileID: second), "key-two")
     }
 
     func testConfigurationServiceSavesOnlyAfterConnectionTestSucceeds() async throws {
@@ -92,35 +201,41 @@ final class AITranslationClientTests: XCTestCase {
         let secrets = InMemorySecretStore()
         let store = AITranslationSettingsStore(defaults: defaults, secretStore: secrets)
         let previous = try remoteCredentials()
-        try store.save(previous)
+        let previousProfile = AITranslationProfile(
+            name: "原服务",
+            endpoint: previous.configuration.endpoint.absoluteString,
+            model: previous.configuration.model
+        )
+        try store.saveProfile(previousProfile, apiKey: previous.apiKey)
         let failingService = AITranslationConfigurationService(
             client: AITranslationClient(transport: FailingTransport(error: URLError(.cannotConnectToHost))),
             store: store
         )
-        let replacement = AITranslationConfigurationDraft(
+        let replacement = AITranslationProfile(
+            name: "新服务",
             endpoint: "https://new.example.com/v1/chat/completions",
-            model: "model-b",
-            apiKey: "new-key"
+            model: "model-b"
         )
 
         do {
-            try await failingService.testAndSave(replacement)
+            try await failingService.testAndSave(replacement, apiKey: "new-key")
             XCTFail("Expected connection test to fail")
         } catch {
             XCTAssertEqual(error as? AITranslationError, .networkFailure)
         }
         XCTAssertEqual(try store.loadCredentials(), previous)
+        XCTAssertEqual(store.loadProfiles().first?.endpoint, previousProfile.endpoint)
 
         let successfulService = AITranslationConfigurationService(
             client: AITranslationClient(transport: CapturingTransport(response: successResponse())),
             store: store
         )
-        try await successfulService.testAndSave(replacement)
+        try await successfulService.testAndSave(replacement, apiKey: "new-key")
 
-        XCTAssertEqual(
-            try store.loadCredentials(),
-            try AITranslationConfigurationValidator.credentials(from: replacement)
-        )
+        XCTAssertEqual(try store.credentials(for: replacement.id), try AITranslationConfigurationValidator.credentials(
+            configuration: .init(endpoint: URL(string: replacement.endpoint)!, model: replacement.model),
+            apiKey: "new-key"
+        ))
     }
 
     func testClientBuildsTextOnlyChatCompletionsRequestAndParsesTranslation() async throws {
@@ -154,6 +269,37 @@ final class AITranslationClientTests: XCTestCase {
         )
         XCTAssertFalse(String(data: body, encoding: .utf8)!.contains("image"))
         XCTAssertFalse(String(data: body, encoding: .utf8)!.contains("coordinates"))
+    }
+
+    func testClientBuildsTranslateGemmaStructuredContentRequest() async throws {
+        let transport = CapturingTransport(response: successResponse())
+        let client = AITranslationClient(transport: transport)
+        let credentials = try AITranslationConfigurationValidator.credentials(from: .init(
+            endpoint: "http://127.0.0.1:8000/v1/chat/completions",
+            model: "TranslateGemma-12b-it-6bit"
+        ))
+
+        _ = try await client.translate(
+            sourceText: "Mac 本地接入 AI 翻译速度比较慢，应该怎么优化？",
+            sourceLanguageCode: "zh",
+            targetLanguageCode: "en-US",
+            credentials: credentials
+        )
+
+        let body = try XCTUnwrap(transport.request?.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["model"] as? String, "TranslateGemma-12b-it-6bit")
+        XCTAssertEqual(json["stream"] as? Bool, false)
+        let messages = try XCTUnwrap(json["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0]["role"] as? String, "user")
+        let content = try XCTUnwrap(messages[0]["content"] as? [[String: String]])
+        XCTAssertEqual(content.count, 1)
+        XCTAssertEqual(content[0]["type"], "text")
+        XCTAssertEqual(content[0]["source_lang_code"], "zh")
+        XCTAssertEqual(content[0]["target_lang_code"], "en-US")
+        XCTAssertEqual(content[0]["text"], "Mac 本地接入 AI 翻译速度比较慢，应该怎么优化？")
+        XCTAssertFalse(String(data: body, encoding: .utf8)!.contains(AITranslationClient.systemInstruction))
     }
 
     func testClientOmitsAuthorizationForLocalEmptyKey() async throws {
@@ -232,11 +378,17 @@ final class AITranslationClientTests: XCTestCase {
 }
 
 private final class InMemorySecretStore: AITranslationSecretStoring, @unchecked Sendable {
-    private var value: String?
+    private var values: [UUID: String] = [:]
+    private var legacyValue: String?
 
-    func load() throws -> String? { value }
-    func save(_ apiKey: String) throws { value = apiKey }
-    func remove() throws { value = nil }
+    func loadAPIKey(profileID: UUID) throws -> String? { values[profileID] }
+    func saveAPIKey(_ apiKey: String, profileID: UUID) throws { values[profileID] = apiKey }
+    func removeAPIKey(profileID: UUID) throws { values[profileID] = nil }
+    func loadLegacyAPIKey() throws -> String? { legacyValue }
+    func removeLegacyAPIKey() throws { legacyValue = nil }
+
+    /// 供迁移测试写入旧版 account。
+    func saveLegacyAPIKey(_ apiKey: String) throws { legacyValue = apiKey }
 }
 
 private final class CapturingTransport: AITranslationTransport, @unchecked Sendable {

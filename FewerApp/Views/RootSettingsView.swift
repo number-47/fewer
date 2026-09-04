@@ -31,7 +31,7 @@ struct RootSettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach([
                     SettingsSection.overview, .permissions, .contextMenu, .templates, .shortcuts,
-                    .screenshot, .inputEnhancement, .modules, .general
+                    .screenshot, .aiTranslate, .inputEnhancement, .modules, .general
                 ]) { sidebarItem($0) }
                 divider
                 sidebarItem(.about)
@@ -84,6 +84,8 @@ struct RootSettingsView: View {
                     ShortcutSettingsView(model: model)
                 case .screenshot:
                     ScreenshotSettingsView()
+                case .aiTranslate:
+                    AITranslationSettingsView()
                 case .inputEnhancement:
                     InputEnhancementSettingsView(onOpenPermissions: { selection = .permissions })
                 case .modules:
@@ -120,6 +122,7 @@ private extension SettingsSection {
         case .templates: "管理“新建文件”可用的模板，支持导入自定义模板。"
         case .shortcuts: "配置全局快捷键与剪切粘贴辅助功能。"
         case .screenshot: "配置截图快捷键、滚动截图与贴图行为。"
+        case .aiTranslate: "配置 OpenAI-compatible 翻译服务，支持多个配置与当前使用项切换。"
         case .inputEnhancement: "配置鼠标滚动增强、手势、按键展示与诊断。"
         case .modules: "启用或关闭模块，配置面板显示与菜单栏独立图标。"
         case .general: "配置应用显示模式、通知与启动行为。"

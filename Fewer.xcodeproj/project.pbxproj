@@ -12,6 +12,7 @@
 		0CC83A157DF8D0C249B1FA72 /* DashboardModuleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71C31F15DCABF7FD0A23C98A /* DashboardModuleView.swift */; };
 		0F940A4DA43062C240F0BBAC /* CalendarMonthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 670BAEAFBCAEA461D7DB6583 /* CalendarMonthTests.swift */; };
 		107D6B9D13E4E5D245F522C3 /* CalendarMonth.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE74DD0E6128977929468F55 /* CalendarMonth.swift */; };
+		10BB4BF12983846B152EE82D /* AITranslationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFC4EC36AA6609A5BA373A96 /* AITranslationSettingsView.swift */; };
 		12235E9613F8F3BD28F1ACBC /* VisionOCRService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAEE2B30B625FEA294CEBAEC /* VisionOCRService.swift */; };
 		13A825BA2A79E26CCB29DA98 /* InputProcessingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 904E61E09A7F8B1CF52F5BC5 /* InputProcessingTests.swift */; };
 		14CCCF4FDB47A825C09AB0C8 /* FewerVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A0155D67E2F30B665E379D /* FewerVersion.swift */; };
@@ -359,6 +360,7 @@
 		AD1807550C64BF6502E2F7E7 /* MenuBarCalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarCalendarView.swift; sourceTree = "<group>"; };
 		ADDDAB82FC4FD5AA342676BD /* ConflictNameResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConflictNameResolver.swift; sourceTree = "<group>"; };
 		AF5B0FB6AEF995E2F1C98838 /* CPUTemperatureReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUTemperatureReader.swift; sourceTree = "<group>"; };
+		AFC4EC36AA6609A5BA373A96 /* AITranslationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITranslationSettingsView.swift; sourceTree = "<group>"; };
 		B0477C6094215DC045F54CFB /* KeycastPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeycastPanelController.swift; sourceTree = "<group>"; };
 		B261E24E1E6A05DC57986A98 /* InputEnhancementStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnhancementStore.swift; sourceTree = "<group>"; };
 		B2AC9B9C02E48E8627288D96 /* MarkupEditorWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkupEditorWindowController.swift; sourceTree = "<group>"; };
@@ -476,6 +478,7 @@
 		24449DDC86017A1B2384B8DF /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				AFC4EC36AA6609A5BA373A96 /* AITranslationSettingsView.swift */,
 				A60C4F3841C6F5434AD75D20 /* AppleTranslationTaskHost.swift */,
 				3F6B653BC2FD2C52673E8CA4 /* CalendarAgendaView.swift */,
 				0160A276150CA87B4FBA5264 /* CalendarMonthPickerView.swift */,
@@ -1133,6 +1136,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				10BB4BF12983846B152EE82D /* AITranslationSettingsView.swift in Sources */,
 				4D2B48D069475F59BC68BEBA /* AppPresentationMode.swift in Sources */,
 				160B36627158AEB002B124EC /* AppleTranslationTaskHost.swift in Sources */,
 				F5191DB9C5ECC37D34E2D46A /* CPUFrequencyReader.swift in Sources */,
