@@ -39,7 +39,6 @@ struct RootSettingsView: View {
             .padding(.vertical, 12)
         }
         .frame(width: 200)
-        .background(Color(nsColor: .underPageBackgroundColor))
     }
 
     private func sidebarItem(_ section: SettingsSection) -> some View {
